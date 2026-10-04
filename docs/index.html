@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bigorna · community maps for Descent: Legends of the Dark</title>
+<meta name="description" content="Bigorna is a fan-made mod for Descent: Legends of the Dark that plays community maps and campaigns, with Bigorna Rooms, an editor that builds them room by room.">
+<link rel="icon" href="bigorna.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#121317;--bg2:#1b1d22;--card:#20232a;--line:#2e323b;--txt:#e7e3da;--mut:#a9a49a;--ouro:#e0a458;--ouro2:#f3cf8f;--bronze:#a8743a}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.65 Inter,system-ui,sans-serif}
+a{color:var(--ouro2)}
+.wrap{max-width:980px;margin:0 auto;padding:0 20px}
+header.top{position:sticky;top:0;z-index:5;background:rgba(18,19,23,.86);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+header.top .wrap{display:flex;align-items:center;gap:14px;height:58px}
+header.top img{width:30px;height:30px}
+header.top b{font-family:Cinzel,serif;letter-spacing:.06em;font-size:19px}
+header.top nav{margin-left:auto;display:flex;gap:18px;align-items:center}
+header.top nav a{color:var(--mut);text-decoration:none;font-size:14px}
+header.top nav a:hover{color:var(--txt)}
+.idioma{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.idioma button{background:none;border:0;color:var(--mut);font:600 12px Inter,sans-serif;padding:5px 10px;cursor:pointer}
+.idioma button.on{background:var(--ouro);color:#1b1d22}
+.hero{padding:84px 0 64px;text-align:center;background:radial-gradient(ellipse at 50% 0%,rgba(224,164,88,.16),transparent 62%)}
+.hero img{width:112px;height:112px;filter:drop-shadow(0 10px 30px rgba(224,164,88,.25))}
+.hero h1{font-family:Cinzel,serif;font-size:clamp(40px,8vw,64px);margin:18px 0 6px;letter-spacing:.05em}
+.hero p.sub{font-size:clamp(17px,2.4vw,20px);color:var(--mut);max-width:640px;margin:0 auto 30px}
+.botoes{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 22px;border-radius:10px;font-weight:600;text-decoration:none;border:1px solid var(--line);color:var(--txt);background:var(--card)}
+.btn.prim{background:linear-gradient(180deg,var(--ouro2),var(--ouro));color:#1b1d22;border-color:transparent}
+.btn:hover{filter:brightness(1.08)}
+.versao{margin-top:14px;color:var(--mut);font-size:13px}
+section{padding:56px 0;border-top:1px solid var(--line)}
+h2{font-family:Cinzel,serif;font-size:28px;margin:0 0 22px;letter-spacing:.03em}
+.grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}
+.card h3{margin:0 0 6px;font-size:17px;color:var(--ouro2)}
+.card p{margin:0;color:var(--mut);font-size:15px}
+ol.passos{counter-reset:p;list-style:none;padding:0;margin:0;display:grid;gap:14px}
+ol.passos li{counter-increment:p;position:relative;padding:16px 18px 16px 62px;background:var(--card);border:1px solid var(--line);border-radius:12px}
+ol.passos li::before{content:counter(p);position:absolute;left:18px;top:14px;width:30px;height:30px;border-radius:50%;background:var(--ouro);color:#1b1d22;font-weight:700;display:grid;place-items:center}
+code{background:var(--bg2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:.88em;overflow-wrap:anywhere}
+.nota{border-left:3px solid var(--ouro);padding:12px 16px;background:var(--bg2);border-radius:0 10px 10px 0;color:var(--mut)}
+footer{padding:36px 0 50px;border-top:1px solid var(--line);color:var(--mut);font-size:14px}
+[data-pt]{display:none}
+html[lang=pt-BR] [data-pt]{display:revert}
+html[lang=pt-BR] [data-en]{display:none}
+@media (max-width:640px){header.top nav a{display:none}.hero{padding:56px 0 44px}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <img src="bigorna.svg" alt=""><b>BIGORNA</b>
+  <nav>
+    <a href="#recursos"><span data-en>Features</span><span data-pt>Recursos</span></a>
+    <a href="#instalar"><span data-en>Install</span><span data-pt>Instalar</span></a>
+    <a href="https://github.com/vcmatias/bigorna-descent">GitHub</a>
+    <div class="idioma"><button data-l="en">EN</button><button data-l="pt">PT</button></div>
+  </nav>
+</div></header>
+
+<div class="hero"><div class="wrap">
+  <img src="bigorna.svg" alt="Bigorna">
+  <h1>Bigorna</h1>
+  <p class="sub" data-en>A fan-made mod for <i>Descent: Legends of the Dark</i> that plays community maps and campaigns, with <b>Bigorna Rooms</b>, an editor that builds them room by room.</p>
+  <p class="sub" data-pt>Mod feito por fã para <i>Descent: Legends of the Dark</i> que joga mapas e campanhas da comunidade, com o <b>Bigorna Rooms</b>, editor que monta esses mapas sala por sala.</p>
+  <div class="botoes">
+    <a class="btn prim" href="https://github.com/vcmatias/bigorna-descent/releases/latest"><span data-en>Download for Windows</span><span data-pt>Baixar para Windows</span></a>
+    <a class="btn" href="https://github.com/vcmatias/bigorna-descent"><span data-en>Source code</span><span data-pt>Código-fonte</span></a>
+  </div>
+  <div class="versao"><span data-en>Version</span><span data-pt>Versão</span> 0.1.0 · <span data-en>requires the game on Steam</span><span data-pt>precisa do jogo na Steam</span></div>
+</div></div>
+
+<section id="recursos"><div class="wrap">
+  <h2 data-en>What it does</h2><h2 data-pt>O que ele faz</h2>
+  <div class="grade">
+    <div class="card"><h3 data-en>Community maps</h3><h3 data-pt>Mapas da comunidade</h3>
+      <p data-en>Plays <code>.dmap</code> maps and <code>.dcamp</code> campaigns inside the game, with its own tiles, monsters, heroes, items, sounds and narration.</p>
+      <p data-pt>Joga mapas <code>.dmap</code> e campanhas <code>.dcamp</code> dentro do jogo, com as peças, monstros, heróis, itens, sons e narração do próprio jogo.</p></div>
+    <div class="card"><h3 data-en>Room by room</h3><h3 data-pt>Sala por sala</h3>
+      <p data-en>Draw each room with the game's tiles, place monsters, chests, doors and objects, write texts and triggers, and test the flow. Runs in Chrome or Edge, offline.</p>
+      <p data-pt>Desenhe cada sala com as peças do jogo, coloque monstros, baús, portas e objetos, escreva textos e gatilhos e teste o andamento. Roda no Chrome ou no Edge, sem internet.</p></div>
+    <div class="card"><h3 data-en>Map generator</h3><h3 data-pt>Gerador de mapas</h3>
+      <p data-en>Builds a whole map from a few choices: size, theme, villain and enemies. Then edit anything by hand.</p>
+      <p data-pt>Monta um mapa inteiro a partir de algumas escolhas: tamanho, tema, vilão e inimigos. Depois, tudo pode ser ajustado à mão.</p></div>
+    <div class="card"><h3 data-en>Campaigns</h3><h3 data-pt>Campanhas</h3>
+      <p data-en>Chains maps into a campaign on the world map, with workshops for heroes, weapons, recipes and feats.</p>
+      <p data-pt>Encadeia mapas numa campanha no mapa-múndi, com oficinas de heróis, armas, receitas e façanhas.</p></div>
+    <div class="card"><h3 data-en>Guided tutorial</h3><h3 data-pt>Tutorial guiado</h3>
+      <p data-en>Walks you through your first map, step by step, inside the editor.</p>
+      <p data-pt>Acompanha a montagem do primeiro mapa, passo a passo, dentro do editor.</p></div>
+    <div class="card"><h3 data-en>Made to last</h3><h3 data-pt>Feito para durar</h3>
+      <p data-en>Maps and campaigns made with any version keep working in every later version.</p>
+      <p data-pt>Mapas e campanhas feitos em qualquer versão continuam valendo em todas as versões seguintes.</p></div>
+  </div>
+</div></section>
+
+<section id="instalar"><div class="wrap">
+  <h2 data-en>Install</h2><h2 data-pt>Instalar</h2>
+  <ol class="passos">
+    <li><span data-en>Download <code>Bigorna-0.1.0.zip</code> from <a href="https://github.com/vcmatias/bigorna-descent/releases/latest">Releases</a> and unzip it anywhere.</span><span data-pt>Baixe o <code>Bigorna-0.1.0.zip</code> em <a href="https://github.com/vcmatias/bigorna-descent/releases/latest">Releases</a> e descompacte em qualquer pasta.</span></li>
+    <li><span data-en>Double-click <code>Install-Bigorna.bat</code>. The window finds the game through Steam and installs the mod, keeping a backup of each file it changes.</span><span data-pt>Dê dois cliques em <code>Install-Bigorna.bat</code>. A janela acha o jogo pela Steam e instala o mod, com cópia de segurança de cada arquivo que muda.</span></li>
+    <li><span data-en>Start the game and wait on the title screen while the mod reads your copy (a few minutes the first time). Then open the world map of a campaign once.</span><span data-pt>Abra o jogo e espere na tela de título enquanto o mod lê a sua cópia (alguns minutos na primeira vez). Depois abra uma vez o mapa-múndi de uma campanha.</span></li>
+    <li><span data-en>Open <b>Bigorna Rooms</b> from the desktop shortcut or from the <b>Mapas da comunidade</b> panel on the title screen.</span><span data-pt>Abra o <b>Bigorna Rooms</b> pelo atalho da Área de Trabalho ou pelo painel <b>Mapas da comunidade</b> na tela de título.</span></li>
+  </ol>
+  <p class="nota" data-en>If Windows shows "Windows protected your PC", the package simply has no paid signature: click "More info" and "Run anyway". The installer is a plain PowerShell script and uses no internet. Run it again after each game update.</p>
+  <p class="nota" data-pt>Se o Windows mostrar "O Windows protegeu o computador", o pacote apenas está sem assinatura paga: clique em "Mais informações" e "Executar assim mesmo". O instalador é um script do PowerShell em texto simples e trabalha sem internet. Rode de novo depois de cada atualização do jogo.</p>
+</div></section>
+
+<section id="compartilhar"><div class="wrap">
+  <h2 data-en>Share your maps</h2><h2 data-pt>Compartilhe seus mapas</h2>
+  <p data-en>Share the <code>.dmap</code> and <code>.dcamp</code> files you make. Players put them in <code>%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of the Dark\CustomMaps</code> and find them in the <b>Mapas da comunidade</b> panel.</p>
+  <p data-pt>Compartilhe os arquivos <code>.dmap</code> e <code>.dcamp</code> que fizer. Quem joga coloca em <code>%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of the Dark\CustomMaps</code> e encontra no painel <b>Mapas da comunidade</b>.</p>
+  <p class="nota" data-en>Bigorna carries nothing from the game. The mod reads your installed copy and writes the editor's data on your computer: keep <code>bigorna-game-data.js</code> and <code>bigorna-worldmap.js</code> to yourself. Maps carry only your own work.</p>
+  <p class="nota" data-pt>O Bigorna não traz nada do jogo. O mod lê a sua cópia instalada e grava os dados do editor no seu computador: guarde <code>bigorna-game-data.js</code> e <code>bigorna-worldmap.js</code> só para você. Os mapas levam só o trabalho de quem os fez.</p>
+</div></section>
+
+<section id="problema"><div class="wrap">
+  <h2 data-en>Found a problem?</h2><h2 data-pt>Achou um problema?</h2>
+  <p data-en>Press <b>F9</b> in the game and describe what happened. The mod packs your text, the map in play and the logs; it sends them only when you click <b>Enviar</b>. You can also open an <a href="https://github.com/vcmatias/bigorna-descent/issues">issue on GitHub</a>.</p>
+  <p data-pt>Aperte <b>F9</b> no jogo e conte o que aconteceu. O mod junta a sua explicação, o mapa em jogo e os registros, e só envia quando você clica em <b>Enviar</b>. Também dá para abrir uma <a href="https://github.com/vcmatias/bigorna-descent/issues">issue no GitHub</a>.</p>
+</div></section>
+
+<footer><div class="wrap">
+  <p data-en>Unofficial fan project. <i>Descent: Legends of the Dark</i> belongs to Fantasy Flight Games and Asmodee; Bigorna has no affiliation with them and no endorsement from them.</p>
+  <p data-pt>Projeto não oficial. <i>Descent: Legends of the Dark</i> pertence à Fantasy Flight Games e à Asmodee; o Bigorna não tem vínculo com elas nem aval delas.</p>
+</div></footer>
+
+<script>
+(function(){
+  var KEY='bigorna-site-lang';
+  function set(l){document.documentElement.lang=l==='pt'?'pt-BR':'en';
+    document.querySelectorAll('.idioma button').forEach(function(b){b.classList.toggle('on',b.dataset.l===l)});
+    try{localStorage.setItem(KEY,l)}catch(e){}}
+  var l=null;try{l=localStorage.getItem(KEY)}catch(e){}
+  if(l!=='en'&&l!=='pt')l=/^pt/i.test(navigator.language||'')?'pt':'en';
+  set(l);
+  document.querySelectorAll('.idioma button').forEach(function(b){b.onclick=function(){set(b.dataset.l)}});
+})();
+</script>
+</body>
+</html>
