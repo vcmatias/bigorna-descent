@@ -26,7 +26,7 @@ namespace Bigorna.Encontro
         public static string Lancar(Dmap m)
         {
             var cena = CenaBase(m);
-            if (cena == null) return "Nenhuma missão oficial disponível para servir de cena base.";
+            if (cena == null) return Idioma.T("Nenhuma missão oficial disponível para servir de cena base.", "No official quest is available to serve as the base scene.");
             SerializedGame partida;
             try
             {
@@ -34,7 +34,7 @@ namespace Bigorna.Encontro
                 partida.Initialize();
                 partida.UnavailableHeroes.Clear();
                 var herois = UserCollectionManager.GetHeroes(true).Select(h => partida.GetPlayer(h, false)).Where(p => p != null).Take(4).ToList();
-                if (herois.Count < 2) return "Faltam heróis na coleção (" + herois.Count + ").";
+                if (herois.Count < 2) return Idioma.T("Faltam heróis na coleção (", "Not enough heroes in the collection (") + herois.Count + ").";
                 foreach (var h in herois) partida.ActivePlayers.Add(h);
                 partida.QuestId = cena.Id;
                 partida.EncounterIndex = 0;
@@ -44,13 +44,13 @@ namespace Bigorna.Encontro
                 Jogo.DadosJogo.CurrentSaveIndex = 0;
                 if (salvar.GetExistingIndexes().Contains(0)) salvar.DeleteSaveSlot(0);
             }
-            catch (Exception ex) { Log.Erro("preparando a partida", ex); return "Não consegui preparar a partida: " + ex.Message; }
+            catch (Exception ex) { Log.Erro("preparando a partida", ex); return Idioma.T("Não consegui preparar a partida: ", "Could not prepare the game: ") + ex.Message; }
             Atual = m; Menu.Relatos.UltimoMapa = m?.Caminho ?? Menu.Relatos.UltimoMapa;
             Avulso = true;
             Resultado = null;
             Log.Info("abrindo «" + m.NomeVisivel + "» sobre a cena de " + cena.Id + ", dificuldade " + partida.GameDifficulty);
             try { Jogo.Carregador.LoadLevel(cena, partida, true); }
-            catch (Exception ex) { Log.Erro("carregando a cena", ex); Atual = null; return "O jogo não carregou a cena: " + ex.Message; }
+            catch (Exception ex) { Log.Erro("carregando a cena", ex); Atual = null; return Idioma.T("O jogo não carregou a cena: ", "The game did not load the scene: ") + ex.Message; }
             Nucleo.Instancia.StartCoroutine(Preparar(m));
             return null;
         }
@@ -86,7 +86,7 @@ namespace Bigorna.Encontro
                 if (!Tabuleiro.Montado)
                 {
                     Log.Info("AVISO: o tabuleiro não foi montado; nada mais é posto por cima");
-                    Dialogos.Mensagem("O tabuleiro do mapa não foi montado. Volte ao menu e abra o mapa outra vez.", null, "Bigorna");
+                    Dialogos.Mensagem(Idioma.T("O tabuleiro do mapa não foi montado. Volte ao menu e abra o mapa outra vez.", "The map's board was not set up. Go back to the menu and open the map again."), null, "Bigorna");
                     yield break;
                 }
                 Silencio.Vigiando = true;

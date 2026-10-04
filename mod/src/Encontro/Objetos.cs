@@ -84,7 +84,7 @@ namespace Bigorna.Encontro
             ["Gate"] = new[] { 2, 1 }, ["Staircase"] = new[] { 3, 2 }, ["StoneTable"] = new[] { 2, 1 },
         };
 
-        static readonly Dictionary<string, string> Nomes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        static readonly Dictionary<string, string> NomesPt = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["Chest"] = "Baú", ["Shelf"] = "Estante", ["Lectern"] = "Altar", ["Well"] = "Poço", ["Cauldron"] = "Caldeirão", ["Door"] = "Porta",
             ["SightToken"] = "Ponto de interesse", ["InteractToken"] = "Ficha de interação", ["Bell"] = "Sino", ["BloodShrine"] = "Santuário",
@@ -94,13 +94,24 @@ namespace Bigorna.Encontro
             ["LadderMedium"] = "Escada de mão média", ["DragonArch"] = "Arco do dragão", ["DragonHead"] = "Cabeça de dragão", ["BellFrame"] = "Moldura do sino",
         };
 
+        static readonly Dictionary<string, string> NomesEn = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Chest"] = "Chest", ["Shelf"] = "Bookshelf", ["Lectern"] = "Lectern", ["Well"] = "Well", ["Cauldron"] = "Cauldron", ["Door"] = "Door",
+            ["SightToken"] = "Point of interest", ["InteractToken"] = "Interaction token", ["Bell"] = "Bell", ["BloodShrine"] = "Blood shrine",
+            ["Fire"] = "Fire", ["Ladder"] = "Ladder", ["Statue"] = "Statue", ["Wagon"] = "Wagon", ["Vault"] = "Vault", ["Platform"] = "Platform",
+            ["Archway"] = "Archway", ["Barricade"] = "Spiked barricade", ["Bridge"] = "Bridge", ["Gate"] = "Gate", ["Pillar"] = "Pillar", ["PillarShort"] = "Short pillar", ["PillarPush"] = "Interactive pillar", ["PillarPushShort"] = "Short interactive pillar", ["PillarTall"] = "Tall pillar", ["Staircase"] = "Staircase",
+            ["Tree"] = "Tree", ["RoundTable"] = "Round table", ["StoneTable"] = "Stone table",
+            ["LadderMedium"] = "Medium ladder", ["DragonArch"] = "Dragon arch", ["DragonHead"] = "Dragon head", ["BellFrame"] = "Bell frame",
+        };
+        static Dictionary<string, string> Nomes => Idioma.Pt ? NomesPt : NomesEn;
+
         public static readonly List<NaMesa> Postos = new List<NaMesa>();
         public static int[] TamanhoDe(string tipo) => tipo != null && Tamanhos.TryGetValue(tipo, out var t) ? t : new[] { 1, 1 };
         static readonly Dictionary<string, GameObject> _prefabs = new Dictionary<string, GameObject>(StringComparer.OrdinalIgnoreCase);
         public static Action<NaMesa, SerializedPlayer> AoUsar; // o motor de gatilhos se pendura aqui
 
         public static bool EhEscadaDeMao(string tipo) => string.Equals(tipo, "Ladder", StringComparison.OrdinalIgnoreCase) || string.Equals(tipo, "LadderMedium", StringComparison.OrdinalIgnoreCase);
-        public static string Nome(string tipo) => tipo != null && Nomes.TryGetValue(tipo, out var n) ? n : (tipo ?? "objeto");
+        public static string Nome(string tipo) => tipo != null && Nomes.TryGetValue(tipo, out var n) ? n : (tipo ?? Idioma.T("objeto", "object"));
 
         public static void Limpar()
         {
@@ -395,15 +406,15 @@ namespace Bigorna.Encontro
         static string LinhaDoObjeto(NaMesa p)
         {
             var o = p.Dados;
-            return "• <b>" + p.Rotulo + "</b>" + (string.Equals(p.Rotulo, Nome(o.Tipo)) ? "" : " (" + Nome(o.Tipo) + ")") + (o.NoCruzamento ? ", no canto marcado" : "") + (o.Nivel > 0 ? ", nível " + o.Nivel : "");
+            return "• <b>" + p.Rotulo + "</b>" + (string.Equals(p.Rotulo, Nome(o.Tipo)) ? "" : " (" + Nome(o.Tipo) + ")") + (o.NoCruzamento ? Idioma.T(", no canto marcado", ", at the marked corner") : "") + (o.Nivel > 0 ? Idioma.T(", nível ", ", level ") + o.Nivel : "");
         }
 
         static void ApresentarGrupo(List<NaMesa> grupo, bool primeiro)
         {
             if (grupo.Count == 0) return;
             var casas = new List<Transform>();
-            string texto = (grupo.Count == 1 ? "Coloquem o objeto nas casas destacadas:\n" : primeiro ? "Coloquem os objetos nas casas destacadas:\n" : "E também:\n") + string.Join("\n", grupo.Select(LinhaDoObjeto).ToArray());
-            Dialogos.Mensagem(texto, () => { foreach (var c in casas) { try { if (c != null) Jogo.Cena?.RemovePersitentHighlight(c); } catch { } } }, "Objetos", () =>
+            string texto = (grupo.Count == 1 ? Idioma.T("Coloquem o objeto nas casas destacadas:\n", "Place the object on the highlighted spaces:\n") : primeiro ? Idioma.T("Coloquem os objetos nas casas destacadas:\n", "Place the objects on the highlighted spaces:\n") : Idioma.T("E também:\n", "And also:\n")) + string.Join("\n", grupo.Select(LinhaDoObjeto).ToArray());
+            Dialogos.Mensagem(texto, () => { foreach (var c in casas) { try { if (c != null) Jogo.Cena?.RemovePersitentHighlight(c); } catch { } } }, Idioma.T("Objetos", "Objects"), () =>
             {
                 var centros = new List<Vector3>();
                 foreach (var p in grupo)
@@ -554,8 +565,9 @@ namespace Bigorna.Encontro
                 string texto;
                 if (pontoDeInteresse)
                     texto = (!string.IsNullOrEmpty(previa) ? previa + "\n\n" : "")
-                        + "<b>Ponto de interesse.</b> Para explorar, escolham um herói (toquem no retrato dele) e toquem aqui. Explorar não gasta a ação do herói; ele precisa estar adjacente ao marcador (a diagonal vale) ou no mesmo espaço.";
-                else texto = !string.IsNullOrEmpty(previa) ? previa : "Para usar, escolham um herói e gastem uma ação com ele neste objeto.";
+                        + Idioma.T("<b>Ponto de interesse.</b> Para explorar, escolham um herói (toquem no retrato dele) e toquem aqui. Explorar não gasta a ação do herói; ele precisa estar adjacente ao marcador (a diagonal vale) ou no mesmo espaço.",
+                            "<b>Point of interest.</b> To explore, choose a hero (tap their portrait) and tap here. Exploring does not use the hero's action; the hero must be adjacent to the token (diagonals count) or in the same space.");
+                else texto = !string.IsNullOrEmpty(previa) ? previa : Idioma.T("Para usar, escolham um herói e gastem uma ação com ele neste objeto.", "To use it, choose a hero and spend one of their actions on this object.");
                 Dialogos.Mensagem(texto, null, p.Rotulo);
                 return true;
             }
@@ -568,7 +580,7 @@ namespace Bigorna.Encontro
 
         /// <summary>O que um objeto ja gasto diz ao ser tocado, olhando ou com um heroi (o mesmo texto): o seu texto de depois de
         /// gasto, ou "nada mais a fazer"; e o aviso de que o toque nao custa a acao do heroi.</summary>
-        public const string SemAcao = "<i>(Já usado: tocar aqui não gasta a ação do herói.)</i>";
+        public static string SemAcao => Idioma.T("<i>(Já usado: tocar aqui não gasta a ação do herói.)</i>", "<i>(Already used: tapping here does not use the hero's action.)</i>");
         public static string TextoDoGasto(NaMesa p) =>
             (!string.IsNullOrEmpty(p?.Dados?.TextoGasto) ? p.Dados.TextoGasto : Motor.Roteiro.NadaMais) + "\n\n" + SemAcao;
 

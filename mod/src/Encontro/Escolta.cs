@@ -29,7 +29,7 @@ namespace Bigorna.Encontro
 
         public static void Comecar(string nome, int chance, IEnumerable<string> cacadores)
         {
-            Ativa = true; _nome = string.IsNullOrEmpty(nome) ? "o protegido" : nome; _chance = Mathf.Clamp(chance, 0, 100);
+            Ativa = true; _nome = string.IsNullOrEmpty(nome) ? Idioma.T("o protegido", "the escort") : nome; _chance = Mathf.Clamp(chance, 0, 100);
             _cacadores.Clear(); foreach (var g in cacadores ?? Enumerable.Empty<string>()) if (!string.IsNullOrEmpty(g)) _cacadores.Add(g);
             _daRodada.Clear();
             Jogo.Termo(Chave, _nome);   // (o nome do protegido, na janela de ativacao)

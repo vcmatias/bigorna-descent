@@ -226,7 +226,7 @@ namespace Bigorna.Encontro
             nid = nid ?? "BIGORNA_" + velha.Id;
             var m = UnityEngine.Object.Instantiate(velha); m.name = nid;
             Reflexao.Por(m, "_id", nid);
-            m.KeyName = Jogo.Termo(nid + "_NAME", (string)j["name"] ?? "Weapon");
+            m.KeyName = Jogo.Termo(nid + "_NAME", (string)j["name"] ?? Idioma.T("Arma", "Weapon"));
             int r = Array.IndexOf(Oficina.Alcances, (string)j["range"]); if (r >= 0) m.RangeApproximation = (TargetRanges)r;
             var pecas = new WeaponPartsModel[3];
             var dadas = ((j["parts"] as JArray) ?? new JArray()).OfType<JObject>().ToList();

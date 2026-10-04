@@ -206,7 +206,7 @@ namespace Bigorna.Encontro
             var go = UnityEngine.Object.Instantiate(prefab.gameObject, pai);
             go.name = prefab.name;
             go.transform.rotation = Quaternion.Euler(0f, p.Rot, 0f);
-            if (EhCaixaDoJogo(p.Tile)) { var e = go.transform.localScale; go.transform.localScale = new Vector3(e.x, e.y * 1.5f, e.z); go.name = "Caixa do jogo (Ato I)"; }   // (topo 2 → 3)
+            if (EhCaixaDoJogo(p.Tile)) { var e = go.transform.localScale; go.transform.localScale = new Vector3(e.x, e.y * 1.5f, e.z); go.name = NomeDaCaixa; }   // (topo 2 → 3)
             go.SetActive(true);
             var tile = go.GetComponent<GameTile>();
             Alinhar(tile, p);
@@ -275,8 +275,8 @@ namespace Bigorna.Encontro
             {
                 var grupo = pecas.Skip(k).Take(4).ToList();
                 bool ultimo = k + 4 >= pecas.Count;
-                string texto = (grupo.Count == 1 ? "Coloquem a peça:\n" : k == 0 ? "Coloquem as peças:\n" : "E também:\n") + string.Join("\n", grupo.Select(t => "• " + LinhaDaPeca(t)).ToArray());
-                Dialogos.Mensagem(texto, ultimo ? (Action)(() => Nucleo.Instancia?.StartCoroutine(RefazerGrade(1.2f))) : null, "Montagem", () =>
+                string texto = (grupo.Count == 1 ? Idioma.T("Coloquem a peça:\n", "Place the tile:\n") : k == 0 ? Idioma.T("Coloquem as peças:\n", "Place the tiles:\n") : Idioma.T("E também:\n", "And also:\n")) + string.Join("\n", grupo.Select(t => "• " + LinhaDaPeca(t)).ToArray());
+                Dialogos.Mensagem(texto, ultimo ? (Action)(() => Nucleo.Instancia?.StartCoroutine(RefazerGrade(1.2f))) : null, Idioma.T("Montagem", "Setup"), () =>
                 {
                     foreach (var t in grupo) Aparecer(t, false);
                     Jogo.Som("Place_Generic");
@@ -305,8 +305,8 @@ namespace Bigorna.Encontro
         static string LinhaDaPeca(GameTile t)
         {
             var p = _pecaDe.TryGetValue(t, out var pp) ? pp : null;
-            return ((t.name ?? "").StartsWith("@Bigorna-") ? "o objeto 3D " : "") + "<b>" + NomeNaMesa(t) + "</b>" + (p != null && EhCaixa(p.Tile) ? " (uma caixa: no chão, com o topo no nível " + p.Nivel + ", sem pilares)" : p != null && p.Nivel > 0 ? ", no nível " + p.Nivel + ", sobre pilares" : "")
-                + (t.IsUnderlay ? " (subcamada: as peças de chão vão por cima dela)" : "");
+            return ((t.name ?? "").StartsWith("@Bigorna-") ? Idioma.T("o objeto 3D ", "the 3D object ") : "") + "<b>" + NomeNaMesa(t) + "</b>" + (p != null && EhCaixa(p.Tile) ? Idioma.T(" (uma caixa: no chão, com o topo no nível " + p.Nivel + ", sem pilares)", " (a box: on the floor, its top at level " + p.Nivel + ", no pillars)") : p != null && p.Nivel > 0 ? Idioma.T(", no nível " + p.Nivel + ", sobre pilares", ", at level " + p.Nivel + ", on pillars") : "")
+                + (t.IsUnderlay ? Idioma.T(" (subcamada: as peças de chão vão por cima dela)", " (underlay: the floor tiles go on top of it)") : "");
         }
 
         static void Rotular(GameTile t)
@@ -466,12 +466,14 @@ namespace Bigorna.Encontro
         }
 
         /// <summary>O nome de uma peca para quem joga: o numero dela; o terreno posto como peca (escadaria, ponte), pelo nome.</summary>
-        static string NomeNaMesa(GameTile t) { var n = (t?.name ?? "?").Trim(); return n.StartsWith("@Bigorna-") ? Objetos.Nome(n.Substring(9)) : (t != null && t.IsUnderlay) || n.IndexOf("underlay", StringComparison.OrdinalIgnoreCase) >= 0 ? NomeDaSubcamada(n) : n; }
+        static string NomeNaMesa(GameTile t) { var n = (t?.name ?? "?").Trim(); return n.StartsWith("@Bigorna-") ? Objetos.Nome(n.Substring(9)) : (t != null && t.IsUnderlay) || n.IndexOf("underlay", StringComparison.OrdinalIgnoreCase) >= 0 ? NomeDaSubcamada(n) : n == NomeDaCaixa ? Idioma.T(NomeDaCaixa, "Game box (Act I)") : n; }
+        /// <summary>O nome (go.name) da caixa do jogo posta como peca; na mesa aparece na lingua do mod.</summary>
+        const string NomeDaCaixa = "Caixa do jogo (Ato I)";
         /// <summary>As subcamadas (peças de fundo) em portugues: agua, agua fetida, brasas, espinhos.</summary>
         static string NomeDaSubcamada(string n)
         {
             var k = (n ?? "").ToLowerInvariant();
-            return k.Contains("fetid") ? "Subcamada de água fétida" : k.Contains("water") ? "Subcamada de água" : k.Contains("ember") ? "Subcamada de brasas" : k.Contains("spike") ? "Subcamada de espinhos" : "Subcamada";
+            return k.Contains("fetid") ? Idioma.T("Subcamada de água fétida", "Fetid water underlay") : k.Contains("water") ? Idioma.T("Subcamada de água", "Water underlay") : k.Contains("ember") ? Idioma.T("Subcamada de brasas", "Embers underlay") : k.Contains("spike") ? Idioma.T("Subcamada de espinhos", "Spikes underlay") : Idioma.T("Subcamada", "Underlay");
         }
 
         /// <summary>Tira pecas com tudo o que esta nelas. As contas (grade, grupos, bloqueios, inimigos que nao contam como
@@ -513,12 +515,12 @@ namespace Bigorna.Encontro
             var objetos = lote.SelectMany(r => r.Objetos).Distinct().ToList();
             var inimigos = lote.SelectMany(r => r.Inimigos).Distinct().ToList();
             var nomes = pecas.Select(NomeNaMesa).GroupBy(n => n).OrderBy(g => g.Key).Select(g => g.Count() > 1 ? g.Key + " ×" + g.Count() : g.Key).ToList();
-            var partes = new List<string> { "as peças <b>" + string.Join(", ", nomes.ToArray()) + "</b>" };
+            var partes = new List<string> { Idioma.T("as peças <b>", "the tiles <b>") + string.Join(", ", nomes.ToArray()) + "</b>" };
             var soltos = objetos.Where(o => o.Dados?.DaPeca < 0).Select(o => o.Rotulo).GroupBy(n => n).Select(g => g.Count() > 1 ? g.Key + " ×" + g.Count() : g.Key).ToList();
-            if (soltos.Count > 0) partes.Add("os objetos " + string.Join(", ", soltos.ToArray()));
-            if (inimigos.Count > 0) partes.Add("os inimigos " + string.Join(", ", inimigos.Select(e => Inimigos.NomeDoInimigo(e)).ToArray()));
+            if (soltos.Count > 0) partes.Add(Idioma.T("os objetos ", "the objects ") + string.Join(", ", soltos.ToArray()));
+            if (inimigos.Count > 0) partes.Add(Idioma.T("os inimigos ", "the enemies ") + string.Join(", ", inimigos.Select(e => Inimigos.NomeDoInimigo(e)).ToArray()));
             var realce = new List<Transform>();
-            Dialogos.Mensagem("Retirem do tabuleiro " + string.Join("; ", partes.ToArray()) + ". Guardem tudo: volta à caixa.",
+            Dialogos.Mensagem(Idioma.T("Retirem do tabuleiro ", "Remove from the board ") + string.Join("; ", partes.ToArray()) + Idioma.T(". Guardem tudo: volta à caixa.", ". Put it all away: it goes back in the box."),
                 () =>
                 {
                     var cena = Jogo.Cena; var nucleo = Nucleo.Instancia;
@@ -544,7 +546,7 @@ namespace Bigorna.Encontro
                             if (ultima) RefazerGradeAgora();
                         }));
                     }
-                }, "Desmontagem",
+                }, Idioma.T("Desmontagem", "Teardown"),
                 () =>
                 {
                     var cena = Jogo.Cena;

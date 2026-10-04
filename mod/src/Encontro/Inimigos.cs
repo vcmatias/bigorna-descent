@@ -161,7 +161,7 @@ namespace Bigorna.Encontro
             if (Balanceado.FigurasLivres(modelo.Type, new Dictionary<EnemyTypes, int>()) + 1 <= 0)
             {
                 Log.Info("  " + e.Id + ": sem miniatura livre de " + modelo.Type + "; não entra");
-                Dialogos.Mensagem("Todas as miniaturas de <b>" + NomeDe(modelo) + "</b> já estão no tabuleiro: este não entra.", null, "Inimigo");
+                Dialogos.Mensagem(Idioma.T("Todas as miniaturas de <b>" + NomeDe(modelo) + "</b> já estão no tabuleiro: este não entra.", "All the <b>" + NomeDe(modelo) + "</b> miniatures are already on the board: this one does not enter."), null, Idioma.T("Inimigo", "Enemy"));
                 yield break;
             }
             var pos = Jogo.Mundo(e.Pos, e.Pos != null && e.Pos.Length >= 2 ? Tabuleiro.AlturaEm(e.Pos[0], e.Pos[1], e.Nivel) : Jogo.Altura(e.Nivel));
@@ -212,7 +212,7 @@ namespace Bigorna.Encontro
             var cor = NomeCor(inimigo.PlasticId);
             Log.Info("  entra " + e.Id + " (" + modelo.Type + ") em " + Jogo.Casa(pos) + (string.IsNullOrEmpty(e.Grupo) ? "" : " [grupo " + e.Grupo + "]") + " · base " + cor);
             bool fechou = false;
-            Dialogos.Mensagem("Coloquem <b>" + nome + "</b> na casa marcada (" + Jogo.Casa(pos) + "), base " + cor + "." + (string.IsNullOrEmpty(e.Texto) ? "" : "\n\n" + e.Texto), () => fechou = true, "Inimigo");
+            Dialogos.Mensagem((Idioma.Pt ? "Coloquem <b>" + nome + "</b> na casa marcada (" + Jogo.Casa(pos) + "), base " + cor + "." : "Place <b>" + nome + "</b> on the marked space (" + Jogo.Casa(pos) + "), " + NomeCor(inimigo.PlasticId, false) + " base.") + (string.IsNullOrEmpty(e.Texto) ? "" : "\n\n" + e.Texto), () => fechou = true, Idioma.T("Inimigo", "Enemy"));
             limite = Time.unscaledTime + 180f;
             while (!fechou && Time.unscaledTime < limite) yield return null;
             while (Jogo.Salvando) yield return null;
@@ -279,8 +279,17 @@ namespace Bigorna.Encontro
             catch (Exception ex) { Log.Info("  pintando a figura: " + ex.Message); }
         }
 
-        static string NomeCor(PlasticIds id)
+        static string NomeCor(PlasticIds id, bool pt = true)
         {
+            if (!pt)
+                switch (id)
+                {
+                    case PlasticIds.Orange: return "orange";
+                    case PlasticIds.Green: return "green";
+                    case PlasticIds.Yellow: return "yellow";
+                    case PlasticIds.Purple: return "purple";
+                    default: return id.ToString().ToLowerInvariant();
+                }
             switch (id)
             {
                 case PlasticIds.Orange: return "laranja";

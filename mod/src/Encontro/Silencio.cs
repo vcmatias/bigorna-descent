@@ -226,9 +226,9 @@ namespace Bigorna.Encontro
             bool? r = Motor.Roteiro.Resultado;
             string novo = null;
             if (chave.Equals("END_ENCOUNTER", StringComparison.OrdinalIgnoreCase) || chave.Equals("END_OF_QUEST", StringComparison.OrdinalIgnoreCase))
-                novo = r == false ? "Derrota. Os heróis recuam, feridos, e o mapa se perde." : "Vitória! O mapa está concluído.";
-            else if (chave.Equals("QUEST_WON", StringComparison.OrdinalIgnoreCase)) novo = "Vitória! O mapa está concluído.";
-            else if (chave.Equals("QUEST_LOST", StringComparison.OrdinalIgnoreCase)) novo = "Derrota. Os heróis recuam, feridos, e o mapa se perde.";
+                novo = r == false ? Idioma.T("Derrota. Os heróis recuam, feridos, e o mapa se perde.", "Defeat. The heroes fall back, wounded, and the map is lost.") : Idioma.T("Vitória! O mapa está concluído.", "Victory! The map is complete.");
+            else if (chave.Equals("QUEST_WON", StringComparison.OrdinalIgnoreCase)) novo = Idioma.T("Vitória! O mapa está concluído.", "Victory! The map is complete.");
+            else if (chave.Equals("QUEST_LOST", StringComparison.OrdinalIgnoreCase)) novo = Idioma.T("Derrota. Os heróis recuam, feridos, e o mapa se perde.", "Defeat. The heroes fall back, wounded, and the map is lost.");
             if (novo == null) return;
             foreach (var t in quadro.GetComponentsInChildren<TMP_Text>(true))
                 if (t != null && string.Equals((t.text ?? "").Trim(), chave, StringComparison.OrdinalIgnoreCase)) { t.text = novo; if (!_palavras.ContainsKey(chave)) { _palavras[chave] = novo; Log.Info("quadro de fim «" + chave + "» em palavras"); } }

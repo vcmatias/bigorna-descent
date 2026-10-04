@@ -124,7 +124,7 @@ namespace Bigorna.Encontro
             var casas = Casas(def.Casas).ToList();
             if (casas.Count == 0) return null;
             var go = UnityEngine.Object.Instantiate(molde.gameObject, pai);
-            go.name = string.IsNullOrEmpty(def.Nome) ? "Peça própria" : def.Nome.Trim();
+            go.name = string.IsNullOrEmpty(def.Nome) ? Idioma.T("Peça própria", "Custom tile") : def.Nome.Trim();
             go.transform.rotation = Quaternion.identity;
             go.transform.position = Vector3.zero;
             var tile = go.GetComponent<GameTile>();

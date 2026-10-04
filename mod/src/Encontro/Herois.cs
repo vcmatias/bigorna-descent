@@ -45,7 +45,7 @@ namespace Bigorna.Encontro
             try
             {
                 var persistente = Jogo.Persistente;
-                var pedido = new MessageRequest { Key = "Escolham até " + vagas + " heróis para esta missão.", CallbackContinue = () => { } };
+                var pedido = new MessageRequest { Key = Idioma.T("Escolham até " + vagas + " heróis para esta missão.", "Choose up to " + vagas + " heroes for this quest."), CallbackContinue = () => { } };
                 var cfg = new StoryMessageSettings { BackgroundType = StoryMessageBackgroundType.Camp, CloseOnFinish = true };
                 ui.StoryMessageDialog.IsHeroSelect = true;
                 persistente.StoryMessages.DisplayMessage(pedido, cfg);
@@ -101,12 +101,12 @@ namespace Bigorna.Encontro
             {
                 var c = casas[i];
                 if (c == null || c.Length < 2) continue;
-                linhas.Add(NomeDe(herois[i]) + ": casa " + c[0] + "," + c[1]);
+                linhas.Add(NomeDe(herois[i]) + Idioma.T(": casa ", ": space ") + c[0] + "," + c[1]);
                 Log.Info("  saída de " + herois[i].HeroId + ": " + c[0] + "," + c[1]);
             }
             if (linhas.Count == 0) return;
             var inicio = casas.Take(herois.Count).Where(c => c != null && c.Length >= 2).ToList();
-            Dialogos.Mensagem("Posições iniciais (casas destacadas):\n" + string.Join("\n", linhas.ToArray()), null, "Heróis", () =>
+            Dialogos.Mensagem(Idioma.T("Posições iniciais (casas destacadas):\n", "Starting positions (highlighted spaces):\n") + string.Join("\n", linhas.ToArray()), null, Idioma.T("Heróis", "Heroes"), () =>
             {
                 try
                 {
