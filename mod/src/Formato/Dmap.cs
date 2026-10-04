@@ -286,20 +286,22 @@ namespace Bigorna.Formato
         [JsonIgnore]
         public string NomeVisivel => !string.IsNullOrEmpty(Metadados?.Nome) ? Metadados.Nome : Path.GetFileNameWithoutExtension(Caminho ?? "mapa");
 
-        [JsonIgnore]
-        public string Resumo
+        /// <summary>O resumo do mapa para a lista do painel, em portugues (pt) ou ingles (o formato nao depende do jogo:
+        /// quem chama diz a lingua).</summary>
+        public string Resumo(bool pt)
         {
-            get
             {
                 var partes = new List<string>();
-                if (!string.IsNullOrEmpty(Metadados?.Autor)) partes.Add("por " + Metadados.Autor);
-                partes.Add((Board?.Pecas?.Count ?? 0) + " peças");
-                partes.Add((Spawns?.Inimigos?.Count ?? 0) + " inimigos");
-                partes.Add((Gatilhos?.Count ?? 0) + " gatilhos");
-                if (Metadados?.Herois != null && Metadados.Herois.Length == 2) partes.Add(Metadados.Herois[0] + " a " + Metadados.Herois[1] + " heróis");
+                if (!string.IsNullOrEmpty(Metadados?.Autor)) partes.Add(L(pt, "por ", "by ") + Metadados.Autor);
+                partes.Add((Board?.Pecas?.Count ?? 0) + L(pt, " peças", " tiles"));
+                partes.Add((Spawns?.Inimigos?.Count ?? 0) + L(pt, " inimigos", " enemies"));
+                partes.Add((Gatilhos?.Count ?? 0) + L(pt, " gatilhos", " triggers"));
+                if (Metadados?.Herois != null && Metadados.Herois.Length == 2) partes.Add(Metadados.Herois[0] + L(pt, " a ", " to ") + Metadados.Herois[1] + L(pt, " heróis", " heroes"));
                 return string.Join(" · ", partes.ToArray());
             }
         }
+
+        static string L(bool pt, string textoPt, string textoEn) => pt ? textoPt : textoEn;
 
         /// <summary>A versao do formato que este mod conhece. Um mapa de versao maior (de um editor mais novo) e lido do mesmo
         /// jeito: o que este mod nao conhece fica de fora, sem erro (regras em compat/LEIAME.md).</summary>
