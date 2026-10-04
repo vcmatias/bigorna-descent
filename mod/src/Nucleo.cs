@@ -109,7 +109,7 @@ namespace Bigorna
                 {
                     if (_rotulo == null) _rotulo = new GUIStyle(GUI.skin.label) { fontSize = 13 };
                     GUI.color = new Color(0.55f, 0.85f, 1f, 0.95f);
-                    GUI.Label(new Rect(12f, 10f, 720f, 22f), "Bigorna " + Bootstrap.Versao + (Lancador.Atual != null ? " · " + Lancador.Atual.NomeVisivel : "") + "  (F9 relatar um problema · F8 esconde · F7 teste de som e cenas · Ctrl+Shift+D modo de teste)", _rotulo);
+                    GUI.Label(new Rect(12f, 10f, 720f, 22f), "Bigorna " + Bootstrap.Versao + (Lancador.Atual != null ? " · " + Lancador.Atual.NomeVisivel : "") + Idioma.T("  (F9 relatar um problema · F8 esconde · F7 teste de som e cenas · Ctrl+Shift+D modo de teste)", "  (F9 report a problem · F8 hide · F7 sound and cutscene test · Ctrl+Shift+D test mode)"), _rotulo);
                     GUI.color = Color.white;
                 }
                 PainelMapas.Desenhar();
