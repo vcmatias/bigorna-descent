@@ -4,6 +4,7 @@ using System.Linq;
 using Bigorna.Encontro;
 using Bigorna.Formato;
 using UnityEngine;
+using static Bigorna.Idioma;
 
 namespace Bigorna.Motor
 {
@@ -44,8 +45,8 @@ namespace Bigorna.Motor
         static string Area(Dictionary<string, object> p)
         {
             var a = P.Area(p);
-            if (a == null) return "área indicada";
-            return a[0] == a[2] && a[1] == a[3] ? "casa " + a[0] + "," + a[1] : "área " + a[0] + "," + a[1] + " a " + a[2] + "," + a[3];
+            if (a == null) return T("área indicada", "the indicated area");
+            return a[0] == a[2] && a[1] == a[3] ? T("casa ", "space ") + a[0] + "," + a[1] : T("área ", "area ") + a[0] + "," + a[1] + T(" a ", " to ") + a[2] + "," + a[3];
         }
 
         public static string RotuloDe(Dmap.Gatilho g)
@@ -55,15 +56,15 @@ namespace Bigorna.Motor
             if (!string.IsNullOrEmpty(rotulo)) return rotulo;
             switch (g.Evento?.Id)
             {
-                case "heroEntersArea": return "Um herói entrou na " + Area(p) + (g.Nome != null ? " (" + g.Nome + ")" : "");
-                case "heroEntersCell": return "Um herói pisou na " + Area(p) + (g.Nome != null ? " (" + g.Nome + ")" : "");
-                case "allHeroesInArea": return "Todos os heróis estão na " + Area(p) + (g.Nome != null ? " (" + g.Nome + ")" : "");
-                case "heroLeavesArea": return "Um herói saiu da " + Area(p) + (g.Nome != null ? " (" + g.Nome + ")" : "");
-                case "specificHeroEnters": return (P.Texto(p, "hero") ?? "O herói") + " entrou na " + Area(p);
-                case "heroOnFire": return "Um herói pegou fogo";
-                case "enemyActivated": return "«" + (P.Texto(p, "enemy") ?? "o inimigo") + "» ativou";
-                case "enemyEntersArea": return "Um inimigo entrou na " + Area(p);
-                case "itemObtained": return "Obtiveram «" + Butim.NomeItem(P.Texto(p, "loot")) + "»";
+                case "heroEntersArea": return T("Um herói entrou na ", "A hero entered ") + Area(p) + (g.Nome != null ? " (" + g.Nome + ")" : "");
+                case "heroEntersCell": return T("Um herói pisou na ", "A hero stepped on ") + Area(p) + (g.Nome != null ? " (" + g.Nome + ")" : "");
+                case "allHeroesInArea": return T("Todos os heróis estão na ", "All heroes are in ") + Area(p) + (g.Nome != null ? " (" + g.Nome + ")" : "");
+                case "heroLeavesArea": return T("Um herói saiu da ", "A hero left ") + Area(p) + (g.Nome != null ? " (" + g.Nome + ")" : "");
+                case "specificHeroEnters": return (P.Texto(p, "hero") ?? T("O herói", "The hero")) + T(" entrou na ", " entered ") + Area(p);
+                case "heroOnFire": return T("Um herói pegou fogo", "A hero caught fire");
+                case "enemyActivated": return T("«" + (P.Texto(p, "enemy") ?? "o inimigo") + "» ativou", "“" + (P.Texto(p, "enemy") ?? "the enemy") + "” activated");
+                case "enemyEntersArea": return T("Um inimigo entrou na ", "An enemy entered ") + Area(p);
+                case "itemObtained": return T("Obtiveram «" + Butim.NomeItem(P.Texto(p, "loot")) + "»", "Obtained “" + Butim.NomeItem(P.Texto(p, "loot")) + "”");
                 default: return g.Rotulo;
             }
         }
@@ -72,12 +73,12 @@ namespace Bigorna.Motor
         {
             switch (d.Id)
             {
-                case "npc_defeated": return "O aliado escoltado morreu";
-                case "object_destroyed": return "O objeto protegido foi destruído";
-                case "enemy_reaches_area": return "Um inimigo chegou à " + Area(d.Params);
-                case "alarm_raised": return "O alarme foi dado";
-                case "item_lost": return "Perderam o item-chave";
-                case "hero_seen": return "Os heróis foram vistos";
+                case "npc_defeated": return T("O aliado escoltado morreu", "The escorted ally died");
+                case "object_destroyed": return T("O objeto protegido foi destruído", "The protected object was destroyed");
+                case "enemy_reaches_area": return T("Um inimigo chegou à ", "An enemy reached ") + Area(d.Params);
+                case "alarm_raised": return T("O alarme foi dado", "The alarm was raised");
+                case "item_lost": return T("Perderam o item-chave", "The key item was lost");
+                case "hero_seen": return T("Os heróis foram vistos", "The heroes were seen");
                 default: return d.Id;
             }
         }
@@ -92,28 +93,28 @@ namespace Bigorna.Motor
             {
                 if (g.Evento == null || !EventosDaMesa.Contains(g.Evento.Id ?? "") || Roteiro.Gasto(g)) continue;
                 var gg = g;
-                _itens.Add(new Item { Secao = "Aconteceu na mesa", Rotulo = RotuloDe(g), Acao = () => { Log.Info("a mesa declara: " + gg.Rotulo); Roteiro.Executar(gg); } });
+                _itens.Add(new Item { Secao = T("Aconteceu na mesa", "Happened on the table"), Rotulo = RotuloDe(g), Acao = () => { Log.Info("a mesa declara: " + gg.Rotulo); Roteiro.Executar(gg); } });
             }
             foreach (var o in Objetos.Postos)
             {
                 if (o.Usado || o.Escondido || (!string.IsNullOrEmpty(o.Grupo) && Tabuleiro.GrupoOculto(o.Grupo))) continue;
                 var oo = o;
-                _itens.Add(new Item { Secao = "Usar objeto", Rotulo = o.Rotulo + (o.Dados.TemPosicao ? " (" + o.Dados.X + "," + o.Dados.Y + ")" : ""), Acao = () => Objetos.Usar(oo, null) });
+                _itens.Add(new Item { Secao = T("Usar objeto", "Use object"), Rotulo = o.Rotulo + (o.Dados.TemPosicao ? " (" + o.Dados.X + "," + o.Dados.Y + ")" : ""), Acao = () => Objetos.Usar(oo, null) });
             }
             var obj = Roteiro.Objetivo;
             if (obj != null)
-                _itens.Add(new Item { Secao = "Objetivos", Rotulo = "Cumprido: " + Roteiro.TextoDe(obj) + (ObjetivosAuto.Automatico(obj) ? "  (o app também vigia este)" : ""), Confirmar = true, Acao = () => { Log.Info("a mesa dá o objetivo por cumprido"); Roteiro.Avancar(); } });
+                _itens.Add(new Item { Secao = T("Objetivos", "Objectives"), Rotulo = T("Cumprido: ", "Completed: ") + Roteiro.TextoDe(obj) + (ObjetivosAuto.Automatico(obj) ? T("  (o app também vigia este)", "  (the app also tracks this one)") : ""), Confirmar = true, Acao = () => { Log.Info("a mesa dá o objetivo por cumprido"); Roteiro.Avancar(); } });
             foreach (var (i, o, feito) in Roteiro.Opcionais)
             {
                 if (feito || !Roteiro.Anunciado(o)) continue;
                 int ii = i;
-                _itens.Add(new Item { Secao = "Objetivos", Rotulo = "Opcional cumprido: " + Roteiro.TextoDe(o), Confirmar = true, Acao = () => Roteiro.MarcarOpcional(ii) });
+                _itens.Add(new Item { Secao = T("Objetivos", "Objectives"), Rotulo = T("Opcional cumprido: ", "Optional completed: ") + Roteiro.TextoDe(o), Confirmar = true, Acao = () => Roteiro.MarcarOpcional(ii) });
             }
             foreach (var d in m.Roteiro.Derrota)
             {
                 if (d == null || !DerrotasDaMesa.Contains(d.Id ?? "")) continue;
                 var dd = d;
-                _itens.Add(new Item { Secao = "Derrota", Rotulo = RotuloDerrota(d), Confirmar = true, Acao = () => Roteiro.DeclararDerrota(dd) });
+                _itens.Add(new Item { Secao = T("Derrota", "Defeat"), Rotulo = RotuloDerrota(d), Confirmar = true, Acao = () => Roteiro.DeclararDerrota(dd) });
             }
             _pintado = _versao;
         }
@@ -135,7 +136,7 @@ namespace Bigorna.Motor
             var cor = GUI.color;
             GUI.color = Color.white;
             var botao = new Rect(Screen.width - 150f, 8f, 140f, 30f);
-            if (GUI.Button(botao, _aberto ? "Fechar mesa" : "Mesa ▾"))
+            if (GUI.Button(botao, _aberto ? T("Fechar mesa", "Close table") : T("Mesa ▾", "Table ▾")))
             {
                 _aberto = !_aberto;
                 if (_aberto) Montar();
@@ -147,18 +148,18 @@ namespace Bigorna.Motor
                 var janela = new Rect(Screen.width - largura - 10f, 44f, largura, altura);
                 GUI.Box(janela, GUIContent.none, _janela);
                 GUILayout.BeginArea(new Rect(janela.x + 10f, janela.y + 8f, janela.width - 20f, janela.height - 16f));
-                GUILayout.Label("Rodada " + Mathf.Max(0, Roteiro.Rodada) + " · objetivo " + Roteiro.ObjetivoAtual + " de " + Roteiro.QuantosObjetivos + " · inimigos derrotados: " + Roteiro.Derrotados, _titulo);
+                GUILayout.Label(T("Rodada ", "Round ") + Mathf.Max(0, Roteiro.Rodada) + T(" · objetivo ", " · objective ") + Roteiro.ObjetivoAtual + T(" de ", " of ") + Roteiro.QuantosObjetivos + T(" · inimigos derrotados: ", " · enemies defeated: ") + Roteiro.Derrotados, _titulo);
                 _rolagem = GUILayout.BeginScrollView(_rolagem);
                 string secao = null;
-                if (_itens.Count == 0) GUILayout.Label("Nada a declarar agora.");
+                if (_itens.Count == 0) GUILayout.Label(T("Nada a declarar agora.", "Nothing to declare right now."));
                 foreach (var item in _itens.ToList())
                 {
                     if (item.Secao != secao) { secao = item.Secao; GUILayout.Space(6f); GUILayout.Label(secao, _secao); }
                     if (_porConfirmar == item)
                     {
                         GUILayout.BeginHorizontal();
-                        if (GUILayout.Button("Confirmar: " + item.Rotulo, _botao)) { _porConfirmar = null; Executar(item); }
-                        if (GUILayout.Button("Não", GUILayout.Width(60f), GUILayout.Height(34f))) _porConfirmar = null;
+                        if (GUILayout.Button(T("Confirmar: ", "Confirm: ") + item.Rotulo, _botao)) { _porConfirmar = null; Executar(item); }
+                        if (GUILayout.Button(T("Não", "No"), GUILayout.Width(60f), GUILayout.Height(34f))) _porConfirmar = null;
                         GUILayout.EndHorizontal();
                     }
                     else if (GUILayout.Button(item.Rotulo, _botao))

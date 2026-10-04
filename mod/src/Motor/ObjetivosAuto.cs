@@ -4,6 +4,7 @@ using System.Linq;
 using Bigorna.Encontro;
 using Bigorna.Formato;
 using FFG.D3;
+using static Bigorna.Idioma;
 
 namespace Bigorna.Motor
 {
@@ -20,14 +21,21 @@ namespace Bigorna.Motor
             "use_n_objects", "search_shelves", "light_fires", "extinguish_fires", "open_all_chests", "reach_all_points", "collect_keys"
         };
 
-        static readonly Dictionary<string, string> Genericos = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        static readonly Dictionary<string, string> GenericosPt = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["defeat_all"] = "Derrotar todos os inimigos", ["defeat_boss"] = "Derrotar o chefe", ["defeat_group"] = "Derrotar o grupo",
             ["defeat_n"] = "Derrotar N inimigos", ["survive_rounds"] = "Sobreviver N rodadas", ["reach_cell"] = "Chegar à casa marcada",
             ["use_object"] = "Usar o objeto", ["open_chest"] = "Abrir o baú", ["use_n_objects"] = "Ativar os mecanismos",
         };
+        static readonly Dictionary<string, string> GenericosEn = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["defeat_all"] = "Defeat all enemies", ["defeat_boss"] = "Defeat the boss", ["defeat_group"] = "Defeat the group",
+            ["defeat_n"] = "Defeat N enemies", ["survive_rounds"] = "Survive N rounds", ["reach_cell"] = "Reach the marked space",
+            ["use_object"] = "Use the object", ["open_chest"] = "Open the chest", ["use_n_objects"] = "Activate the mechanisms",
+        };
+        static Dictionary<string, string> Genericos => Pt ? GenericosPt : GenericosEn;
 
-        public static string NomeGenerico(string id) => id != null && Genericos.TryGetValue(id, out var n) ? n : "Cumprir o objetivo";
+        public static string NomeGenerico(string id) => id != null && Genericos.TryGetValue(id, out var n) ? n : T("Cumprir o objetivo", "Complete the objective");
 
         /// <summary>O mod julga este objetivo sozinho? Se nao, ele aparece na Mesa para ser declarado.</summary>
         public static bool Automatico(Dmap.Objetivo o)

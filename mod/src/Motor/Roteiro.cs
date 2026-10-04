@@ -8,6 +8,7 @@ using FFG.D3;
 using FFG.D3.UI;
 using NodeCanvas.DialogueTrees;
 using UnityEngine;
+using static Bigorna.Idioma;
 
 namespace Bigorna.Motor
 {
@@ -323,7 +324,7 @@ namespace Bigorna.Motor
             Mesa.Atualizar();
         }
 
-        public const string NadaMais = "Não há mais nada a fazer aqui.";
+        public static string NadaMais => T("Não há mais nada a fazer aqui.", "There is nothing more to do here.");
 
         public static void Escolheu(int opcao, int objeto)
         {
@@ -531,7 +532,7 @@ namespace Bigorna.Motor
         {
             if (Objetivo == null && _opcionais.Count == 0) return null;
             var sb = new System.Text.StringBuilder();
-            if (Objetivo != null) sb.Append(Anunciado(Objetivo) ? TextoDe(Objetivo) : "Explorem: a missão final ainda vai ser revelada.");
+            if (Objetivo != null) sb.Append(Anunciado(Objetivo) ? TextoDe(Objetivo) : T("Explorem: a missão final ainda vai ser revelada.", "Explore: the final mission is yet to be revealed."));
             for (int i = 0; i < _opcionais.Count; i++)
             {
                 if (!Anunciado(_opcionais[i])) continue;
@@ -603,7 +604,7 @@ namespace Bigorna.Motor
             var t = TextoDe(_opcionais[i]);
             Log.Info("objetivo opcional cumprido: " + t);
             MostrarObjetivo();
-            Dialogos.Mensagem("Objetivo opcional cumprido: " + t, null, "Objetivo");
+            Dialogos.Mensagem(T("Objetivo opcional cumprido: ", "Optional objective completed: ") + t, null, T("Objetivo", "Objective"));
             Mesa.Atualizar();
         }
 

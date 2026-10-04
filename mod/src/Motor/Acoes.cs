@@ -8,6 +8,7 @@ using FFG.Core;
 using FFG.D3;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
+using static Bigorna.Idioma;
 
 namespace Bigorna.Motor
 {
@@ -102,14 +103,14 @@ namespace Bigorna.Motor
         }
 
         /// <summary>A frase do proprio jogo para a acao adicional, no idioma do jogo (a chave UI_ADDITIONAL_ACTION).</summary>
-        static string AcaoAdicional() => Jogo.Texto("UI_ADDITIONAL_ACTION", "O herói pode fazer mais uma ação.");
+        static string AcaoAdicional() => Jogo.Texto("UI_ADDITIONAL_ACTION", T("O herói pode fazer mais uma ação.", "The hero may perform an additional action."));
 
         static void Anunciar()
         {
             if (Roteiro.Pendencias.Count == 0) return;
-            var texto = "Apliquem na mesa:\n" + string.Join("\n", Roteiro.Pendencias.ToArray());
+            var texto = T("Apliquem na mesa:\n", "Apply on the table:\n") + string.Join("\n", Roteiro.Pendencias.ToArray());
             Roteiro.Pendencias.Clear();
-            Dialogos.Mensagem(texto, null, "Na mesa");
+            Dialogos.Mensagem(texto, null, T("Na mesa", "On the table"));
         }
 
         static void Uma(Dmap.Clausula a, Dmap.Gatilho dono)
@@ -149,7 +150,7 @@ namespace Bigorna.Motor
                 case "askYesNo":
                 {
                     var v = P.Texto(p, "var") ?? "resposta";
-                    var sim = P.Texto(p, "yes") ?? "Sim"; var nao = P.Texto(p, "no") ?? "Não";
+                    var sim = P.Texto(p, "yes") ?? T("Sim", "Yes"); var nao = P.Texto(p, "no") ?? T("Não", "No");
                     int objeto = Roteiro.ObjetoDaPergunta;
                     Dialogos.Escolha(P.Texto(p, "text") ?? "?", new List<string> { sim, nao }, i =>
                     {
@@ -189,7 +190,7 @@ namespace Bigorna.Motor
                     var area = P.Area(p);
                     // sai da reserva (spawn pool) quando ha uma; senao, dos inimigos que o mapa ja tem
                     var modelos = Inimigos.Reserva.Count > 0 ? Inimigos.Reserva.Distinct().ToList() : Roteiro.Mapa.Spawns.Inimigos.Where(e => !Balanceado.EhVaga(e)).Select(e => e.Id).Where(x => !string.IsNullOrEmpty(x)).Distinct().ToList();
-                    if (modelos.Count == 0) { Anotar("Entram " + n + " inimigos aleatórios" + (area != null ? " na área " + area[0] + "," + area[1] + " a " + area[2] + "," + area[3] : "")); break; }
+                    if (modelos.Count == 0) { Anotar(T("Entram " + n + " inimigos aleatórios", n + " random enemies enter") + (area != null ? T(" na área ", " in area ") + area[0] + "," + area[1] + T(" a ", " to ") + area[2] + "," + area[3] : "")); break; }
                     var lista = new List<Dmap.Inimigo>();
                     var vaoEntrar = new Dictionary<EnemyTypes, int>();
                     for (int i = 0; i < n; i++)
@@ -298,10 +299,10 @@ namespace Bigorna.Motor
                     Jogo.Sujo();
                     break;
                 }
-                case "reduceThreat": Anotar("Reduzam a ameaça em " + P.Inteiro(p, "amount", 2)); break;
-                case "setEnemyTarget": Anotar("«" + P.Texto(p, "enemy") + "» passa a mirar " + P.Texto(p, "hero")); break;
-                case "showEnemyActivation": Anotar("Ativação de «" + P.Texto(p, "enemy") + "»"); break;
-                case "enemyDropsLoot": Anotar("«" + P.Texto(p, "enemy") + "» deixa cair espólios (" + P.Inteiro(p, "points", 3) + " pontos)"); break;
+                case "reduceThreat": Anotar(T("Reduzam a ameaça em ", "Reduce the threat by ") + P.Inteiro(p, "amount", 2)); break;
+                case "setEnemyTarget": Anotar(T("«" + P.Texto(p, "enemy") + "» passa a mirar " + P.Texto(p, "hero"), "“" + P.Texto(p, "enemy") + "” now targets " + P.Texto(p, "hero"))); break;
+                case "showEnemyActivation": Anotar(T("Ativação de «" + P.Texto(p, "enemy") + "»", "Activation of “" + P.Texto(p, "enemy") + "”")); break;
+                case "enemyDropsLoot": Anotar(T("«" + P.Texto(p, "enemy") + "» deixa cair espólios (" + P.Inteiro(p, "points", 3) + " pontos)", "“" + P.Texto(p, "enemy") + "” drops loot (" + P.Inteiro(p, "points", 3) + " points)")); break;
                 case "addEnemyToReserve":
                 case "removeEnemyFromReserve":
                 {
@@ -318,16 +319,16 @@ namespace Bigorna.Motor
                 case "blockRandomSpawn": case "unblockRandomSpawn": break;
 
                 // ------------------------------------------------ herois (ficam na mesa)
-                case "damageHeroes": Anotar("Cada herói sofre " + P.Inteiro(p, "amount", 2) + " de dano"); break;
-                case "damageHero": Anotar(NomeHeroi(P.Texto(p, "hero")) + " sofre " + P.Inteiro(p, "amount", 2) + " de dano"); break;
+                case "damageHeroes": Anotar(T("Cada herói sofre " + P.Inteiro(p, "amount", 2) + " de dano", "Each hero suffers " + P.Inteiro(p, "amount", 2) + " damage")); break;
+                case "damageHero": Anotar(NomeHeroi(P.Texto(p, "hero")) + T(" sofre " + P.Inteiro(p, "amount", 2) + " de dano", " suffers " + P.Inteiro(p, "amount", 2) + " damage")); break;
                 case "damageRandomHero":
                 {
                     var herois = Jogo.Herois;
                     var h = herois.Count > 0 ? herois[UnityEngine.Random.Range(0, herois.Count)] : null;
-                    Anotar((h != null ? Herois.NomeDe(h) : "Um herói") + " sofre " + P.Inteiro(p, "amount", 1) + " de dano");
+                    Anotar((h != null ? Herois.NomeDe(h) : T("Um herói", "A hero")) + T(" sofre " + P.Inteiro(p, "amount", 1) + " de dano", " suffers " + P.Inteiro(p, "amount", 1) + " damage"));
                     break;
                 }
-                case "healHeroes": Anotar("Cada herói recupera " + P.Inteiro(p, "amount", 2) + " de vida"); break;
+                case "healHeroes": Anotar(T("Cada herói recupera " + P.Inteiro(p, "amount", 2) + " de vida", "Each hero recovers " + P.Inteiro(p, "amount", 2) + " health")); break;
                 case "moveHeroes":
                 {
                     // entra na fila de avisos: depois das pecas e dos objetos da sala que abriu, antes dos inimigos (que esperam a
@@ -337,8 +338,8 @@ namespace Bigorna.Motor
                     if (pares != null) for (int k = 0; k + 1 < pares.Count; k += 2) casas.Add(new[] { pares[k], pares[k + 1], pares[k], pares[k + 1] });
                     if (casas.Count == 0) { var ar = P.Area(p); if (ar != null) casas.Add(ar); }
                     var txt = P.Texto(p, "text");
-                    var texto = !string.IsNullOrEmpty(txt) ? txt : casas.Count > 0 ? "Movam os heróis para as casas destacadas (um herói por casa; se faltar casa, na casa livre mais próxima)." : "Movam todos os heróis para o lugar indicado.";
-                    Dialogos.Mensagem(texto, null, "Na mesa", () =>
+                    var texto = !string.IsNullOrEmpty(txt) ? txt : casas.Count > 0 ? T("Movam os heróis para as casas destacadas (um herói por casa; se faltar casa, na casa livre mais próxima).", "Move the heroes to the highlighted spaces (one hero per space; if there are not enough, to the nearest empty space).") : T("Movam todos os heróis para o lugar indicado.", "Move all heroes to the indicated place.");
+                    Dialogos.Mensagem(texto, null, T("Na mesa", "On the table"), () =>
                     {
                         LimparDestinos();
                         var cena = Jogo.Cena; int n = 0;
@@ -351,8 +352,8 @@ namespace Bigorna.Motor
                     });
                     break;
                 }
-                case "moveHero": { var c = P.Celula(p); Anotar("Movam " + NomeHeroi(P.Texto(p, "hero")) + " para " + (c != null ? c[0] + "," + c[1] : "o lugar indicado")); break; }
-                case "setHeroOnFire": Anotar(NomeHeroi(P.Texto(p, "hero")) + " pega fogo"); break;
+                case "moveHero": { var c = P.Celula(p); Anotar(T("Movam ", "Move ") + NomeHeroi(P.Texto(p, "hero")) + T(" para ", " to ") + (c != null ? T("", "space ") + c[0] + "," + c[1] : T("o lugar indicado", "the indicated place"))); break; }
+                case "setHeroOnFire": Anotar(NomeHeroi(P.Texto(p, "hero")) + T(" pega fogo", " catches fire")); break;
 
                 // ------------------------------------------------ butim
                 case "giveLoot": { var it = P.Texto(p, "loot") ?? P.Texto(p, "item") ?? ""; if (it.Length > 0) Roteiro.Vars["item-" + it] = 1; Butim.Entregar(new Dmap.Butim { Modo = "explicit", Itens = new List<string> { it } }, null); break; }
@@ -362,9 +363,9 @@ namespace Bigorna.Motor
                 case "removeRandomMaterial": Butim.TirarMateriais(P.Inteiro(p, "amount", 1), null); break;
                 case "giveGold": Butim.Entregar(new Dmap.Butim { Modo = "explicit", Ouro = P.Inteiro(p, "amount", 10) }, null); break;
                 case "giveRandomItem": Butim.Entregar(new Dmap.Butim { Modo = "random", Quantos = Math.Max(1, P.Inteiro(p, "count", 1)), Ouro = P.Inteiro(p, "gold", 0) }, null); break;
-                case "removeItem": Anotar("Percam o item «" + Butim.NomeItem(P.Texto(p, "loot")) + "»"); break;
-                case "giveRecipe": Anotar("Aprendem a receita «" + P.Texto(p, "recipe") + "»"); break;
-                case "removeMaterials": Anotar("Gastem " + P.Inteiro(p, "amount", 1) + " de «" + P.Texto(p, "material") + "»"); break;
+                case "removeItem": Anotar(T("Percam o item «" + Butim.NomeItem(P.Texto(p, "loot")) + "»", "Lose the item “" + Butim.NomeItem(P.Texto(p, "loot")) + "”")); break;
+                case "giveRecipe": Anotar(T("Aprendem a receita «" + P.Texto(p, "recipe") + "»", "Learn the recipe “" + P.Texto(p, "recipe") + "”")); break;
+                case "removeMaterials": Anotar(T("Gastem " + P.Inteiro(p, "amount", 1) + " de «" + P.Texto(p, "material") + "»", "Spend " + P.Inteiro(p, "amount", 1) + " “" + P.Texto(p, "material") + "”")); break;
 
                 // ------------------------------------------------ tabuleiro
                 case "revealTiles": Tabuleiro.Revelar(P.Texto(p, "group")); break;
@@ -388,7 +389,7 @@ namespace Bigorna.Motor
                 case "hideObject": Objetos.Mostrar(P.Inteiro(p, "interactable", -1), false); break;
                 // o objeto fica na mesa, mas ja nao se usa (um teste cumulativo que enfim passou)
                 case "spendObject": { var po = Objetos.Pegar(P.Inteiro(p, "interactable", -1)); if (po != null) { po.Usado = true; Log.Info("  objeto «" + po.Rotulo + "» gasto"); } break; }
-                case "startFire": { var ar = P.Area(p); Anotar("Fogo na área " + (ar != null ? ar[0] + "," + ar[1] + " a " + ar[2] + "," + ar[3] : "indicada")); break; }
+                case "startFire": { var ar = P.Area(p); Anotar(ar != null ? T("Fogo na área ", "Fire in area ") + ar[0] + "," + ar[1] + T(" a ", " to ") + ar[2] + "," + ar[3] : T("Fogo na área indicada", "Fire in the indicated area")); break; }
                 case "highlightArea":
                 {
                     var cena = Jogo.Cena; if (cena == null) break;
@@ -430,7 +431,7 @@ namespace Bigorna.Motor
                         ativas = opcoes.Take(5).Select((_, i) => i >= umaVez.Count || string.IsNullOrEmpty(umaVez[i]) || Roteiro.Var(umaVez[i]) == 0).ToList();
                         if (!ativas.Any(a => a))
                         {
-                            Dialogos.Mensagem(P.Texto(p, "empty") ?? "Nada mais a fazer aqui.");
+                            Dialogos.Mensagem(P.Texto(p, "empty") ?? T("Nada mais a fazer aqui.", "Nothing more to do here."));
                             break;
                         }
                     }
@@ -465,15 +466,19 @@ namespace Bigorna.Motor
                     if (Menu.Depuracao.PassarTeste) { Log.Info("  [teste] o teste passa sozinho"); Roteiro.Vars["ultimosSucessos"] = meta; if (acumulado) Roteiro.Vars[chave] = 0; resultado(true); break; }
                     if (!secreto && !acumulado)
                     {
-                        var textoA = (P.Texto(p, "text") ?? "Teste") + "\n\n" + (string.IsNullOrEmpty(atributo) ? "" : "Teste de <b>" + atributo + "</b>: ")
-                            + "precisam de <b>" + alvo + "</b> sucesso(s). Façam o teste na mesa e digam se passaram.";
-                        Dialogos.Escolha(textoA, new List<string> { Jogo.Texto("UI_PASS", "Passou"), Jogo.Texto("UI_FAIL", "Falhou") }, i => { Roteiro.Vars["ultimosSucessos"] = i == 0 ? meta : 0; resultado(i == 0); });
+                        var textoA = (P.Texto(p, "text") ?? T("Teste", "Test")) + "\n\n" + T((string.IsNullOrEmpty(atributo) ? "" : "Teste de <b>" + atributo + "</b>: ")
+                            + "precisam de <b>" + alvo + "</b> sucesso(s). Façam o teste na mesa e digam se passaram.",
+                            (string.IsNullOrEmpty(atributo) ? "You need" : "<b>" + atributo + "</b> test: you need") + " <b>" + alvo + "</b> success(es). Make the test on the table and say whether you passed.");
+                        Dialogos.Escolha(textoA, new List<string> { Jogo.Texto("UI_PASS", T("Passou", "Pass")), Jogo.Texto("UI_FAIL", T("Falhou", "Fail")) }, i => { Roteiro.Vars["ultimosSucessos"] = i == 0 ? meta : 0; resultado(i == 0); });
                         break;
                     }
                     int antes = acumulado ? Roteiro.Var(chave) : 0;
-                    var texto = (P.Texto(p, "text") ?? "Teste") + "\n\n" + (string.IsNullOrEmpty(atributo) ? "Teste de habilidade" : "Teste de <b>" + atributo + "</b>")
+                    var texto = (P.Texto(p, "text") ?? T("Teste", "Test")) + "\n\n" + T((string.IsNullOrEmpty(atributo) ? "Teste de habilidade" : "Teste de <b>" + atributo + "</b>")
                         + (secreto ? " (o número de sucessos necessários é secreto)." : ": precisam de <b>" + alvo + "</b> sucesso(s)" + (acumulado ? " no total (já têm " + antes + ")." : "."))
-                        + "\nFaçam o teste na mesa e informem quantos sucessos obtiveram.";
+                        + "\nFaçam o teste na mesa e informem quantos sucessos obtiveram.",
+                        (string.IsNullOrEmpty(atributo) ? "Skill test" : "<b>" + atributo + "</b> test")
+                        + (secreto ? " (the number of successes needed is secret)." : ": you need <b>" + alvo + "</b> success(es)" + (acumulado ? " in total (you have " + antes + ")." : "."))
+                        + "\nMake the test on the table and enter how many successes you got.");
                     Dialogos.Desafio(texto, n =>
                     {
                         int total = acumulado ? antes + Math.Max(0, n) : n;
@@ -481,10 +486,10 @@ namespace Bigorna.Motor
                         if (acumulado) Roteiro.Vars[chave] = ok ? 0 : total;
                         Roteiro.Vars["ultimosSucessos"] = n;
                         Log.Info("  teste: " + n + " sucesso(s)" + (acumulado ? ", " + total + " no total" : "") + ", precisava de " + meta + (secreto ? " (secreto)" : ""));
-                        string msg = ok ? "<b>Sucesso!</b>" + (secreto ? "" : " (" + total + " de " + meta + ")")
-                            : acumulado ? "<b>Ainda não.</b> O esforço conta: vocês estão mais perto" + (secreto ? "" : " (" + total + " de " + meta + ")") + ". Tentem de novo."
-                            : "<b>Fracasso.</b>" + (secreto ? "" : " (" + n + " de " + meta + ")");
-                        Dialogos.Mensagem(msg, null, "Teste");
+                        string msg = ok ? T("<b>Sucesso!</b>", "<b>Success!</b>") + (secreto ? "" : " (" + total + T(" de ", " of ") + meta + ")")
+                            : acumulado ? T("<b>Ainda não.</b> O esforço conta: vocês estão mais perto", "<b>Not yet.</b> The effort counts: you are closer") + (secreto ? "" : " (" + total + T(" de ", " of ") + meta + ")") + T(". Tentem de novo.", ". Try again.")
+                            : T("<b>Fracasso.</b>", "<b>Failure.</b>") + (secreto ? "" : " (" + n + T(" de ", " of ") + meta + ")");
+                        Dialogos.Mensagem(msg, null, T("Teste", "Test"));
                         resultado(ok);
                     });
                     break;
@@ -492,7 +497,7 @@ namespace Bigorna.Motor
                 case "showVirtueChoice":
                 {
                     int objeto = Roteiro.ObjetoDaPergunta;
-                    Dialogos.Escolha(P.Texto(p, "text") ?? "", new List<string> { P.Texto(p, "option1") ?? "Primeira virtude", P.Texto(p, "option2") ?? "Segunda virtude" }, i => Roteiro.Escolheu(i, objeto));
+                    Dialogos.Escolha(P.Texto(p, "text") ?? "", new List<string> { P.Texto(p, "option1") ?? T("Primeira virtude", "First virtue"), P.Texto(p, "option2") ?? T("Segunda virtude", "Second virtue") }, i => Roteiro.Escolheu(i, objeto));
                     break;
                 }
                 case "setObjectiveText": Roteiro.DefinirTextoObjetivo(P.Texto(p, "text") ?? "", P.Booleano(p, "final", false)); break;
@@ -557,7 +562,7 @@ namespace Bigorna.Motor
         static string NomeHeroi(string id)
         {
             var h = Herois.Por(id);
-            return h != null ? Herois.NomeDe(h) : (string.IsNullOrEmpty(id) ? "o herói indicado" : id);
+            return h != null ? Herois.NomeDe(h) : (string.IsNullOrEmpty(id) ? T("o herói indicado", "the indicated hero") : id);
         }
 
         static void Tirar(SerializedEnemy e)

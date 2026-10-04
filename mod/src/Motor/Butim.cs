@@ -6,6 +6,7 @@ using Bigorna.Formato;
 using FFG.Core;
 using FFG.D3;
 using UnityEngine;
+using static Bigorna.Idioma;
 
 namespace Bigorna.Motor
 {
@@ -81,7 +82,7 @@ namespace Bigorna.Motor
                 if (b.Ouro > 0) Ouro(d, b.Ouro, r);
                 if (b.Materiais > 0) MateriaisAleatorios(d, b.Materiais, r);
                 for (int k = 0; k < b.Equipamento; k++) ItemAleatorio(d, r);
-                if (b.Receitas > 0) r.Avisos.Add("Recebam " + b.Receitas + " receita(s) (na mesa).");
+                if (b.Receitas > 0) r.Avisos.Add(T("Recebam " + b.Receitas + " receita(s) (na mesa).", "Take " + b.Receitas + " recipe(s) (on the table)."));
             }
             catch (Exception ex) { Log.Erro("entregando os espólios", ex); }
             Mostrar(r, origem);
@@ -112,17 +113,17 @@ namespace Bigorna.Motor
             var d = Jogo.DadosJogo?.Data; string texto;
             try
             {
-                if (d == null) texto = "Percam " + v + " de ouro (na mesa).";
+                if (d == null) texto = T("Percam " + v + " de ouro (na mesa).", "Lose " + v + " gold (on the table).");
                 else
                 {
                     int tinha = d.Gold; d.ChangeGoldDuringQuest(-v); int foi = tinha - d.Gold;
                     Log.Info("  o grupo perde " + foi + " de ouro (tinha " + tinha + ")");
-                    texto = foi > 0 ? "Perderam " + foi + " " + Jogo.Texto("UI_GOLD", "ouro") + "." : "O grupo não tinha ouro para perder.";
+                    texto = foi > 0 ? T("Perderam ", "The party lost ") + foi + " " + Jogo.Texto("UI_GOLD", T("ouro", "gold")) + "." : T("O grupo não tinha ouro para perder.", "The party had no gold to lose.");
                     Jogo.Sujo();
                 }
             }
             catch (Exception ex) { Log.Erro("tirando ouro", ex); return; }
-            Dialogos.Mensagem(texto, null, origem ?? Jogo.Texto("UI_TREASURE", "Tesouro"));
+            Dialogos.Mensagem(texto, null, origem ?? Jogo.Texto("UI_TREASURE", T("Tesouro", "Treasure")));
         }
 
         /// <summary>O grupo perde n materiais de fabricação ao acaso (uma unidade de cada vez, dos que tem).</summary>
@@ -132,7 +133,7 @@ namespace Bigorna.Motor
             var d = Jogo.DadosJogo?.Data; var perdidos = new Dictionary<string, int>(); string texto;
             try
             {
-                if (d == null) texto = "Percam " + n + " material(is) de fabricação ao acaso (na mesa).";
+                if (d == null) texto = T("Percam " + n + " material(is) de fabricação ao acaso (na mesa).", "Lose " + n + " random crafting material(s) (on the table).");
                 else
                 {
                     for (int k = 0; k < n; k++)
@@ -144,12 +145,12 @@ namespace Bigorna.Motor
                         if (m.Qty <= 0) d.RemoveTreasureDuringQuest(m);
                     }
                     Log.Info("  o grupo perde materiais: " + string.Join(", ", perdidos.Select(x => x.Value + " " + x.Key).ToArray()));
-                    texto = perdidos.Count == 0 ? "O grupo não tinha materiais para perder." : "Perderam: " + string.Join(", ", perdidos.Select(x => x.Value + " " + x.Key).ToArray()) + ".";
+                    texto = perdidos.Count == 0 ? T("O grupo não tinha materiais para perder.", "The party had no crafting materials to lose.") : T("Perderam: ", "The party lost: ") + string.Join(", ", perdidos.Select(x => x.Value + " " + x.Key).ToArray()) + ".";
                     Jogo.Sujo();
                 }
             }
             catch (Exception ex) { Log.Erro("tirando materiais", ex); return; }
-            Dialogos.Mensagem(texto, null, origem ?? Jogo.Texto("UI_TREASURE", "Tesouro"));
+            Dialogos.Mensagem(texto, null, origem ?? Jogo.Texto("UI_TREASURE", T("Tesouro", "Treasure")));
         }
 
         public static bool Tem(string id)
@@ -171,14 +172,14 @@ namespace Bigorna.Motor
             ItemModel m = null; try { m = UserCollectionManager.GetItem(id, false); } catch { }
             if (d != null && m is RecipeModel rec)
             {
-                if (d.GetDiscoveredRecipe(rec.Id) != null) { r.Avisos.Add("O grupo já conhece a receita de «" + NomeItem(rec.CraftedItemId) + "»."); return; }
+                if (d.GetDiscoveredRecipe(rec.Id) != null) { r.Avisos.Add(T("O grupo já conhece a receita de «" + NomeItem(rec.CraftedItemId) + "».", "The party already knows the recipe for “" + NomeItem(rec.CraftedItemId) + "”.")); return; }
                 d.AddTreasureDuringQuest(new SerializedRecipe(rec));
-                r.Digitais.Add(Jogo.Texto("UI_RECIPE", "Receita") + ": " + NomeItem(rec.CraftedItemId));
+                r.Digitais.Add(Jogo.Texto("UI_RECIPE", T("Receita", "Recipe")) + ": " + NomeItem(rec.CraftedItemId));
                 r.Ganhos.Add(new InventoryChange(rec, 1));
                 Log.Info("  o grupo aprende a receita «" + rec.Id + "»");
                 return;
             }
-            if (d == null || m == null || m is RecipeModel) { r.Avisos.Add("Recebam «" + NomeItem(id) + "»" + (qtd > 1 ? " ×" + qtd : "") + " (peguem a carta)."); return; }
+            if (d == null || m == null || m is RecipeModel) { r.Avisos.Add(T("Recebam «" + NomeItem(id) + "»" + (qtd > 1 ? " ×" + qtd : "") + " (peguem a carta).", "Take “" + NomeItem(id) + "”" + (qtd > 1 ? " ×" + qtd : "") + " (take the card).")); return; }
             var nome = NomeItem(id);
             if (m is ConsumableModel c)
             {
@@ -194,7 +195,7 @@ namespace Bigorna.Motor
             }
             else
             {
-                if (d.GetItem(id) != null) { r.Avisos.Add("O grupo já tem «" + nome + "»."); return; }
+                if (d.GetItem(id) != null) { r.Avisos.Add(T("O grupo já tem «" + nome + "».", "The party already has “" + nome + "”.")); return; }
                 d.AddTreasureDuringQuest(new SerializedItem(m));
                 r.Digitais.Add(nome);
             }
@@ -224,7 +225,7 @@ namespace Bigorna.Motor
                 return;
             }
             var loots = UserCollectionManager.GetLoots(true)?.Where(x => x != null).ToList();
-            if (d == null || loots == null || loots.Count == 0) { r.Avisos.Add("Recebam espólios aleatórios de " + pontos + " ponto(s) (na mesa)."); return; }
+            if (d == null || loots == null || loots.Count == 0) { r.Avisos.Add(T("Recebam espólios aleatórios de " + pontos + " ponto(s) (na mesa).", "Take " + pontos + " point(s) of random loot (on the table).")); return; }
             var loot = loots[UnityEngine.Random.Range(0, loots.Count)];
             var conta = new Dictionary<CraftingMaterialModel, int>();
             void Soma(CraftingMaterialModel x) { if (x == null) return; conta[x] = conta.TryGetValue(x, out var n) ? n + 1 : 1; pontos -= Math.Max(1, x.Value); }
@@ -238,14 +239,14 @@ namespace Bigorna.Motor
                 if (ok.Count == 0) { if (conta.Count == 0) Soma(c1 ?? c2); break; }
                 Soma(ok[UnityEngine.Random.Range(0, ok.Count)]);
             }
-            if (conta.Count == 0) { r.Avisos.Add("Recebam espólios aleatórios (na mesa)."); return; }
+            if (conta.Count == 0) { r.Avisos.Add(T("Recebam espólios aleatórios (na mesa).", "Take random loot (on the table).")); return; }
             foreach (var kv in conta) Item(d, kv.Key.Id, kv.Value, r);
         }
 
         static void MateriaisAleatorios(SerializedGame d, int n, Recebido r)
         {
             var mats = UserCollectionManager.GetCraftingMaterials(true)?.Where(x => x != null).ToList();
-            if (d == null || mats == null || mats.Count == 0) { r.Avisos.Add("Recebam " + n + " material(is) de fabricação (na mesa)."); return; }
+            if (d == null || mats == null || mats.Count == 0) { r.Avisos.Add(T("Recebam " + n + " material(is) de fabricação (na mesa).", "Take " + n + " crafting material(s) (on the table).")); return; }
             var m = mats[UnityEngine.Random.Range(0, mats.Count)];
             Item(d, m.Id, n, r);
         }
@@ -259,7 +260,7 @@ namespace Bigorna.Motor
             if (pool != null && pool.Count > 0 && d != null)
             {
                 var livres = pool.Where(id => { if (string.IsNullOrEmpty(id) || _doPool.Contains(id)) return false; bool tem; try { tem = d.GetDiscoveredItem(id) != null; } catch { tem = d.GetItem(id) != null; } if (tem) return false; try { return !(UserCollectionManager.GetItem(id, false) is CraftingMaterialModel); } catch { return true; } }).ToList();
-                if (livres.Count == 0) { r.Avisos.Add("Todos os itens do pool deste mapa já foram obtidos."); return; }
+                if (livres.Count == 0) { r.Avisos.Add(T("Todos os itens do pool deste mapa já foram obtidos.", "All items in this map's item pool have already been obtained.")); return; }
                 var id = livres[UnityEngine.Random.Range(0, livres.Count)];
                 ItemModel m = null; try { m = UserCollectionManager.GetItem(id, false); } catch { }
                 if (!(m is ConsumableModel || m is CraftingMaterialModel)) _doPool.Add(id);   // os que acumulam podem vir de novo
@@ -267,14 +268,14 @@ namespace Bigorna.Motor
                 return;
             }
             var ids = d?.AvailableItemIds;
-            if (ids == null || ids.Count == 0) { r.Avisos.Add("Recebam um item aleatório (na mesa)."); return; }
+            if (ids == null || ids.Count == 0) { r.Avisos.Add(T("Recebam um item aleatório (na mesa).", "Take a random item (on the table).")); return; }
             var novos = new List<string>();
             foreach (var id in ids)
             {
                 ItemModel m = null; try { m = UserCollectionManager.GetItem(id, true); } catch { }
                 if (m != null && !m.IsUpgrade && d.GetDiscoveredItem(m) == null) novos.Add(id);
             }
-            if (novos.Count == 0) { r.Avisos.Add("Todos os itens já foram descobertos."); return; }
+            if (novos.Count == 0) { r.Avisos.Add(T("Todos os itens já foram descobertos.", "All items have already been discovered.")); return; }
             var escolhido = novos[UnityEngine.Random.Range(0, novos.Count)];
             ids.Remove(escolhido);
             Item(d, escolhido, 1, r);
@@ -282,10 +283,10 @@ namespace Bigorna.Motor
 
         static void Ouro(SerializedGame d, int v, Recebido r)
         {
-            if (d == null) { r.Avisos.Add("Recebam " + v + " de ouro."); return; }
+            if (d == null) { r.Avisos.Add(T("Recebam " + v + " de ouro.", "Take " + v + " gold.")); return; }
             d.ChangeGoldDuringQuest(v);
             r.Ganhos.Add(new InventoryChange(new GoldDetails(v), v));
-            r.Digitais.Add(v + " " + Jogo.Texto("UI_GOLD", "ouro"));
+            r.Digitais.Add(v + " " + Jogo.Texto("UI_GOLD", T("ouro", "gold")));
         }
 
         static void Mostrar(Recebido r, string origem)
@@ -293,8 +294,8 @@ namespace Bigorna.Motor
             if (r.Ganhos.Count == 0 && r.Avisos.Count == 0) return;
             string lista(List<string> l) => l.Count == 1 ? l[0] : string.Concat(l.Select(x => "\n  - " + x));
             var partes = new List<string>();
-            if (r.Digitais.Count > 0) partes.Add(string.Format(Jogo.Texto("GAIN_DIGITAL_TREASURE", "Recebido: {0}"), lista(r.Digitais)));
-            if (r.Fisicos.Count > 0) partes.Add(string.Format(Jogo.Texto("GAIN_PHYSICAL_TREASURE", "Peguem: {0}"), lista(r.Fisicos)));
+            if (r.Digitais.Count > 0) partes.Add(string.Format(Jogo.Texto("GAIN_DIGITAL_TREASURE", T("Recebido: {0}", "Received: {0}")), lista(r.Digitais)));
+            if (r.Fisicos.Count > 0) partes.Add(string.Format(Jogo.Texto("GAIN_PHYSICAL_TREASURE", T("Peguem: {0}", "Take: {0}")), lista(r.Fisicos)));
             partes.AddRange(r.Avisos);
             var texto = string.Join("\n\n", partes.ToArray());
             Log.Info("  espólios" + (origem != null ? " de «" + origem + "»" : "") + ": " + texto.Replace("\n", " "));
@@ -314,7 +315,7 @@ namespace Bigorna.Motor
                 catch (Exception ex) { Log.Info("  façanhas dos espólios: " + ex.Message); }
             }
             Jogo.Sujo();
-            Dialogos.Mensagem(texto, () => { try { if (ganhos.Length > 0) Jogo.UI?.InventoryChangedCallout?.CloseCallout(); } catch { } }, origem ?? Jogo.Texto("UI_TREASURE", "Tesouro"),
+            Dialogos.Mensagem(texto, () => { try { if (ganhos.Length > 0) Jogo.UI?.InventoryChangedCallout?.CloseCallout(); } catch { } }, origem ?? Jogo.Texto("UI_TREASURE", T("Tesouro", "Treasure")),
                 () => { try { if (ganhos.Length > 0) { var c = Jogo.UI?.InventoryChangedCallout; if (c != null) { c.SyncTo(ganhos, null); c.gameObject.SetActive(true); } } } catch (Exception ex) { Log.Info("  faixa de itens: " + ex.Message); } });
         }
     }
