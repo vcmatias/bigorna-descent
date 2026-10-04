@@ -55,7 +55,7 @@ The full guide is in the `README.md` inside the package.
 
 Put `.dmap` and `.dcamp` files in
 `%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of the Dark\CustomMaps`
-(the editor can export straight there). On the title screen, the **Mapas da comunidade** panel lists them.
+(the editor can export straight there). On the title screen, the **Community maps** panel lists them.
 
 ## Compatibility promise
 
@@ -83,7 +83,7 @@ The mod compiles against the game's own assemblies, which are not in this reposi
 `Legends of the Dark_Data\Managed` folder into a `refs/` folder at the repository root, then run `bash mod/build.sh`
 (needs the .NET SDK and Python 3). The DLL embeds the editor page built by `editor/salas/montar_salas.py --publico`.
 
-The in-game panels are in Portuguese; the editor is in English, with a Portuguese option.
+The mod and the editor speak English and Portuguese: pick the language in the installer, and switch it any time in the game's **Community maps** panel or in the editor's settings.
 
 ## License
 
