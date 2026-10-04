@@ -130,7 +130,7 @@ def montar(saida, fontes):
     print("montado:", saida, "(" + str(os.path.getsize(saida)) + " bytes)")
 
 
-FONTES_PUBLICAS = '<script src="bigorna-game-data.js"></script>\n<script src="bigorna-worldmap.js"></script>'
+FONTES_PUBLICAS = '<script src="bigorna-idioma.js"></script>\n<script src="bigorna-game-data.js"></script>\n<script src="bigorna-worldmap.js"></script>'
 
 
 def main():

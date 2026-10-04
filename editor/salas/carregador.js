@@ -42,6 +42,7 @@
 
   function emPortugues(jogo) {
     try { const v = localStorage.getItem('bigorna-idioma'); if (v === 'pt') return true; if (v === 'en') return false; } catch { }
+    if (window.BIGORNA_IDIOMA === 'pt' || window.BIGORNA_IDIOMA === 'en') return window.BIGORNA_IDIOMA === 'pt';   // the language picked in the installer (the mod writes bigorna-idioma.js)
     const l = (jogo && jogo.lang) || navigator.language || '';
     return /^pt/i.test(l);
   }

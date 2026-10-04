@@ -11,11 +11,13 @@
    marked data-sem-traducao are skipped, the value and text of text fields too, and any text that is exactly one of the
    strings of the work in progress (projeto / campanha) is left as it is.
    In English nothing of this is installed. The choice lives in localStorage['bigorna-idioma'] ('en' | 'pt'); without it,
-   the language of the game (the mod writes `lang` at the root of the game data) decides. */
+   the language picked in the installer or in the mod's panel (window.BIGORNA_IDIOMA, from bigorna-idioma.js, written by
+   the mod next to the editor) decides, and without that the language of the game (`lang` at the root of the game data). */
 
 const IDIOMAS = [['en', 'English'], ['pt', 'Português (Brasil)']];
 const IDIOMA = (() => {
   try { const v = localStorage.getItem('bigorna-idioma'); if (v === 'en' || v === 'pt') return v; } catch { }
+  if (window.BIGORNA_IDIOMA === 'pt' || window.BIGORNA_IDIOMA === 'en') return window.BIGORNA_IDIOMA;   // picked in the installer or in the mod's panel
   const l = (window.BIGORNA_JOGO || {}).lang;
   return typeof l === 'string' && /^pt/i.test(l) ? 'pt' : 'en';
 })();
