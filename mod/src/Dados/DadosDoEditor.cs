@@ -100,6 +100,7 @@ namespace Bigorna.Dados
                 var novo = new byte[s.Length];
                 int lidos = 0; while (lidos < novo.Length) { int n = s.Read(novo, lidos, novo.Length - lidos); if (n <= 0) break; lidos += n; }
                 Directory.CreateDirectory(Pasta);
+                Idioma.GravarParaOEditor();
                 if (File.Exists(ArquivoEditor))
                 {
                     var velho = File.ReadAllBytes(ArquivoEditor);
@@ -130,7 +131,7 @@ namespace Bigorna.Dados
         static IEnumerator Gerar()
         {
             Gerando = true;
-            Avisar("Bigorna: preparing the editor data from your game…");
+            Avisar(T("Bigorna: preparando os dados do editor a partir do seu jogo…", "Bigorna: preparing the editor data from your game…"));
             float t0 = Time.realtimeSinceStartup;
             float limite = Time.unscaledTime + 120f;
             while (Time.unscaledTime < limite && (Jogo.Persistente?.ABLoader == null || Contar("Enemies") == 0)) yield return null;
@@ -138,7 +139,7 @@ namespace Bigorna.Dados
             if (ab == null || Contar("Enemies") == 0)
             {
                 Log.Info("dados do editor: a coleção do jogo não carregou; tento na próxima vez");
-                Avisar("Bigorna: the game collection did not load; the editor data will be made next time.", 12f);
+                Avisar(T("Bigorna: a coleção do jogo não carregou; os dados do editor ficam para a próxima vez.", "Bigorna: the game collection did not load; the editor data will be made next time."), 12f);
                 _verificado = false; Gerando = false; yield break;
             }
             var carregados = new List<string>();
@@ -204,7 +205,7 @@ namespace Bigorna.Dados
                 {
                     try { g.Retrato(ab, p); } catch (Exception ex) { g.Falhas++; if (g.Falhas <= 10) Log.Info("retrato «" + p.Caminho + "»: " + ex.Message); }
                     feitos++;
-                    if (++n % 12 == 0) { Avisar("Bigorna: preparing the editor data from your game… pictures " + feitos + "/" + total); yield return null; }
+                    if (++n % 12 == 0) { Avisar(T("Bigorna: preparando os dados do editor a partir do seu jogo… imagens ", "Bigorna: preparing the editor data from your game… pictures ") + feitos + "/" + total); yield return null; }
                 }
                 if (!ja && NoTituloAinda()) { try { ab.UnloadBundle(kv.Key); } catch { } }
                 yield return null;
@@ -221,9 +222,9 @@ namespace Bigorna.Dados
             if (erro == null)
             {
                 Log.Info("dados do editor gravados em " + dt.ToString("0.0") + " s: " + g.Resumo() + " → " + ArquivoDados);
-                Avisar(TemAlgumMapa() ? "Bigorna: editor data ready (" + g.Resumo() + ")." : FaltaMapa, TemAlgumMapa() ? 10f : 16f);
+                Avisar(TemAlgumMapa() ? T("Bigorna: dados do editor prontos (", "Bigorna: editor data ready (") + g.Resumo(Idioma.Pt) + ")." : FaltaMapa, TemAlgumMapa() ? 10f : 16f);
             }
-            else Avisar("Bigorna: could not write the editor data: " + erro, 20f);
+            else Avisar(T("Bigorna: não consegui gravar os dados do editor: ", "Bigorna: could not write the editor data: ") + erro, 20f);
             Gerando = false;
         }
 
@@ -599,9 +600,14 @@ namespace Bigorna.Dados
                 File.Move(tmp, arquivo);
             }
 
-            public string Resumo()
+            /// <summary>As contagens; em portugues para o registro, na lingua do mod para o aviso na tela.</summary>
+            public string Resumo(bool pt = true)
             {
                 int N(string k) => (_cat[k] as JArray)?.Count ?? (_cat[k] as JObject)?.Count ?? 0;
+                if (!pt)
+                    return _pecas.Count + " tiles, " + N("monstros") + " enemies, " + N("ativacoes") + " activations, " + N("itens") + " items, " + N("personagens") + " characters, "
+                        + N("herois") + " heroes, " + N("facanhas") + " feats, " + N("receitas") + " recipes, " + Imagens + " pictures" + (Falhas > 0 ? " (" + Falhas + " failed)" : "")
+                        + (SemBundle > 0 ? ", " + SemBundle + " without bundle" : "") + ", " + _en.Count + " texts";
                 return _pecas.Count + " peças, " + N("monstros") + " monstros, " + N("ativacoes") + " ativações, " + N("itens") + " itens, " + N("personagens") + " personagens, "
                     + N("herois") + " heróis, " + N("facanhas") + " façanhas, " + N("receitas") + " receitas, " + Imagens + " imagens" + (Falhas > 0 ? " (" + Falhas + " falharam)" : "")
                     + (SemBundle > 0 ? ", " + SemBundle + " sem bundle" : "") + ", " + _en.Count + " textos";
@@ -693,7 +699,7 @@ namespace Bigorna.Dados
         static string FaltaMapa => T("Bigorna: dados do editor prontos. Para liberar o editor, abra uma campanha até o mapa-múndi.",
                                      "Bigorna: editor data ready. To unlock the editor, open a campaign up to the world map.");
 
-        static string T(string pt, string en) => LinguaDoJogo().StartsWith("pt") ? pt : en;
+        static string T(string pt, string en) => Idioma.T(pt, en);
 
         static bool TemMapa(string ato)
         {
