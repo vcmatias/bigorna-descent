@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="/*@@ICONE@@*/">
+<title>Bigorna Rooms</title>
+<style>
+/*@@ESTILO@@*/
+</style>
+</head>
+<body>
+<header id="topo">
+  <div class="marca"><span class="bigorna">⚒</span><h1 data-sem-traducao>Bigorna <span>Rooms</span></h1></div>
+  <div class="campos">
+    <label class="nomeMapa">Map <input id="m_nome" placeholder="Name of the map"></label>
+    <button id="btnMapa" title="Music, scene, spawn pool, final mission, intro">Map setup</button>
+    <span class="sep"></span>
+    <button id="btnOficina" title="The Workshop: monsters, NPCs, items, tiles, objects, heroes and weapons of this map">⚒ Workshop</button>
+  </div>
+  <div class="acoes">
+    <button id="btnCampanha" title="Campaign">Start a campaign</button>
+    <button id="btnApagarTudo" class="perigo" title="Erase the rooms of this map (tiles, objects, monsters, hero spaces, triggers), its name and its map setup. The workshop and the campaign stay. Asks first and offers to export.">🗑 Clear Map</button>
+    <span id="autoEstado" class="auto" hidden></span>
+    <button id="btnConfig" title="Settings: export folder, author, open, import, quick save/load">⚙</button>
+    <button id="btnExportar" class="primario">Export map</button>
+  </div>
+</header>
+<div id="faixa"></div>
+<main>
+  <aside id="esq">
+    <section class="bloco" id="blocoCampanha" hidden>
+      <h2>Campaign <span id="campNome" class="etq"></span></h2>
+      <div id="missaoAtualInfo" class="missao ativa"></div>
+      <p class="ajuda">You are building the rooms of this map. Pick another map, or add maps, waypoints and dialogues, on the campaign screen (“Campaign ▸” above).</p>
+    </section>
+    <section class="bloco">
+      <h2>Rooms</h2>
+      <div id="listaSalas"></div>
+      <button id="btnNovaSala" class="primario largo">Create the starting room</button>
+      <button id="btnGerarSala" class="largo" title="Build a room from an archetype: three candidates to pick from">✦ Generate room</button>
+      <button id="btnGerarMapa" class="largo" title="Build a whole map: the reason for the incursion, its progression, objectives, a gimmick and the finale">✦ Generate map (experimental)</button>
+      <p class="ajuda" id="ajudaSala"></p>
+    </section>
+    <section class="bloco" id="blocoConferencia"><h2>Checklist</h2><ul id="conferencia"></ul></section>
+    <section class="bloco" id="blocoDicas"><h2>Hints</h2><ul id="dicas"></ul></section>
+  </aside>
+  <section id="centro"><canvas id="tela"></canvas>
+    <div id="controles3d" hidden>
+      <div class="tit">3D view</div>
+      <div class="linha3"><button data-c3="esq" title="Turn 45° to the left (Q)">⟲</button><button data-c3="sobe" title="Look more from above (W)">▲</button><button data-c3="dir" title="Turn 45° to the right (E)">⟳</button></div>
+      <div class="linha3"><button data-c3="topo" title="Straight from above (T)">⊤</button><button data-c3="desce" title="Look more from the side (S)">▼</button><button data-c3="inicio" title="Back to the first angle (Home)">◇</button></div>
+      <div class="linha3"><button data-c3="enq" title="Fit the map (F)">⤢</button><button data-c3="sair" class="largo2" title="Back to the plan (Esc)">Plan</button></div>
+      <small>Drag moves · right-drag turns</small>
+    </div>
+  </section>
+</main>
+
+<!-- campaign screen: covers the rooms editor while open -->
+<section id="telaCampanha" hidden>
+  <header id="topoC">
+    <button id="cVoltar">◂ Rooms</button>
+    <div class="marca"><span class="bigorna">⚒</span><h1>Bigorna <span>Campaign</span></h1></div>
+    <div class="campos"><label>Campaign <input id="c_nome" placeholder="Name of the campaign"></label></div>
+    <div id="abasC">
+      <button data-aba="fluxo" class="ativo">Story flow</button>
+      <button data-aba="mundo">World map</button>
+      <button id="cCaixas" class="caixas" hidden>◂ Back to the story flow</button>
+    </div>
+    <div class="acoes"><button id="cApagar" class="perigo" title="Erase the campaign, all its maps and its workshop from the editor">Delete campaign</button><button id="cExportar" class="primario">Export campaign</button></div>
+  </header>
+  <main id="mainC">
+    <aside id="esqC"></aside>
+    <section id="centroC">
+      <div id="barraC"><div class="botoes" id="cBotoes"></div><span class="espaco"></span><button id="cEnquadrar" class="sm" title="Fit the whole flow in the view">⤢ Fit</button><button id="cVars" class="sm" title="The choices the campaign remembers: create, rename, see what sets each one and what depends on it">Story variables</button><button id="cInv" class="sm" title="What a party of veterans already holds when the campaign starts: gold, items, weapon parts and skills">Starting inventory</button><button id="dicaC" class="sm" title="">?</button></div>
+      <canvas id="telaC"></canvas>
+    </section>
+    <aside id="dirC"></aside>
+  </main>
+</section>
+
+<!-- workshop screen: monsters, NPCs, items, tiles, objects, heroes, weapons -->
+<section id="telaFichas" hidden>
+  <header id="topoF">
+    <button id="fVoltar">◂ Rooms</button>
+    <div class="marca"><span class="bigorna">⚒</span><h1>Bigorna <span>Workshop</span></h1></div>
+    <div id="abasF">
+      <button data-aba="monstros" class="ativo">Monsters</button>
+      <button data-aba="personagens">NPCs</button>
+      <button data-aba="itens">Items</button>
+      <button data-aba="receitas">Recipes</button>
+      <button data-aba="pecas">Tiles</button>
+      <button data-aba="objetos">Objects</button>
+      <button data-aba="herois">Heroes</button>
+      <button data-aba="armas">Weapons</button>
+      <button data-aba="facanhas">Feats</button>
+      <button data-aba="pericias">Skills</button>
+      <button data-aba="historias">Stories</button>
+    </div>
+    <button id="fAjuda" title="How this workshop works">?</button>
+  </header>
+  <main id="mainF">
+    <aside id="esqF"></aside>
+    <section id="centroF"></section>
+  </main>
+</section>
+<div id="aviso"></div>
+<!--@@FONTES@@-->
+<script type="text/plain" id="bigorna-app">
+/*@@IDIOMA@@*/
+/*@@IDIOMA_PT@@*/
+/*@@JOGO@@*/
+/*@@CONFIG@@*/
+/*@@BASE@@*/
+/*@@DESENHO@@*/
+/*@@TEXTURAS@@*/
+/*@@PAPELAO@@*/
+/*@@TRES@@*/
+/*@@INTERFACE@@*/
+/*@@GATILHOS@@*/
+/*@@FICHAS@@*/
+/*@@HEROIS@@*/
+/*@@ARMAS@@*/
+/*@@RECEITAS@@*/
+/*@@FACANHAS@@*/
+/*@@PERICIAS@@*/
+/*@@PACOTES@@*/
+/*@@CAMPANHA@@*/
+/*@@HISTORIAS@@*/
+/*@@NARRATIVA@@*/
+/*@@OFICINA_HISTORIAS@@*/
+/*@@GERADOR@@*/
+/*@@GERADOR_MAPAS@@*/
+/*@@SIMULADOR@@*/
+/*@@EXPORTAR@@*/
+/*@@TUTORIAL@@*/
+</script>
+<script>
+/*@@CARREGADOR@@*/
+</script>
+</body>
+</html>
