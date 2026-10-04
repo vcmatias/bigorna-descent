@@ -3,6 +3,7 @@ using System.Linq;
 using Bigorna.Encontro;
 using FFG.D3;
 using UnityEngine;
+using static Bigorna.Idioma;
 
 namespace Bigorna.Menu
 {
@@ -23,16 +24,16 @@ namespace Bigorna.Menu
             GUI.Box(r, "");
             GUILayout.BeginArea(new Rect(r.x + 8f, r.y + 6f, r.width - 16f, r.height - 12f));
             GUILayout.BeginHorizontal();
-            GUILayout.Label("<b>Teste de som e de cenas</b>  (F7 fecha)", new GUIStyle(GUI.skin.label) { richText = true });
-            if (GUILayout.Button(_cenas ? "Sons" : "Cenas", GUILayout.Width(70f))) _cenas = !_cenas;
+            GUILayout.Label(T("<b>Teste de som e de cenas</b>  (F7 fecha)", "<b>Sound and cutscene test</b>  (F7 closes)"), new GUIStyle(GUI.skin.label) { richText = true });
+            if (GUILayout.Button(_cenas ? T("Sons", "Sounds") : T("Cenas", "Cutscenes"), GUILayout.Width(80f))) _cenas = !_cenas;
             GUILayout.EndHorizontal();
             if (_cenas) { DesenharCenas(); GUILayout.EndArea(); return; }
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Filtro:", GUILayout.Width(44f));
+            GUILayout.Label(T("Filtro:", "Filter:"), GUILayout.Width(44f));
             _filtro = GUILayout.TextField(_filtro ?? "");
-            if (GUILayout.Button("Parar tudo", GUILayout.Width(90f))) Sons.Tocar("Stop_All");
+            if (GUILayout.Button(T("Parar tudo", "Stop all"), GUILayout.Width(90f))) Sons.Tocar("Stop_All");
             GUILayout.EndHorizontal();
-            GUILayout.Label("Último: " + _ultimo + "   ·   o nome é o que vai no gatilho «Play a sound» do editor");
+            GUILayout.Label(T("Último: ", "Last: ") + _ultimo + T("   ·   o nome é o que vai no gatilho «Play a sound» do editor", "   ·   the name is what goes in the editor's \"Play a sound\" trigger"));
             _rolagem = GUILayout.BeginScrollView(_rolagem);
             var f = (_filtro ?? "").Trim().ToLowerInvariant();
             foreach (var (banco, eventos) in Sons.Bancos)
@@ -56,22 +57,22 @@ namespace Bigorna.Menu
 
         static void DesenharCenas()
         {
-            GUILayout.Label("Cenas (vídeos) da sua coleção. O nome ou o id é o que vai no gatilho «Start a cutscene».");
+            GUILayout.Label(T("Cenas (vídeos) da sua coleção. O nome ou o id é o que vai no gatilho «Start a cutscene».", "Cutscenes (videos) in your collection. The name or the id is what goes in the \"Start a cutscene\" trigger."));
             _rolagem = GUILayout.BeginScrollView(_rolagem);
             try
             {
                 var todas = UserCollectionManager.GetCutscenes(true);
-                if (todas == null) GUILayout.Label("(o catálogo ainda não carregou)");
+                if (todas == null) GUILayout.Label(T("(o catálogo ainda não carregou)", "(the catalog has not loaded yet)"));
                 else foreach (var c in todas.Where(x => x != null).OrderBy(x => x.name))
                 {
                     GUILayout.BeginHorizontal();
                     GUILayout.Label(c.name + "\n<size=10>" + c.Id + " · " + c.SoundEventName + "</size>", new GUIStyle(GUI.skin.label) { richText = true });
                     GUI.enabled = !Cinematica.EmMarcha && Jogo.EmEncontro;
-                    if (GUILayout.Button("Ver", GUILayout.Width(50f), GUILayout.Height(34f))) Cinematica.Tocar(c.Id);
+                    if (GUILayout.Button(T("Ver", "View"), GUILayout.Width(50f), GUILayout.Height(34f))) Cinematica.Tocar(c.Id);
                     GUI.enabled = true;
                     GUILayout.EndHorizontal();
                 }
-                if (!Jogo.EmEncontro) GUILayout.Label("As cenas só tocam dentro de uma missão (abra um mapa).");
+                if (!Jogo.EmEncontro) GUILayout.Label(T("As cenas só tocam dentro de uma missão (abra um mapa).", "Cutscenes only play inside a quest (open a map)."));
             }
             catch (Exception ex) { GUILayout.Label(ex.Message); }
             GUILayout.EndScrollView();

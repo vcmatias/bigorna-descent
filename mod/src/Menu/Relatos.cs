@@ -8,6 +8,7 @@ using System.Text;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.Networking;
+using static Bigorna.Idioma;
 
 namespace Bigorna.Menu
 {
@@ -78,26 +79,29 @@ namespace Bigorna.Menu
             var r = Janela;
             GUI.Box(r, ""); GUI.Box(r, "");
             GUILayout.BeginArea(new Rect(r.x + 12f, r.y + 10f, r.width - 24f, r.height - 20f));
-            GUILayout.Label("Relatar um problema", _titulo);
-            GUILayout.Label("Contem o que aconteceu: o que fizeram, o que esperavam e o que o jogo fez. Quanto mais detalhes (sala, objeto, rodada), melhor.", _pequeno);
+            GUILayout.Label(T("Relatar um problema", "Report a problem"), _titulo);
+            GUILayout.Label(T("Contem o que aconteceu: o que fizeram, o que esperavam e o que o jogo fez. Quanto mais detalhes (sala, objeto, rodada), melhor.",
+                "Tell what happened: what you did, what you expected and what the game did. The more details (room, object, round), the better."), _pequeno);
             _rolagem = GUILayout.BeginScrollView(_rolagem, GUILayout.Height(170f));
             _texto = GUILayout.TextArea(_texto ?? "", _area, GUILayout.ExpandHeight(true));
             GUILayout.EndScrollView();
-            GUILayout.Label("Contato (opcional: e-mail ou Discord, para o autor poder perguntar mais):", _pequeno);
+            GUILayout.Label(T("Contato (opcional: e-mail ou Discord, para o autor poder perguntar mais):", "Contact (optional: e-mail or Discord, so the author can ask for more):"), _pequeno);
             _contato = GUILayout.TextField(_contato ?? "", 120);
             GUILayout.Space(6f);
-            GUILayout.Label("<b>Vai junto:</b> " + string.Join(", ", Itens().Select(i => i.Nome).ToArray())
-                + ". O nome do seu usuário do Windows sai dos registros. " + (PodeEnviar ? "Com «Enviar», o pacote vai por e-mail para o autor do Bigorna." : "O pacote fica salvo na pasta Relatos, para vocês mandarem ao autor."), _pequeno);
+            GUILayout.Label(T("<b>Vai junto:</b> ", "<b>Included:</b> ") + string.Join(", ", Itens().Select(i => i.Nome).ToArray())
+                + T(". O nome do seu usuário do Windows sai dos registros. ", ". Your Windows user name is removed from the logs. ")
+                + (PodeEnviar ? T("Com «Enviar», o pacote vai por e-mail para o autor do Bigorna.", "With \"Send\", the package goes by e-mail to the author of Bigorna.")
+                              : T("O pacote fica salvo na pasta Relatos, para vocês mandarem ao autor.", "The package is saved in the Relatos folder, for you to send to the author.")), _pequeno);
             GUILayout.FlexibleSpace();
             if (!string.IsNullOrEmpty(_situacao)) GUILayout.Label(_situacao, _pequeno);
             GUILayout.BeginHorizontal();
             GUI.enabled = !_enviando && (_texto ?? "").Trim().Length >= 5;
-            if (PodeEnviar && GUILayout.Button(_enviando ? "Enviando…" : "Enviar", GUILayout.Height(32f), GUILayout.Width(130f))) Nucleo.Instancia?.StartCoroutine(Enviar());
-            if (GUILayout.Button("Só salvar o pacote", GUILayout.Height(32f), GUILayout.Width(160f))) Salvar();
+            if (PodeEnviar && GUILayout.Button(_enviando ? T("Enviando…", "Sending…") : T("Enviar", "Send"), GUILayout.Height(32f), GUILayout.Width(130f))) Nucleo.Instancia?.StartCoroutine(Enviar());
+            if (GUILayout.Button(T("Só salvar o pacote", "Just save the package"), GUILayout.Height(32f), GUILayout.Width(170f))) Salvar();
             GUI.enabled = true;
-            if (GUILayout.Button("Abrir a pasta", GUILayout.Height(32f), GUILayout.Width(120f))) AbrirPasta();
+            if (GUILayout.Button(T("Abrir a pasta", "Open folder"), GUILayout.Height(32f), GUILayout.Width(120f))) AbrirPasta();
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Fechar", GUILayout.Height(32f), GUILayout.Width(90f))) Aberto = false;
+            if (GUILayout.Button(T("Fechar", "Close"), GUILayout.Height(32f), GUILayout.Width(90f))) Aberto = false;
             GUILayout.EndHorizontal();
             GUILayout.EndArea();
         }
@@ -200,10 +204,10 @@ namespace Bigorna.Menu
             {
                 var zip = Montar(out var nome);
                 _ultimoPacote = Guardar(zip, nome);
-                _situacao = "Pacote salvo: " + Limpar(_ultimoPacote) + " (" + zip.Length / 1024 + " KB). Mandem este arquivo ao autor.";
+                _situacao = T("Pacote salvo: ", "Package saved: ") + Limpar(_ultimoPacote) + " (" + zip.Length / 1024 + T(" KB). Mandem este arquivo ao autor.", " KB). Send this file to the author.");
                 Log.Info("relato salvo: " + _ultimoPacote);
             }
-            catch (Exception ex) { _situacao = "Não consegui montar o pacote: " + ex.Message; Log.Erro("montando o relato", ex); }
+            catch (Exception ex) { _situacao = T("Não consegui montar o pacote: ", "Could not build the package: ") + ex.Message; Log.Erro("montando o relato", ex); }
         }
 
         static IEnumerator Enviar()
@@ -211,9 +215,9 @@ namespace Bigorna.Menu
             _enviando = true;
             byte[] zip = null; string nome = null;
             try { zip = Montar(out nome); _ultimoPacote = Guardar(zip, nome); }
-            catch (Exception ex) { _situacao = "Não consegui montar o pacote: " + ex.Message; Log.Erro("montando o relato", ex); _enviando = false; yield break; }
-            if (zip.Length > LimiteDoPacote) { _situacao = "O pacote ficou grande demais para enviar (" + zip.Length / 1024 + " KB). Ele está salvo na pasta Relatos: mandem ao autor."; _enviando = false; yield break; }
-            _situacao = "Enviando…";
+            catch (Exception ex) { _situacao = T("Não consegui montar o pacote: ", "Could not build the package: ") + ex.Message; Log.Erro("montando o relato", ex); _enviando = false; yield break; }
+            if (zip.Length > LimiteDoPacote) { _situacao = T("O pacote ficou grande demais para enviar (", "The package is too big to send (") + zip.Length / 1024 + T(" KB). Ele está salvo na pasta Relatos: mandem ao autor.", " KB). It is saved in the Relatos folder: send it to the author."); _enviando = false; yield break; }
+            _situacao = T("Enviando…", "Sending…");
             var corpo = new JObject
             {
                 ["chave"] = Chave,
@@ -240,19 +244,21 @@ namespace Bigorna.Menu
                 try { var j = JObject.Parse(resposta ?? ""); ok = j.Value<bool?>("ok") == true; id = j.Value<string>("id"); if (!ok) { recusa = j.Value<string>("erro"); Log.Info("relato recusado: " + resposta); } } catch { }
                 if (ok)
                 {
-                    _situacao = "Enviado. Obrigado! (relato " + id + ")";
+                    _situacao = T("Enviado. Obrigado! (relato ", "Sent. Thank you! (report ") + id + ")";
                     _texto = ""; _contato = "";
                     Log.Info("relato enviado: " + id);
                 }
                 else if (recusa == "limite da pessoa" || recusa == "limite do dia")
                 {
-                    _situacao = (recusa == "limite da pessoa" ? "Vocês já mandaram 5 relatos hoje, o limite por dia." : "O limite de relatos de hoje foi atingido.")
-                        + " O pacote está salvo na pasta Relatos: mandem amanhã ou por outro meio.";
+                    _situacao = (recusa == "limite da pessoa" ? T("Vocês já mandaram 5 relatos hoje, o limite por dia.", "You have already sent 5 reports today, the daily limit.")
+                                                             : T("O limite de relatos de hoje foi atingido.", "Today's report limit has been reached."))
+                        + T(" O pacote está salvo na pasta Relatos: mandem amanhã ou por outro meio.", " The package is saved in the Relatos folder: send it tomorrow or another way.");
                     Log.Info("relato: " + recusa);
                 }
                 else
                 {
-                    _situacao = "O envio não confirmou (" + (recusa ?? req.error ?? ("resposta " + req.responseCode)) + "). O pacote está salvo na pasta Relatos: mandem ao autor.";
+                    _situacao = T("O envio não confirmou (", "The upload was not confirmed (") + (recusa ?? req.error ?? (T("resposta ", "response ") + req.responseCode))
+                        + T("). O pacote está salvo na pasta Relatos: mandem ao autor.", "). The package is saved in the Relatos folder: send it to the author.");
                     Log.Info("relato: envio sem confirmação (" + req.responseCode + " " + req.error + ")");
                 }
             }

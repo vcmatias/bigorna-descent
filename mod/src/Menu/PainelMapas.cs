@@ -6,6 +6,7 @@ using Bigorna.Encontro;
 using Bigorna.Formato;
 using FFG.D3;
 using UnityEngine;
+using static Bigorna.Idioma;
 
 namespace Bigorna.Menu
 {
@@ -69,56 +70,63 @@ namespace Bigorna.Menu
             if (Jogo.CenaAtual() != Scene.Titlescene) { _aberto = false; return; }
             Estilos();
             var botao = new Rect(Screen.width / 2f - 130f, Screen.height - 64f, 260f, 40f);
-            if (GUI.Button(botao, _aberto ? "Fechar mapas" : "Mapas da comunidade", _botao)) Alternar();
+            if (GUI.Button(botao, _aberto ? T("Fechar mapas", "Close maps") : T("Mapas da comunidade", "Community maps"), _botao)) Alternar();
             if (!_aberto) return;
             if (Time.unscaledTime > _proximaLeitura) Reler();
             float largura = Mathf.Min(760f, Screen.width - 40f), altura = Mathf.Min(Screen.height - 140f, 620f);
             var janela = new Rect((Screen.width - largura) / 2f, 60f, largura, altura);
             GUI.Box(janela, GUIContent.none, _janela);
             GUILayout.BeginArea(new Rect(janela.x + 14f, janela.y + 10f, janela.width - 28f, janela.height - 20f));
-            // o titulo numa linha, os botoes na seguinte (numa linha so, o titulo espremia letra por letra)
-            GUILayout.Label("Mapas da comunidade · Bigorna " + Bootstrap.Versao, _titulo);
+            // o titulo numa linha (com a troca de lingua na ponta), os botoes na seguinte (numa linha so, o titulo espremia letra por letra)
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Reler", _botao, GUILayout.Width(80f))) Reler();
-            if (GUILayout.Button("Abrir pasta", _botao, GUILayout.Width(110f))) AbrirPasta();
-            if (Dados.DadosDoEditor.EditorInstalado && GUILayout.Button("Abrir editor", _botao, GUILayout.Width(120f))) Dados.DadosDoEditor.AbrirEditor();
+            GUILayout.Label(T("Mapas da comunidade", "Community maps") + " · Bigorna " + Bootstrap.Versao, _titulo);
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button(Pt ? "English" : "Português", _botao, GUILayout.Width(100f))) Definir(!Pt);
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(T("Reler", "Reload"), _botao, GUILayout.Width(80f))) Reler();
+            if (GUILayout.Button(T("Abrir pasta", "Open folder"), _botao, GUILayout.Width(110f))) AbrirPasta();
+            if (Dados.DadosDoEditor.EditorInstalado && GUILayout.Button(T("Abrir editor", "Open editor"), _botao, GUILayout.Width(120f))) Dados.DadosDoEditor.AbrirEditor();
             GUI.enabled = !Dados.DadosDoEditor.Gerando;
-            if (GUILayout.Button(Dados.DadosDoEditor.Gerando ? "Gerando…" : "Refazer dados do editor", _botao, GUILayout.Width(190f))) Dados.DadosDoEditor.Refazer();
+            if (GUILayout.Button(Dados.DadosDoEditor.Gerando ? T("Gerando…", "Generating…") : T("Refazer dados do editor", "Rebuild editor data"), _botao, GUILayout.Width(190f))) Dados.DadosDoEditor.Refazer();
             GUI.enabled = true;
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Relatar um problema", _botao, GUILayout.Width(170f))) Relatos.Alternar();
+            if (GUILayout.Button(T("Relatar um problema", "Report a problem"), _botao, GUILayout.Width(170f))) Relatos.Alternar();
             GUILayout.EndHorizontal();
             GUILayout.Label(Bootstrap.PastaMapas, _pequeno);
-            if (_erro != null) GUILayout.Label("Não li a pasta: " + _erro, _pequeno);
+            if (_erro != null) GUILayout.Label(T("Não li a pasta: ", "Could not read the folder: ") + _erro, _pequeno);
             GUILayout.Space(6f);
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Campanhas (" + _campanhas.Count + ")", _aba == 0 ? _abaOn : _abaOff, GUILayout.Width(180f))) _aba = 0;
-            if (GUILayout.Button("Mapas avulsos (" + _mapas.Count + ")", _aba == 1 ? _abaOn : _abaOff, GUILayout.Width(200f))) _aba = 1;
-            if (GUILayout.Button("Mapas oficiais (" + MapasOficiais.Quantas + ")", _aba == 2 ? _abaOn : _abaOff, GUILayout.Width(200f))) _aba = 2;
+            if (GUILayout.Button(T("Campanhas", "Campaigns") + " (" + _campanhas.Count + ")", _aba == 0 ? _abaOn : _abaOff, GUILayout.Width(180f))) _aba = 0;
+            if (GUILayout.Button(T("Mapas avulsos", "Standalone maps") + " (" + _mapas.Count + ")", _aba == 1 ? _abaOn : _abaOff, GUILayout.Width(200f))) _aba = 1;
+            if (GUILayout.Button(T("Mapas oficiais", "Official maps") + " (" + MapasOficiais.Quantas + ")", _aba == 2 ? _abaOn : _abaOff, GUILayout.Width(200f))) _aba = 2;
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
-            GUILayout.Label(_aba == 0 ? "Uma campanha encadeia vários mapas no mapa-múndi do jogo (diálogos, viagens, recompensas). Os mapas de uma campanha jogam-se por ela, não pela lista de mapas avulsos."
-                : _aba == 1 ? "Um mapa avulso é um .dmap solto: começa direto no tabuleiro e, ao terminar, volta ao menu."
-                : "As missões do próprio jogo, para jogar de novo qualquer uma delas com as regras oficiais: escolham a missão, o grupo e a dificuldade.", _pequeno);
+            GUILayout.Label(_aba == 0 ? T("Uma campanha encadeia vários mapas no mapa-múndi do jogo (diálogos, viagens, recompensas). Os mapas de uma campanha jogam-se por ela, não pela lista de mapas avulsos.",
+                                         "A campaign links several maps on the game's world map (dialogues, travel, rewards). A campaign's maps are played through it, not from the standalone maps list.")
+                : _aba == 1 ? T("Um mapa avulso é um .dmap solto: começa direto no tabuleiro e, ao terminar, volta ao menu.",
+                                "A standalone map is a single .dmap: it starts right on the board and goes back to the menu when it ends.")
+                : T("As missões do próprio jogo, para jogar de novo qualquer uma delas com as regras oficiais: escolham a missão, o grupo e a dificuldade.",
+                    "The game's own quests, to replay any of them with the official rules: choose the quest, the party and the difficulty."), _pequeno);
             GUILayout.Space(4f);
             _rolagem = GUILayout.BeginScrollView(_rolagem);
-            if (_aba == 0 && _campanhas.Count == 0) GUILayout.Label("Nenhuma campanha (.dcamp) na pasta. No editor, «Create campaign» e depois «Export campaign».", _texto);
-            if (_aba == 1 && _mapas.Count == 0) GUILayout.Label("Nenhum .dmap avulso na pasta. Exporte um mapa no editor e copie para cá.", _texto);
+            if (_aba == 0 && _campanhas.Count == 0) GUILayout.Label(T("Nenhuma campanha (.dcamp) na pasta. No editor, «Create campaign» e depois «Export campaign».", "No campaigns (.dcamp) in the folder. In the editor, use \"Create campaign\" and then \"Export campaign\"."), _texto);
+            if (_aba == 1 && _mapas.Count == 0) GUILayout.Label(T("Nenhum .dmap avulso na pasta. Exporte um mapa no editor e copie para cá.", "No standalone .dmap in the folder. Export a map in the editor and copy it here."), _texto);
             if (_aba == 0) foreach (var c in _campanhas)
             {
                 if (!_progressos.TryGetValue(c, out var prog)) _progressos[c] = prog = Campanha.Progresso.Carregar(c);
                 GUILayout.BeginHorizontal(GUI.skin.box);
                 GUILayout.BeginVertical();
                 GUILayout.Label(c.NomeVisivel, _texto);
-                GUILayout.Label(c.Nos.Count(n => n.EhMapa) + " mapa(s), " + c.Nos.Count(n => !n.EhMapa) + " parada(s) narrativa(s)" + (prog.Completados.Count > 0 ? " · " + prog.Completados.Count + " nó(s) completado(s)" : "") + (string.IsNullOrEmpty(c.Metadados.Descricao) ? "" : "\n" + c.Metadados.Descricao), _pequeno);
+                GUILayout.Label(c.Nos.Count(n => n.EhMapa) + T(" mapa(s), ", " map(s), ") + c.Nos.Count(n => !n.EhMapa) + T(" parada(s) narrativa(s)", " narrative stop(s)") + (prog.Completados.Count > 0 ? " · " + prog.Completados.Count + T(" nó(s) completado(s)", " node(s) completed") : "") + (string.IsNullOrEmpty(c.Metadados.Descricao) ? "" : "\n" + c.Metadados.Descricao), _pequeno);
                 GUILayout.EndVertical();
-                if (GUILayout.Button(prog.Completados.Count > 0 ? "Continuar" : "Jogar", _botao, GUILayout.Width(100f), GUILayout.Height(40f)))
+                if (GUILayout.Button(prog.Completados.Count > 0 ? T("Continuar", "Continue") : T("Jogar", "Play"), _botao, GUILayout.Width(100f), GUILayout.Height(40f)))
                 {
                     Log.Info("«Jogar» campanha " + c.NomeVisivel + " (" + c.Caminho + ")");
                     var erro = Campanha.Campanha.Comecar(c, false);
                     if (erro != null) _erro = erro; else _aberto = false;
                 }
-                if (prog.Completados.Count > 0 && GUILayout.Button("Recomeçar", _botao, GUILayout.Width(100f), GUILayout.Height(40f)))
+                if (prog.Completados.Count > 0 && GUILayout.Button(T("Recomeçar", "Restart"), _botao, GUILayout.Width(100f), GUILayout.Height(40f)))
                 {
                     var erro = Campanha.Campanha.Comecar(c, true);
                     if (erro != null) _erro = erro; else _aberto = false;
@@ -132,9 +140,9 @@ namespace Bigorna.Menu
                 GUILayout.BeginHorizontal(GUI.skin.box);
                 GUILayout.BeginVertical();
                 GUILayout.Label(m.NomeVisivel, _texto);
-                GUILayout.Label(m.Resumo + (string.IsNullOrEmpty(m.Metadados.Descricao) ? "" : "\n" + m.Metadados.Descricao), _pequeno);
+                GUILayout.Label(m.Resumo(Pt) + (string.IsNullOrEmpty(m.Metadados.Descricao) ? "" : "\n" + m.Metadados.Descricao), _pequeno);
                 GUILayout.EndVertical();
-                if (GUILayout.Button("Jogar", _botao, GUILayout.Width(90f), GUILayout.Height(40f)))
+                if (GUILayout.Button(T("Jogar", "Play"), _botao, GUILayout.Width(90f), GUILayout.Height(40f)))
                 {
                     Log.Info("«Jogar» em " + m.NomeVisivel + " (" + m.Caminho + ")");
                     var erro = Lancador.Lancar(m);

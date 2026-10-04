@@ -5,6 +5,7 @@ using FFG.Core;
 using FFG.D3;
 using NodeCanvas.Framework;
 using UnityEngine;
+using static Bigorna.Idioma;
 
 namespace Bigorna.Menu
 {
@@ -60,8 +61,8 @@ namespace Bigorna.Menu
 
         public static string Jogar(QuestModel q, List<HeroModel> herois, DifficultySetting dificuldade)
         {
-            if (q == null) return "Escolha uma missão.";
-            if (herois == null || herois.Count < 2 || herois.Count > 4) return "Escolha de 2 a 4 heróis.";
+            if (q == null) return T("Escolha uma missão.", "Choose a quest.");
+            if (herois == null || herois.Count < 2 || herois.Count > 4) return T("Escolha de 2 a 4 heróis.", "Choose 2 to 4 heroes.");
             SerializedGame partida;
             try
             {
@@ -71,7 +72,7 @@ namespace Bigorna.Menu
                 foreach (var h in herois)
                 {
                     var p = partida.GetPlayer(h, false);
-                    if (p == null) return "O herói " + NomeHeroi(h) + " não está na coleção.";
+                    if (p == null) return T("O herói " + NomeHeroi(h) + " não está na coleção.", "The hero " + NomeHeroi(h) + " is not in your collection.");
                     partida.ActivePlayers.Add(p);
                 }
                 partida.QuestId = q.Id;
@@ -84,10 +85,10 @@ namespace Bigorna.Menu
                 if (salvar.GetExistingIndexes().Contains(0)) salvar.DeleteSaveSlot(0);
                 if (q.Id == "STORY_QUEST_1" || q.Id == "ACT2_QUEST_1") Jogo.Carregador.LoadingIntroSequence = true;
             }
-            catch (Exception ex) { Log.Erro("preparando a missão oficial", ex); return "Não consegui preparar a partida: " + ex.Message; }
+            catch (Exception ex) { Log.Erro("preparando a missão oficial", ex); return T("Não consegui preparar a partida: ", "Could not set up the game: ") + ex.Message; }
             Log.Info("mapa oficial: " + q.Id + " (" + Nome(q) + "), " + herois.Count + " herói(s), dificuldade " + dificuldade + ", progressão " + partida.CampaignProgressionOverride);
             try { Jogo.Carregador.LoadLevel(q, partida, true); }
-            catch (Exception ex) { Log.Erro("carregando a missão oficial", ex); return "O jogo não carregou a missão: " + ex.Message; }
+            catch (Exception ex) { Log.Erro("carregando a missão oficial", ex); return T("O jogo não carregou a missão: ", "The game did not load the quest: ") + ex.Message; }
             EmJogo = true;
             return null;
         }
@@ -180,7 +181,8 @@ namespace Bigorna.Menu
         static QuestModel _escolhida;
         static readonly HashSet<string> _grupo = new HashSet<string>();
         static int _dificuldade = 1;
-        static readonly string[] Dificuldades = { "Fácil", "Normal", "Difícil", "Brutal" };
+        static readonly string[] DificuldadesPt = { "Fácil", "Normal", "Difícil", "Brutal" }, DificuldadesEn = { "Easy", "Normal", "Hard", "Brutal" };
+        static string[] Dificuldades => Pt ? DificuldadesPt : DificuldadesEn;
         static readonly DifficultySetting[] Valores = { DifficultySetting.Journey, DifficultySetting.Standard, DifficultySetting.Heroic, DifficultySetting.Warfare };
         static List<QuestModel> _lista;
         static List<HeroModel> _herois;
@@ -192,18 +194,18 @@ namespace Bigorna.Menu
         {
             _lista = _lista ?? Lista(); _herois = _herois ?? Herois();
             string erro = null;
-            if (_lista.Count == 0) { GUILayout.Label("Nenhuma missão do jogo encontrada na sua coleção.", texto); return null; }
+            if (_lista.Count == 0) { GUILayout.Label(T("Nenhuma missão do jogo encontrada na sua coleção.", "No game quests found in your collection."), texto); return null; }
             Act? ato = null;
             foreach (var q in _lista)
             {
-                if (ato != q.Act) { ato = q.Act; GUILayout.Space(4f); GUILayout.Label(q.Act == Act.ActI ? "Ato I" : q.Act == Act.ActII ? "Ato II" : "Ato III", texto); }
+                if (ato != q.Act) { ato = q.Act; GUILayout.Space(4f); GUILayout.Label(T("Ato ", "Act ") + (q.Act == Act.ActI ? "I" : q.Act == Act.ActII ? "II" : "III"), texto); }
                 GUILayout.BeginVertical(GUI.skin.box);
                 GUILayout.BeginHorizontal();
                 GUILayout.BeginVertical();
-                GUILayout.Label(Nome(q) + (q.Type == QuestModel.QuestType.Side ? "  (secundária)" : ""), texto);
+                GUILayout.Label(Nome(q) + (q.Type == QuestModel.QuestType.Side ? T("  (secundária)", "  (side quest)") : ""), texto);
                 var d = Descricao(q); if (!string.IsNullOrEmpty(d) && _escolhida == q) GUILayout.Label(d, pequeno);
                 GUILayout.EndVertical();
-                if (GUILayout.Button(_escolhida == q ? "Fechar" : "Escolher", botao, GUILayout.Width(100f), GUILayout.Height(34f)))
+                if (GUILayout.Button(_escolhida == q ? T("Fechar", "Close") : T("Escolher", "Choose"), botao, GUILayout.Width(100f), GUILayout.Height(34f)))
                 {
                     _escolhida = _escolhida == q ? null : q;
                     if (_escolhida != null) { _grupo.Clear(); foreach (var id in Exigidos(q)) _grupo.Add(id); }
@@ -219,7 +221,7 @@ namespace Bigorna.Menu
         static string Configurar(QuestModel q, GUIStyle botao, GUIStyle pequeno, Action fechar)
         {
             var exigidos = Exigidos(q);
-            GUILayout.Label("Heróis (2 a 4)" + (exigidos.Count > 0 ? " · a missão exige os marcados em destaque" : "") + ":", pequeno);
+            GUILayout.Label(T("Heróis (2 a 4)", "Heroes (2 to 4)") + (exigidos.Count > 0 ? T(" · a missão exige os marcados em destaque", " · the quest requires the highlighted ones") : "") + ":", pequeno);
             int col = 0;
             GUILayout.BeginHorizontal();
             foreach (var h in _herois)
@@ -234,14 +236,15 @@ namespace Bigorna.Menu
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Dificuldade:", pequeno, GUILayout.Width(80f));
+            GUILayout.Label(T("Dificuldade:", "Difficulty:"), pequeno, GUILayout.Width(80f));
             _dificuldade = GUILayout.Toolbar(_dificuldade, Dificuldades, GUILayout.Width(360f));
             GUILayout.FlexibleSpace();
             GUI.enabled = _grupo.Count >= 2 && _grupo.Count <= 4;
-            bool jogar = GUILayout.Button("Jogar", botao, GUILayout.Width(100f), GUILayout.Height(34f));
+            bool jogar = GUILayout.Button(T("Jogar", "Play"), botao, GUILayout.Width(100f), GUILayout.Height(34f));
             GUI.enabled = true;
             GUILayout.EndHorizontal();
-            GUILayout.Label("Regras do jogo, sem nada do mod por cima; o grupo começa com o equipamento inicial e a campanha no ponto desta missão. Ao terminar, volta ao menu.", pequeno);
+            GUILayout.Label(T("Regras do jogo, sem nada do mod por cima; o grupo começa com o equipamento inicial e a campanha no ponto desta missão. Ao terminar, volta ao menu.",
+                "The game's own rules, with nothing from the mod on top; the party starts with the starting gear and the campaign at this quest's point. When it ends, it goes back to the menu."), pequeno);
             if (!jogar) return null;
             var grupo = _herois.Where(h => _grupo.Contains(h.Id)).ToList();
             Log.Info("«Jogar» mapa oficial " + q.Id);

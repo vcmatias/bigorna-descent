@@ -5,6 +5,7 @@ using Bigorna.Encontro;
 using Bigorna.Formato;
 using Bigorna.Motor;
 using UnityEngine;
+using static Bigorna.Idioma;
 
 namespace Bigorna.Menu
 {
@@ -34,18 +35,19 @@ namespace Bigorna.Menu
         public static void Teclas()
         {
             if (!Ctrl) return;
-            if (Shift && Input.GetKeyDown(KeyCode.D)) { Ligada = !Ligada; Aberto = Ligada; Avisar(Ligada ? "modo de teste ligado (Ctrl+D abre o painel)" : "modo de teste desligado"); return; }
+            if (Shift && Input.GetKeyDown(KeyCode.D)) { Ligada = !Ligada; Aberto = Ligada; if (Ligada) Avisar("modo de teste ligado (Ctrl+D abre o painel)", "test mode on (Ctrl+D opens the panel)"); else Avisar("modo de teste desligado", "test mode off"); return; }
             if (!Ligada) return;
             if (Input.GetKeyDown(KeyCode.D)) Aberto = !Aberto;
-            if (Input.GetKeyDown(KeyCode.T)) { TestesPassam = !TestesPassam; Avisar("testes " + (TestesPassam ? "passam sozinhos" : "perguntam de novo")); }
+            if (Input.GetKeyDown(KeyCode.T)) { TestesPassam = !TestesPassam; Avisar("testes " + (TestesPassam ? "passam sozinhos" : "perguntam de novo"), "skill tests " + (TestesPassam ? "pass on their own" : "ask again")); }
             if (!Pronto) return;
             if (Input.GetKeyDown(KeyCode.N)) AbrirProxima();
             if (Input.GetKeyDown(KeyCode.K)) DerrotarTodos();
             if (Input.GetKeyDown(KeyCode.U)) UsarProximo();
-            if (Input.GetKeyDown(KeyCode.W)) { Roteiro.Completar(true); Avisar("mapa vencido"); }
+            if (Input.GetKeyDown(KeyCode.W)) { Roteiro.Completar(true); Avisar("mapa vencido", "map won"); }
         }
 
-        static void Avisar(string t) { _ultimo = t; Log.Info("[teste] " + t); }
+        /// <summary>Mostra o aviso no painel, na lingua do mod; o registro fica em portugues.</summary>
+        static void Avisar(string pt, string en) { _ultimo = T(pt, en); Log.Info("[teste] " + pt); }
 
         /// <summary>As salas ainda fechadas, em ordem (sala 2, 3…), com o gatilho que as abre.</summary>
         static List<(string grupo, Dmap.Gatilho g)> Fechadas()
@@ -65,61 +67,62 @@ namespace Bigorna.Menu
         {
             try
             {
-                if (g != null) { Roteiro.Executar(g, true, true); Avisar("abrindo «" + grupo + "» pelo gatilho «" + g.Rotulo + "»"); }
-                else { Tabuleiro.Revelar(grupo); Avisar("revelando «" + grupo + "» (nenhum gatilho a abre)"); }
+                if (g != null) { Roteiro.Executar(g, true, true); Avisar("abrindo «" + grupo + "» pelo gatilho «" + g.Rotulo + "»", "opening \"" + grupo + "\" through the trigger \"" + g.Rotulo + "\""); }
+                else { Tabuleiro.Revelar(grupo); Avisar("revelando «" + grupo + "» (nenhum gatilho a abre)", "revealing \"" + grupo + "\" (no trigger opens it)"); }
             }
             catch (Exception ex) { Log.Erro("abrindo sala no modo de teste", ex); }
         }
-        public static void AbrirProxima() { var f = Fechadas(); if (f.Count == 0) { Avisar("todas as salas estão abertas"); return; } Abrir(f[0].grupo, f[0].g); }
+        public static void AbrirProxima() { var f = Fechadas(); if (f.Count == 0) { Avisar("todas as salas estão abertas", "all rooms are open"); return; } Abrir(f[0].grupo, f[0].g); }
 
         public static void DerrotarTodos()
         {
             int n = 0;
             try { foreach (var e in Jogo.Inimigos.ToList()) { Acoes.Derrotar(e); n++; } } catch (Exception ex) { Log.Erro("derrotando no modo de teste", ex); }
-            Avisar(n + " monstro(s) derrotado(s)");
+            Avisar(n + " monstro(s) derrotado(s)", "enemies defeated: " + n);
         }
 
         static IEnumerable<Objetos.NaMesa> Usaveis() => Objetos.Postos.Where(p => p != null && p.Visivel && !p.Usado && p.Dados != null && !Objetos.EhEscadaDeMao(p.Dados.Tipo)).Reverse();
         public static void UsarProximo()
         {
-            var p = Usaveis().FirstOrDefault(); if (p == null) { Avisar("nenhum objeto por usar"); return; }
-            try { Objetos.Usar(p.Indice); Avisar("usado «" + p.Rotulo + "»"); } catch (Exception ex) { Log.Erro("usando no modo de teste", ex); }
+            var p = Usaveis().FirstOrDefault(); if (p == null) { Avisar("nenhum objeto por usar", "no objects left to use"); return; }
+            try { Objetos.Usar(p.Indice); Avisar("usado «" + p.Rotulo + "»", "used \"" + p.Rotulo + "\""); } catch (Exception ex) { Log.Erro("usando no modo de teste", ex); }
         }
 
         public static void Desenhar()
         {
             if (!Ligada) return;
-            if (!Aberto) { GUI.color = new Color(1f, 0.8f, 0.4f, 0.95f); GUI.Label(new Rect(12f, 30f, 600f, 22f), "MODO DE TESTE · Ctrl+D painel · Ctrl+N abre sala · Ctrl+K derrota · Ctrl+U usa objeto · Ctrl+T testes · Ctrl+W vence"); GUI.color = Color.white; return; }
-            _janela = GUILayout.Window(77311, _janela, Janela, "Bigorna · modo de teste");
+            if (!Aberto) { GUI.color = new Color(1f, 0.8f, 0.4f, 0.95f); GUI.Label(new Rect(12f, 30f, 600f, 22f), T("MODO DE TESTE · Ctrl+D painel · Ctrl+N abre sala · Ctrl+K derrota · Ctrl+U usa objeto · Ctrl+T testes · Ctrl+W vence", "TEST MODE · Ctrl+D panel · Ctrl+N opens room · Ctrl+K defeats · Ctrl+U uses object · Ctrl+T tests · Ctrl+W wins")); GUI.color = Color.white; return; }
+            _janela = GUILayout.Window(77311, _janela, Janela, T("Bigorna · modo de teste", "Bigorna · test mode"));
         }
 
         static void Janela(int id)
         {
             if (_pequeno == null) _pequeno = new GUIStyle(GUI.skin.label) { fontSize = 11, wordWrap = true };
-            GUILayout.Label("Ctrl+N abre a próxima sala · Ctrl+K derrota todos · Ctrl+U usa o próximo objeto · Ctrl+T testes · Ctrl+W vence · Ctrl+D fecha · Ctrl+Shift+D desliga", _pequeno);
-            TestesPassam = GUILayout.Toggle(TestesPassam, " Testes de habilidade passam sozinhos");
-            if (!Pronto) { GUILayout.Label("Entre num mapa do Bigorna para usar os atalhos.", _pequeno); GUI.DragWindow(); return; }
+            GUILayout.Label(T("Ctrl+N abre a próxima sala · Ctrl+K derrota todos · Ctrl+U usa o próximo objeto · Ctrl+T testes · Ctrl+W vence · Ctrl+D fecha · Ctrl+Shift+D desliga",
+                "Ctrl+N opens the next room · Ctrl+K defeats all · Ctrl+U uses the next object · Ctrl+T tests · Ctrl+W wins · Ctrl+D closes · Ctrl+Shift+D turns off"), _pequeno);
+            TestesPassam = GUILayout.Toggle(TestesPassam, T(" Testes de habilidade passam sozinhos", " Skill tests pass on their own"));
+            if (!Pronto) { GUILayout.Label(T("Entre num mapa do Bigorna para usar os atalhos.", "Enter a Bigorna map to use the shortcuts."), _pequeno); GUI.DragWindow(); return; }
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Derrotar todos")) DerrotarTodos();
-            if (GUILayout.Button("Próxima sala")) AbrirProxima();
-            if (GUILayout.Button("Vencer o mapa")) { Roteiro.Completar(true); Avisar("mapa vencido"); }
+            if (GUILayout.Button(T("Derrotar todos", "Defeat all"))) DerrotarTodos();
+            if (GUILayout.Button(T("Próxima sala", "Next room"))) AbrirProxima();
+            if (GUILayout.Button(T("Vencer o mapa", "Win the map"))) { Roteiro.Completar(true); Avisar("mapa vencido", "map won"); }
             GUILayout.EndHorizontal();
             if (!string.IsNullOrEmpty(_ultimo)) GUILayout.Label("› " + _ultimo, _pequeno);
             _rolagem = GUILayout.BeginScrollView(_rolagem);
-            GUILayout.Label("<b>Salas fechadas</b>");
+            GUILayout.Label(T("<b>Salas fechadas</b>", "<b>Closed rooms</b>"));
             foreach (var (grupo, g) in Fechadas())
             {
                 GUILayout.BeginHorizontal();
-                GUILayout.Label(grupo + (g == null ? " (sem gatilho)" : ""), _pequeno, GUILayout.Width(250));
-                if (GUILayout.Button("Abrir", GUILayout.Width(70))) Abrir(grupo, g);
+                GUILayout.Label(grupo + (g == null ? T(" (sem gatilho)", " (no trigger)") : ""), _pequeno, GUILayout.Width(250));
+                if (GUILayout.Button(T("Abrir", "Open"), GUILayout.Width(70))) Abrir(grupo, g);
                 GUILayout.EndHorizontal();
             }
-            GUILayout.Label("<b>Objetos na mesa</b>");
+            GUILayout.Label(T("<b>Objetos na mesa</b>", "<b>Objects on the table</b>"));
             foreach (var p in Objetos.Postos.Where(x => x != null && x.Visivel && x.Dados != null && !Objetos.EhEscadaDeMao(x.Dados.Tipo)))
             {
                 GUILayout.BeginHorizontal();
-                GUILayout.Label("#" + p.Indice + " " + p.Rotulo + (p.Usado ? " (usado)" : ""), _pequeno, GUILayout.Width(250));
-                if (GUILayout.Button(p.Usado ? "De novo" : "Usar", GUILayout.Width(70))) { if (p.Usado) Objetos.Reabrir(p.Indice); Objetos.Usar(p.Indice); Avisar("usado «" + p.Rotulo + "»"); }
+                GUILayout.Label("#" + p.Indice + " " + p.Rotulo + (p.Usado ? T(" (usado)", " (used)") : ""), _pequeno, GUILayout.Width(250));
+                if (GUILayout.Button(p.Usado ? T("De novo", "Again") : T("Usar", "Use"), GUILayout.Width(70))) { if (p.Usado) Objetos.Reabrir(p.Indice); Objetos.Usar(p.Indice); Avisar("usado «" + p.Rotulo + "»", "used \"" + p.Rotulo + "\""); }
                 GUILayout.EndHorizontal();
             }
             GUILayout.EndScrollView();
