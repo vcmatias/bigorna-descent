@@ -77,7 +77,7 @@ namespace Bigorna.Campanha
                         }
                         case "giveItem": Campanha.DarItem((string)a["item"], (int?)a["qty"] ?? 1); break;
                         case "giveMaterials": Campanha.DarMateriais((int?)a["n"] ?? (int?)a["amount"] ?? 1); break;
-                        case "removeMaterials": Dialogos.Narrativa("O grupo entrega " + ((int?)a["amount"] ?? 1) + " material(is).", null, null); break;
+                        case "removeMaterials": Dialogos.Narrativa(Idioma.T("O grupo entrega " + ((int?)a["amount"] ?? 1) + " material(is).", "The party hands over " + ((int?)a["amount"] ?? 1) + " material(s)."), null, null); break;
                         case "setVar": Campanha.Estado?.PorVar((string)a["var"], (int?)a["value"] ?? 1); break;
                         case "addVar": { var v = (string)a["var"]; Campanha.Estado?.PorVar(v, (Campanha.Estado?.Var(v) ?? 0) + ((int?)a["value"] ?? 1)); break; }
                         default: Log.Info("  ação de campanha desconhecida: " + que); break;

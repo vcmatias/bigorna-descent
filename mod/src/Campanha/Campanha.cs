@@ -38,7 +38,7 @@ namespace Bigorna.Campanha
                 Abrir(c);
                 if (recomecar) Estado.Zerar();
                 var modelo = CampanhaDoJogo(c);
-                if (modelo == null) return "Nenhuma campanha do jogo disponível para servir de base.";
+                if (modelo == null) return Idioma.T("Nenhuma campanha do jogo disponível para servir de base.", "No campaign of the game is available to serve as the base.");
                 var partida = new SerializedGame(modelo.Id);
                 partida.Initialize();
                 partida.PartyName = c.NomeVisivel;
@@ -53,7 +53,7 @@ namespace Bigorna.Campanha
                     partida.ActiveDestinationIds.AddUniqueItem(no.Id);
                     n++;
                 }
-                if (n == 0) return "A campanha não tem nenhum nó disponível no início (todos completados?). Use «Recomeçar».";
+                if (n == 0) return Idioma.T("A campanha não tem nenhum nó disponível no início (todos completados?). Use «Recomeçar».", "The campaign has no node available at the start (all completed?). Use \"Restart\".");
                 var salvar = SingletonBehaviour<SaveLoadController>.Instance;
                 Jogo.DadosJogo.CurrentSaveIndex = salvar.GetFirstFreeIndex();
                 Log.Info("partida de «" + c.NomeVisivel + "» na ranhura " + Jogo.DadosJogo.CurrentSaveIndex + " com " + n + " destino(s) de saída");
@@ -233,18 +233,18 @@ namespace Bigorna.Campanha
             var p = n.Premios; if (p == null) return;
             foreach (var item in p.Itens) DarItem(item, 1);
             if (p.Materiais > 0) DarMateriais(p.Materiais);
-            if (p.Ouro > 0) Motor.Butim.Entregar(new Formato.Dmap.Butim { Modo = "explicit", Ouro = p.Ouro }, "Recompensa");
+            if (p.Ouro > 0) Motor.Butim.Entregar(new Formato.Dmap.Butim { Modo = "explicit", Ouro = p.Ouro }, Idioma.T("Recompensa", "Reward"));
         }
 
         public static void DarItem(string id, int quantidade)
         {
             if (string.IsNullOrEmpty(id)) return;
-            Motor.Butim.DarItem(id, quantidade, "Recompensa");
+            Motor.Butim.DarItem(id, quantidade, Idioma.T("Recompensa", "Reward"));
         }
 
         public static void DarMateriais(int n)
         {
-            Motor.Butim.DarMateriais(n, "Recompensa");
+            Motor.Butim.DarMateriais(n, Idioma.T("Recompensa", "Reward"));
         }
     }
 }
