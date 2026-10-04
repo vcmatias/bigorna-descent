@@ -177,7 +177,19 @@ function Get-ModVersion {
 # ------------------------------------------------------------------ editor
 
 # o editor do pacote (o mesmo que vai dentro da DLL) na pasta Editor, para o atalho funcionar desde ja
+# a lingua escolhida aqui vale para o mod (bigorna-idioma.txt, lido no jogo) e para o editor (bigorna-idioma.js, ao lado dele)
+function Save-Language {
+    try {
+        $utf8 = New-Object System.Text.UTF8Encoding($false)
+        New-Item -ItemType Directory -Force -Path (Get-EditorFolder) | Out-Null
+        [IO.File]::WriteAllText((Join-Path (Get-DataFolder) 'bigorna-idioma.txt'), $Lang, $utf8)
+        [IO.File]::WriteAllText((Join-Path (Get-EditorFolder) 'bigorna-idioma.js'), "window.BIGORNA_IDIOMA = `"$Lang`";`n", $utf8)
+        Log ('idioma do mod e do editor: ' + $Lang)
+    } catch { Log ('ERRO gravando o idioma: ' + $_.Exception.Message) }
+}
+
 function Install-Editor {
+    Save-Language
     $src = Join-Path $here 'Bigorna-Salas.html'
     if (-not (Test-Path -LiteralPath $src)) { return $false }
     New-Item -ItemType Directory -Force -Path (Get-EditorFolder) | Out-Null
@@ -312,7 +324,8 @@ $fontStep = New-Object System.Drawing.Font('Segoe UI', 10)
 $fontStepOn = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)
 
 $form = New-Object System.Windows.Forms.Form
-$form.Text = (L 'Instalador do Bigorna' 'Bigorna installer') + $(if ((Get-ModVersion)) { ' ' + (Get-ModVersion) } else { '' })
+function Set-FormTitle { $form.Text = (L 'Instalador do Bigorna' 'Bigorna installer') + $(if ((Get-ModVersion)) { ' ' + (Get-ModVersion) } else { '' }) }
+Set-FormTitle
 $form.ClientSize = New-Object System.Drawing.Size([int](760 * $K), [int](500 * $K))
 $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedDialog'
@@ -333,7 +346,8 @@ $brand.ForeColor = $cSideOn
 Set-Box $brand 20 20 180 40
 $side.Controls.Add($brand)
 
-$stepNames = @((L 'Boas-vindas' 'Welcome'), (L 'Pasta do jogo' 'Game folder'), (L 'Instalar o mod' 'Install the mod'), (L 'Liberar o editor' 'Unlock the editor'), (L 'Pronto' 'Done'))
+function Get-StepNames { return @((L 'Boas-vindas' 'Welcome'), (L 'Pasta do jogo' 'Game folder'), (L 'Instalar o mod' 'Install the mod'), (L 'Liberar o editor' 'Unlock the editor'), (L 'Pronto' 'Done')) }
+$stepNames = Get-StepNames
 $stepLabels = @()
 for ($i = 0; $i -lt $stepNames.Count; $i++) {
     $lb = New-Object System.Windows.Forms.Label
@@ -343,6 +357,19 @@ for ($i = 0; $i -lt $stepNames.Count; $i++) {
     $side.Controls.Add($lb)
     $stepLabels += $lb
 }
+
+# idioma: segue o Windows na abertura e pode ser trocado aqui a qualquer momento
+$langLabel = New-Object System.Windows.Forms.Label
+$langLabel.Text = 'Idioma do mod / Language'
+$langLabel.ForeColor = $cSideText
+Set-Box $langLabel 20 418 180 20
+$side.Controls.Add($langLabel)
+$langBox = New-Object System.Windows.Forms.ComboBox
+$langBox.DropDownStyle = 'DropDownList'
+[void]$langBox.Items.AddRange(@('Português', 'English'))
+$langBox.SelectedIndex = $(if ($PT) { 0 } else { 1 })
+Set-Box $langBox 20 442 170 26
+$side.Controls.Add($langBox)
 
 $title = New-Object System.Windows.Forms.Label
 Set-Box $title 235 20 500 36
@@ -503,7 +530,7 @@ function Show-Step([int]$n) {
     switch ($n) {
         0 {
             $title.Text = (L 'Instalar o Bigorna' 'Install Bigorna')
-            New-Text (L "Este assistente:`r`n`r`n$([char]0x2022) encontra o Descent: Legends of the Dark no seu computador;`r`n$([char]0x2022) instala o mod Bigorna na pasta do jogo;`r`n$([char]0x2022) coloca o editor Bigorna Rooms na pasta de dados do jogo e cria um atalho dele na Área de Trabalho, se você quiser.;`r`n$([char]0x2022) acompanha você abrindo o jogo e uma campanha até o mapa-múndi: nesse caminho o mod lê as peças, monstros, textos e o mapa da sua cópia, e o editor fica liberado.`r`n`r`nO pacote traz só código próprio. O conteúdo do jogo sai da sua cópia instalada e fica no seu computador.`r`n`r`nProjeto de fã, sem vínculo com a Fantasy Flight Games ou a Asmodee. É preciso ter o jogo." "This wizard:`r`n`r`n$([char]0x2022) finds Descent: Legends of the Dark on your computer;`r`n$([char]0x2022) installs the Bigorna mod in the game folder;`r`n$([char]0x2022) puts the Bigorna Rooms editor in the game data folder and makes a desktop shortcut to it, if you want one.;`r`n$([char]0x2022) walks you through starting the game and a campaign up to the world map: on the way, the mod reads the tiles, monsters, texts and map of your copy, and the editor unlocks.`r`n`r`nThe package holds only its own code. The game content comes from your installed copy and stays on your computer.`r`n`r`nA fan project, not affiliated with Fantasy Flight Games or Asmodee. You need the game.") 0 300 $null | Out-Null
+            New-Text (L "Este assistente:`r`n`r`n$([char]0x2022) encontra o Descent: Legends of the Dark no seu computador;`r`n$([char]0x2022) instala o mod Bigorna na pasta do jogo;`r`n$([char]0x2022) coloca o editor Bigorna Rooms na pasta de dados do jogo e cria um atalho dele na Área de Trabalho, se você quiser;`r`n$([char]0x2022) acompanha você abrindo o jogo e uma campanha até o mapa-múndi: nesse caminho o mod lê as peças, monstros, textos e o mapa da sua cópia, e o editor fica liberado.`r`n`r`nO pacote traz só código próprio. O conteúdo do jogo sai da sua cópia instalada e fica no seu computador.`r`n`r`nProjeto de fã, sem vínculo com a Fantasy Flight Games ou a Asmodee. É preciso ter o jogo." "This wizard:`r`n`r`n$([char]0x2022) finds Descent: Legends of the Dark on your computer;`r`n$([char]0x2022) installs the Bigorna mod in the game folder;`r`n$([char]0x2022) puts the Bigorna Rooms editor in the game data folder and makes a desktop shortcut to it, if you want one;`r`n$([char]0x2022) walks you through starting the game and a campaign up to the world map: on the way, the mod reads the tiles, monsters, texts and map of your copy, and the editor unlocks.`r`n`r`nThe package holds only its own code. The game content comes from your installed copy and stays on your computer.`r`n`r`nA fan project, not affiliated with Fantasy Flight Games or Asmodee. You need the game.") 0 300 $null | Out-Null
             $u = New-Object System.Windows.Forms.LinkLabel
             $u.Text = (L 'Desinstalar o Bigorna...' 'Uninstall Bigorna...')
             Set-Box $u 0 330 300 24
@@ -544,7 +571,7 @@ function Show-Step([int]$n) {
             $body.Controls.Add($lb)
             $ui.Log = $lb
             $ui.Status = New-Text '' 212 60 $null
-            New-Text (L 'Depois de uma atualização do jogo, rode este instalador de novo: a atualização reescreve as listas do jogo.' 'After a game update, run this installer again: the update rewrites the game lists.') 290 40 $null | Out-Null
+            $ui.Note = New-Text (L 'Depois de uma atualização do jogo, rode este instalador de novo: a atualização reescreve as listas do jogo.' 'After a game update, run this installer again: the update rewrites the game lists.') 290 40 $null
             $btnNext.Enabled = $false
             Invoke-Install
         }
@@ -600,6 +627,7 @@ function Invoke-Next {
         2 { if ($S.Installed) { Show-Step 3 } }
         3 { Update-Unlock; if ($S.Ready) { Show-Step 4 } }
         4 {
+            Save-Language
             if ($ui.Shortcut.Checked) { try { New-Shortcut } catch { Show-Error $_.Exception.Message } }
             $form.Close()
         }
@@ -628,6 +656,31 @@ function Invoke-UninstallUi {
         $form.Close()
     } catch { Show-Error $_.Exception.Message }
 }
+
+function Set-Language([bool]$pt) {
+    if ($pt -eq $script:PT) { return }
+    $script:PT = $pt; $script:Lang = $(if ($pt) { 'pt' } else { 'en' })
+    Log ('idioma: ' + $script:Lang)
+    Set-FormTitle
+    if ($S.Installed -or $S.Step -ge 3) { Save-Language }   # depois da instalacao, a troca vale para o mod e o editor
+    $script:stepNames = Get-StepNames
+    $btnBack.Text = (L '< Voltar' '< Back'); $btnCancel.Text = (L 'Cancelar' 'Cancel')
+    switch ($S.Step) {
+        1 { $path = $ui.Path.Text; $forge = $ui.Forge.Checked; Show-Step 1; $ui.Path.Text = $path; $ui.Forge.Checked = $forge; Update-GameCheck }
+        2 {
+            # a instalacao ja rodou: so os textos mudam (refazer a etapa instalaria de novo)
+            Update-Side
+            $title.Text = (L 'Instalar o mod' 'Install the mod')
+            $ui.Note.Text = (L 'Depois de uma atualização do jogo, rode este instalador de novo: a atualização reescreve as listas do jogo.' 'After a game update, run this installer again: the update rewrites the game lists.')
+            if ($S.Installed) { $ui.Status.Text = (L 'Mod instalado. Avance para liberar o editor.' 'Mod installed. Go on to unlock the editor.') }
+            else { $ui.Status.Text = (L 'A instalação falhou. Volte, confira a pasta e tente de novo.' 'Installation failed. Go back, check the folder and try again.') }
+            $btnNext.Text = (L 'Avançar >' 'Next >')
+        }
+        4 { $sc = $ui.Shortcut.Checked; Show-Step 4; $ui.Shortcut.Checked = $sc }
+        default { Show-Step $S.Step }
+    }
+}
+$langBox.Add_SelectedIndexChanged({ try { Set-Language ($langBox.SelectedIndex -eq 0) } catch { Show-Error $_.Exception.Message } })
 
 $btnNext.Add_Click({ try { Invoke-Next } catch { Show-Error $_.Exception.Message } })
 $btnBack.Add_Click({ try { if ($S.Step -eq 2) { Show-Step 1 } else { Show-Step ($S.Step - 1) } } catch { Show-Error $_.Exception.Message } })

@@ -53,8 +53,8 @@ into `%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of t
   sounds from your copy of the game;
 - `bigorna-worldmap.js`: the world map, pictured the first time you open the world map in each act. The editor unlocks once any act has its picture.
 
-A notice in the corner shows the progress. On the title screen, the "Mapas da comunidade" panel has the buttons
-"Abrir editor" (open the editor) and "Refazer dados do editor" (read the game again).
+A notice in the corner shows the progress. On the title screen, the "Community maps" panel has the buttons
+"Open editor" and "Rebuild editor data" (read the game again).
 
 **Do not share `bigorna-game-data.js` or `bigorna-worldmap.js`**: they hold the game's texts and pictures. Share the
 maps and campaigns you make (`.dmap`, `.dcamp`); anyone who opens them uses their own copy of the game.
@@ -62,17 +62,17 @@ maps and campaigns you make (`.dmap`, `.dcamp`); anyone who opens them uses thei
 ## Play community maps
 
 Put `.dmap` and `.dcamp` files in `%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of the Dark\CustomMaps`
-(the editor can export straight there). On the title screen, "Mapas da comunidade" lists them.
+(the editor can export straight there). On the title screen, "Community maps" lists them.
 
 ## Report a problem
 
-In the game, press **F9** (or the "Relatar um problema" button in the "Mapas da comunidade" panel). Write what happened:
+In the game, press **F9** (or the "Report a problem" button in the "Community maps" panel). Write what happened:
 what you did, what you expected and what the game did. The mod builds a .zip with your text, the map and campaign in play
 and the game logs (`bigorna.log`, `Player.log`), with your Windows user name replaced by `%USERPROFILE%`.
 
-- **Enviar** (send): the package goes to the author of Bigorna by e-mail. Nothing leaves your computer without this
+- **Send**: the package goes to the author of Bigorna by e-mail. Nothing leaves your computer without this
   click.
-- **Só salvar o pacote** (just save): it stays in the `Relatos` folder, in the game's data folder, for you to send some
+- **Just save the package**: it stays in the `Relatos` folder, in the game's data folder, for you to send some
   other way.
 
 ## Uninstall
@@ -87,4 +87,8 @@ stay where they are.
 the DLLs from your `Legends of the Dark_Data\Managed` folder into `source/refs/` first (they are not included).
 `source/editor/salas/montar_salas.py --publico` builds the editor page that goes inside the DLL.
 
-The in-game panels of the mod are in Portuguese; the editor is in English.
+## Language
+
+The mod and the editor speak English and Portuguese. The installer window has a language box (it starts in the Windows language)
+and sets both. Later, the language button in the "Community maps" panel switches the mod, and the editor has its own
+choice in its settings.

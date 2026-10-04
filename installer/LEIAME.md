@@ -56,6 +56,12 @@ Na tela de título, na primeira vez (e de novo depois de uma atualização do jo
 Um aviso no canto mostra o andamento. No painel "Mapas da comunidade" da tela de título ficam os botões
 "Abrir editor" e "Refazer dados do editor".
 
+## Idioma
+
+O mod e o editor falam português e inglês. A janela do instalador tem a caixa de idioma (começa na língua do Windows) e
+ajusta os dois. Depois, o botão de idioma no painel "Mapas da comunidade" troca o mod, e o editor tem a própria escolha
+nas configurações dele.
+
 **Guarde `bigorna-game-data.js` e `bigorna-worldmap.js` só para você**: eles têm textos e imagens do jogo.
 Compartilhe os mapas e campanhas que fizer (`.dmap`, `.dcamp`); quem abrir usa a própria cópia do jogo.
 
