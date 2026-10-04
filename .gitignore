@@ -1,0 +1,10 @@
+# DLLs do jogo (cada pessoa copia as suas) e saídas de compilação
+refs/
+mod/out/
+editor/dist/
+editor/dados/
+__pycache__/
+*.pyc
+# dados que o mod grava a partir da cópia do jogo: nunca vão para o repositório
+bigorna-game-data.js
+bigorna-worldmap.js
