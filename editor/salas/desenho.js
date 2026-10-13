@@ -145,8 +145,10 @@ function desenhar() {
 
   const pecas = []; projeto.salas.forEach((s, si) => s.pecas.forEach((p, pi) => { const alf = ehAlfombra(p.tile); pecas.push({ p, si, pi, alf, ordem: alf ? -1 : (p.level || 0) }); }));
   pecas.sort((a, b) => a.ordem - b.ordem);
-  const adicionadas = pecasAdicionadas();
-  pecas.forEach(({ p, si, pi, alf }) => desenharPeca(p, (si !== salaAtual ? 0.35 : 1) * (adicionadas.has(si + ':' + pi) ? 0.55 : 1) * alfaNivel(alf ? 0 : p.level), sel && sel.tipo === 'peca' && sel.sala === si && sel.i === pi, si === salaAtual));
+  const adicionadas = pecasAdicionadas(); const marcas = marcasDoMapa();
+  pecas.forEach(({ p, si, pi, alf }) => { const mk = marcas.pecas.has(si + ':' + pi);
+    desenharPeca(p, (si !== salaAtual ? 0.35 : 1) * (adicionadas.has(si + ':' + pi) ? 0.55 : 1) * (mk ? 0.4 : 1) * alfaNivel(alf ? 0 : p.level), sel && sel.tipo === 'peca' && sel.sala === si && sel.i === pi, si === salaAtual);
+    if (mk) marcaDeDestino(casasDaPeca(p)); });
   // a room still in preview (the room generator): tinted blue and striped, with a dashed edge and a label, to show it is provisional
   projeto.salas.forEach((s, si) => { if (s._previa) desenharPrevia(si); });
   // pillars of the tiles
@@ -174,7 +176,8 @@ function desenhar() {
     const casas = casasDoObjeto(o); const img = imagemObj(o.type);
     const xs = casas.map(c => c[0]), ys = casas.map(c => c[1]); const x0 = Math.min(...xs), y0 = Math.min(...ys), w = Math.max(...xs) - x0 + 1, h = Math.max(...ys) - y0 + 1;
     const aN = alfaNivel(o.level, ehTipo(o, 'Staircase')); const vo = varObj(o.type);
-    ctx.globalAlpha = (si === salaAtual ? 1 : 0.4) * (o.hidden ? 0.55 : 1) * aN;
+    const ehMk = marcas.objetos.has(si + ':' + oi);
+    ctx.globalAlpha = (si === salaAtual ? 1 : 0.4) * (o.hidden || ehMk ? 0.55 : 1) * (ehMk ? 0.6 : 1) * aN;
     const tex = !vo && texturaDoObjeto(o.type);
     if (tex) desenharTexturaGirada(tex, o, x0, y0, w, h);
     else if (vo) { casas.forEach(([x, y]) => { ctx.fillStyle = vo.cor || '#6a5a48'; ctx.fillRect(x * C + 1.5, y * C + 1.5, C - 3, C - 3); }); ctx.fillStyle = 'rgba(0,0,0,.25)'; casas.forEach(([x, y]) => ctx.fillRect(x * C + 1.5, y * C + C - 5, C - 3, 3.5)); }
@@ -188,6 +191,7 @@ function desenhar() {
     if (escolha && escolha.modo === 'object') { const pulso = 0.5 + 0.5 * Math.sin(Date.now() / 250); ctx.strokeStyle = `rgba(255,230,120,${0.4 + 0.6 * pulso})`; ctx.lineWidth = 4 / vista.zoom; ctx.strokeRect(x0 * C - 2, y0 * C - 2, w * C + 4, h * C + 4); }
     ctx.fillStyle = '#fff'; ctx.font = `${10 / vista.zoom}px system-ui`; ctx.shadowColor = '#000'; ctx.shadowBlur = 3;
     ctx.fillText(rotulo(o).slice(0, 18) + ((o.level || 0) > 0 ? ' L' + o.level : ''), x0 * C + 3, y0 * C + h * C - 3); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    if (ehMk) marcaDeDestino(casas);
     if (selecionado) marcarSelecao(x0, y0, w, h);
   });
   // enemies
@@ -195,12 +199,14 @@ function desenhar() {
     const [x, y] = e.pos; const img = retratoImg('ini:' + e.enemy, iconeIni(e.enemy));
     const spawn = origem.tipo === 'gat';
     ctx.globalAlpha = (si === salaAtual ? 1 : 0.4) * (spawn ? 0.85 : 1) * alfaNivel(e.level);
-    ctx.fillStyle = ehPool(e.enemy) ? COR.pool : spawn ? COR.spawn : COR.inimigo; ctx.beginPath(); ctx.arc(x * C + C / 2, y * C + C / 2, C * 0.44, 0, Math.PI * 2); ctx.fill();
-    if (img && img.complete && img.naturalWidth) { ctx.save(); ctx.beginPath(); ctx.arc(x * C + C / 2, y * C + C / 2, C * 0.38, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(img, x * C + C * 0.12, y * C + C * 0.12, C * 0.76, C * 0.76); ctx.restore(); }
-    else { ctx.fillStyle = '#fff'; ctx.font = `bold ${11 / vista.zoom}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(nomeIni(e.enemy).slice(0, 2).toUpperCase(), x * C + C / 2, y * C + C / 2 + 4 / vista.zoom); ctx.textAlign = 'left'; }
+    // (a large monster takes 2x2 spaces: drawn over all four, from its space down and to the right)
+    const G = ehGrande(e.enemy) ? 2 : 1; const cxI = x * C + C * G / 2, cyI = y * C + C * G / 2;
+    ctx.fillStyle = ehPool(e.enemy) ? COR.pool : spawn ? COR.spawn : COR.inimigo; ctx.beginPath(); ctx.arc(cxI, cyI, C * 0.44 * G, 0, Math.PI * 2); ctx.fill();
+    if (img && img.complete && img.naturalWidth) { ctx.save(); ctx.beginPath(); ctx.arc(cxI, cyI, C * 0.38 * G, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(img, cxI - C * 0.38 * G, cyI - C * 0.38 * G, C * 0.76 * G, C * 0.76 * G); ctx.restore(); }
+    else { ctx.fillStyle = '#fff'; ctx.font = `bold ${11 * G / vista.zoom}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(nomeIni(e.enemy).slice(0, 2).toUpperCase(), cxI, cyI + 4 * G / vista.zoom); ctx.textAlign = 'left'; }
     ctx.globalAlpha = 1;
     const selecionado = sel && sel.tipo === 'inimigo' && sel.sala === si && ((origem.tipo === 'sala' && sel.g === undefined && sel.i === origem.i) || (origem.tipo === 'gat' && sel.g === origem.g && sel.obj === origem.obj && (sel.l || 'gatilhos') === origem.l && sel.i === origem.k));
-    if (selecionado) marcarSelecao(x, y, 1, 1);
+    if (selecionado) marcarSelecao(x, y, G, G);
   }));
   // the pillar tool shows the sockets of the elevated tiles of this room at the ribbon level
   if (ferramenta === 'pilar' && !escolha && salaAtual >= 0) { const tomados = new Set(pilaresDoMapa().map(({ q }) => q.pos[0] + ',' + q.pos[1])); (projeto.salas[salaAtual]?.pecas || []).forEach(p => { if (ehAlfombra(p.tile) || ehCaixa(p.tile) || !(p.level > 0) || (p.level || 0) !== nivel) return;
@@ -289,6 +295,17 @@ function desenharPrevia(si) {
   const rot = tr('PREVIEW · not added yet'); ctx.font = `bold ${12 / z}px system-ui`; const w = ctx.measureText(rot).width;
   const lx = Math.min(...casas.filter(c => c[1] * C === y0).map(c => c[0])) * C;   // (over the top row, where the room begins)
   ctx.fillStyle = 'rgba(20,60,100,.92)'; ctx.fillRect(lx, y0 - 20 / z, w + 12 / z, 18 / z); ctx.fillStyle = '#bfe6ff'; ctx.fillText(rot, lx + 6 / z, y0 - 7 / z);
+  ctx.restore();
+}
+/* the marker of a "Move" (where a tile or an object goes): a dashed outline and an arrow sign over its squares */
+function marcaDeDestino(casas) {
+  if (!casas.length) return; const S = new Set(casas.map(c => c.join(','))); ctx.save(); ctx.globalAlpha = 1;
+  ctx.strokeStyle = 'rgba(120,220,255,.95)'; ctx.lineWidth = 2 / vista.zoom; ctx.setLineDash([6 / vista.zoom, 4 / vista.zoom]); ctx.beginPath();
+  casas.forEach(([x, y]) => { if (!S.has(x + ',' + (y - 1))) { ctx.moveTo(x * C, y * C); ctx.lineTo((x + 1) * C, y * C); } if (!S.has(x + ',' + (y + 1))) { ctx.moveTo(x * C, (y + 1) * C); ctx.lineTo((x + 1) * C, (y + 1) * C); }
+    if (!S.has((x - 1) + ',' + y)) { ctx.moveTo(x * C, y * C); ctx.lineTo(x * C, (y + 1) * C); } if (!S.has((x + 1) + ',' + y)) { ctx.moveTo((x + 1) * C, y * C); ctx.lineTo((x + 1) * C, (y + 1) * C); } });
+  ctx.stroke(); ctx.setLineDash([]);
+  const [lx, ly] = casas.reduce((a, c) => c[1] < a[1] || (c[1] === a[1] && c[0] < a[0]) ? c : a, casas[0]);
+  ctx.fillStyle = 'rgba(120,220,255,1)'; ctx.font = `bold ${11 / vista.zoom}px system-ui`; ctx.shadowColor = '#000'; ctx.shadowBlur = 3; ctx.fillText('➜ ' + tr('marker'), lx * C + 3, (ly + 1) * C - 4 / vista.zoom); ctx.shadowBlur = 0;
   ctx.restore();
 }
 function desenharPeca(p, alfa, selecionada, ativa) {
@@ -438,8 +455,10 @@ tela.addEventListener('mousedown', ev => {
     if (alfombra && usoAlfombra(pecaEscolhida) >= caixaAlfombra(pecaEscolhida)) return aviso(VERSO_ALFOMBRA[pecaEscolhida] ? 'All ' + CAIXA_ALFOMBRAS + ' ' + nomeAlfombra(pecaEscolhida) + ' / ' + nomeAlfombra(VERSO_ALFOMBRA[pecaEscolhida]) + ' cards are already on the map (the two faces share the same cards).' : 'All ' + caixaAlfombra(pecaEscolhida) + ' cop' + (caixaAlfombra(pecaEscolhida) > 1 ? 'ies' : 'y') + ' of ' + nomeAlfombra(pecaEscolhida) + ' are already on the map (change the copies in the Workshop).');
     if (alfombra && nivel > 0) return aviso('Underlays lie on the floor: pick level 0 on the ribbon.');
     if (!alfombra && s.pecas.some(q => numeroDaPeca(q.tile) === numeroDaPeca(p.tile)) && typeof Tutorial !== 'undefined' && Tutorial.ativo() && Tutorial.explicar('pecas-mesma-sala')) return;   // (the tutorial explains it the first time)
-    if (!alfombra && s.pecas.some(q => numeroDaPeca(q.tile) === numeroDaPeca(p.tile))) return aviso(ehDaOficina(p.tile) ? 'The workshop tile ' + nomePeca(p.tile) + ' is already in this room (each one is a single piece).' : 'Tile ' + numeroDaPeca(p.tile) + ' is already in this room (side A or B).');
-    if (colide(p, salaAtual, -1)) return aviso(alfombra ? 'It overlaps another underlay.' : 'It overlaps another tile of the same level.');
+    // the same tile again in this room: only as the marker of where it moves to ("Move a tile")
+    const original = alfombra ? -1 : s.pecas.findIndex((q, qi) => numeroDaPeca(q.tile) === numeroDaPeca(p.tile) && !ehMarca('peca', salaAtual, qi));
+    if (colide(p, salaAtual, original)) return aviso(alfombra ? 'It overlaps another underlay.' : 'It overlaps another tile of the same level.');
+    if (original >= 0) { avisarMovimento(salaAtual, original, p); return; }
     const reuso = !alfombra && pecaReutilizada(numeroDaPeca(p.tile), salaAtual);
     const por = () => { s.pecas.push(p); sel = { tipo: 'peca', sala: salaAtual, i: s.pecas.length - 1 }; ferramenta = null; if (caixa) { if (nivel !== p.level) nivel = p.level; tudo(); avisoLongo(nomePeca(p.tile) + ' is a box with its top at level ' + p.level + ': it needs no pillars. The ribbon went to level ' + p.level + ' to work on top of it.'); return; } tudo(); if (p.level > 0) avisoLongo('Elevated tile (level ' + p.level + '): give it pillars in its sockets (between two squares on a straight edge) with the Pillar tool (' + pilaresPermitidos(p.level).map(k => SUPORTES[k].nome.toLowerCase()).join(', ') + ').'); };
     if (reuso) { avisarReuso(reuso, salaAtual, por); return; }

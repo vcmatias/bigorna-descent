@@ -212,6 +212,8 @@ const musicasDosMapas = (docs, sub) => [...new Set(docs.flatMap(d => [d && d.met
 /* the videos of the scenes of a campaign (files next to the .dcamp) */
 const videosDasCenas = (dcamp, sub) => [...new Set([...(dcamp?.dialogues || []).filter(d => d.type === 'video' && d.video).map(d => d.video), dcamp?.meta?.worldMap?.file, dcamp?.meta?.city?.file].filter(Boolean))].map(nome => ({ nome, texto: AUDIOS[nome] || null, sub }));
 const monstro = id => MONSTROS().find(m => m.id === id) || null;
+/* a large monster (the centurion, the bosses at the end of the acts): it takes 2x2 spaces, its position the top-left one */
+const ehGrande = id => { const m = monstro(id); return !!m && ((m.size || 0) >= 2 || (m.mec || []).includes('Huge')); };
 /* "Balanced from enemy pool": a space of the room the game fills by its own rule for random spawns (the room's spawn
    pool, the map's tier range, points from the number of heroes). See regraDoBalanceio and simularBalanceio. */
 const POOL_ID = '@pool';
@@ -226,11 +228,14 @@ const nomeItem = id => receitaDoItem(id) ? nomeReceita(receitaDoItem(id)) : runa
 /* the items that may be handed out: only the workshop's (item 4 of the 24/09 batch). Old projects may still point at game loot ids: those are kept but flagged */
 const itemDaOficina = id => !!ITENS_B().find(i => i.id === id) || !!runaDoItem(id) || !!receitaDoItem(id);
 const opcoesItens = atual => ITENS_B().map(i => `<option value="${esc(i.id)}" ${atual === i.id ? 'selected' : ''}>${esc(i.nome)}</option>`).join('') + ((oficina().armas || []).some(a => a.runa) ? `<optgroup label="Runes of the workshop (the weapon comes with its rune)">${oficina().armas.filter(a => a.runa).map(a => `<option value="RUNA:${esc(a.id)}" ${atual === 'RUNA:' + a.id ? 'selected' : ''}>${esc(nomeItem('RUNA:' + a.id))}</option>`).join('')}</optgroup>` : '') + ((oficina().receitas || []).length ? `<optgroup label="Recipes of the workshop (the party learns it)">${oficina().receitas.map(r => `<option value="RECEITA:${esc(r.id)}" ${atual === 'RECEITA:' + r.id ? 'selected' : ''}>${esc(nomeReceita(r))}</option>`).join('')}</optgroup>` : '') + (atual && !itemDaOficina(atual) ? `<option value="${esc(atual)}" selected>${esc(nomeItem(atual))} (not in the workshop!)</option>` : '');
-/* heroes drawn at random from the party when a scene plays (the mod picks two different ones each time): @hero1, @hero2;
-   {hero1} and {hero2} in the text become their names. @actor is the hero who used the object that plays the scene
+/* heroes drawn at random from the party when a scene plays (the mod picks different ones each time): @hero1 to @hero4;
+   {hero1} to {hero4} in the text become their names; with fewer heroes in the party, hero 3 repeats hero 1 and hero 4 hero 2. @actor is the hero who used the object that plays the scene
    ({actor} in the text); a scene played by nothing a hero used takes a random one */
-const HEROIS_SORTEADOS = [{ id: '@hero1', nome: 'Random hero 1' }, { id: '@hero2', nome: 'Random hero 2' }, { id: '@actor', nome: 'The hero who used the object' }];
-const nomePersonagem = id => { const s = HEROIS_SORTEADOS.find(h => h.id === id); if (s) return tr(s.nome); return PERSONAGENS_B().find(p => p.id === id)?.nome || id || ''; };
+const HEROIS_SORTEADOS = [{ id: '@hero1', nome: 'Random hero 1' }, { id: '@hero2', nome: 'Random hero 2' }, { id: '@hero3', nome: 'Random hero 3 (or 1)' }, { id: '@hero4', nome: 'Random hero 4 (or 2)' }, { id: '@actor', nome: 'The hero who used the object' }];
+/* the heroes of the party in the campaign scenes (between maps): hero 1 is the first of the party, hero 2 the second...;
+   with fewer heroes, hero 3 speaks as hero 1 and hero 4 as hero 2 (3 heroes: hero 4 as hero 1) */
+const HEROIS_DA_CAMPANHA = [{ id: '@hero1', nome: 'Hero 1 of the party' }, { id: '@hero2', nome: 'Hero 2 of the party' }, { id: '@hero3', nome: 'Hero 3 (or hero 1)' }, { id: '@hero4', nome: 'Hero 4 (or hero 2)' }];
+const nomePersonagem = id => { const s = (typeof telaCampanhaAberta === 'function' && telaCampanhaAberta() ? HEROIS_DA_CAMPANHA : HEROIS_SORTEADOS).find(h => h.id === id) || HEROIS_SORTEADOS.find(h => h.id === id); if (s) return tr(s.nome); return PERSONAGENS_B().find(p => p.id === id)?.nome || id || ''; };
 function retratoDoMonstro(m) { if (!m) return ''; if (m.retrato) return m.retrato; const b = chaveArte(m.textureTab); return RETRATOS.monstros[b] || ''; }
 function retratoDoPersonagem(p) { if (!p) return ''; if (p.retrato) return p.retrato; return RETRATOS.personagens[p.rostoBase] || ''; }
 function retratoDoItem(i) { if (!i) return ''; if (i.retrato) return i.retrato; return RETRATOS.itens[i.imagemBase] || ''; }
@@ -343,6 +348,23 @@ function colide(p, sala, indice) {
     if (ehEspecial(p.tile) && !ehEspecial(q.tile) && (q.level || 0) > topo(p)) return false;
     return true; }));
 }
+/* the markers of the "Move" triggers: the second object (or the tile laid again) that shows where an object or a tile goes.
+   A marker does not come out in the setup of its room (exported hidden, or not at all for a tile). {objetos, pecas}: "si:i" */
+function marcasDoMapa(p = projeto) {
+  const r = { objetos: new Set(), pecas: new Set() };
+  (p.salas || []).forEach(s => (s.objetos || []).concat((s.inimigos || []), s.grupoPool ? [s.grupoPool] : []).forEach(o => todosGatilhos(o).forEach(g => {
+    if (g.tipo === 'move_object' && g.marcaIndex !== undefined && p.salas[g.marcaSala]?.objetos[g.marcaIndex]) r.objetos.add(g.marcaSala + ':' + g.marcaIndex);
+    if (g.tipo === 'move_tile' && g.marcaPeca !== undefined && p.salas[g.marcaSala]?.pecas[g.marcaPeca]) r.pecas.add(g.marcaSala + ':' + g.marcaPeca); })));
+  (p.contadores || []).concat(p.eventos || []).forEach(c => todosGatilhos(c).forEach(g => {
+    if (g.tipo === 'move_object' && g.marcaIndex !== undefined) r.objetos.add(g.marcaSala + ':' + g.marcaIndex);
+    if (g.tipo === 'move_tile' && g.marcaPeca !== undefined) r.pecas.add(g.marcaSala + ':' + g.marcaPeca); }));
+  return r;
+}
+const ehMarca = (tipo, si, i, p = projeto) => marcasDoMapa(p)[tipo === 'peca' ? 'pecas' : 'objetos'].has(si + ':' + i);
+/* a tile wholly over underlays (every square of it has an underlay below): taken off keeping what stands on it, all of
+   that stays on the underlay */
+function pecaSobreAlfombra(q, p = projeto) { if (!q || ehAlfombra(q.tile) || (q.level || 0)) return false; const sob = new Set(); (p.salas || []).forEach(s => s.pecas.forEach(a => { if (ehAlfombra(a.tile)) casasDaPeca(a).forEach(c => sob.add(c.join(','))); }));
+  const cs = casasDaPeca(q); return cs.length > 0 && cs.every(c => sob.has(c.join(','))); }
 const rotulo = o => o.ehContador ? 'Counter “' + (o.nome || '?') + '”' : o.enemy ? nomeIni(o.enemy) : (o.name || nomeObj(o.type));
 /* the consequence lists of an object: its triggers, what runs when a requirement fails, and the outcome lists hung on a
    trigger by its uid (LISTA_FILHA: "ok:<uid>"/"fail:<uid>" of a test, "op1:<uid>" of an answer, "senao:<uid>",
@@ -595,6 +617,11 @@ function problemasDaSala(si) {
       if (g.tipo === 'rounds' && (o['rodada:' + g.uid] || []).some(x => ['skill_test', 'choice', 'rounds'].includes(x.tipo))) p.push('"' + rotulo(o) + '": every N rounds holds a skill test, a choice or another “Every N rounds”: take it out');
       if (g.tipo === 'counter' && g.acao === 'use' && !(o['conta:' + g.uid] || []).length) p.push('"' + rotulo(o) + '": use a count with nothing inside');
       if (g.tipo === 'add_tile' && !projeto.salas[g.sala]?.pecas[g.peca]) p.push('"' + rotulo(o) + '": add tile without a tile');
+      if (g.tipo === 'move_tile' && !projeto.salas[g.sala]?.pecas[g.peca]) p.push('"' + rotulo(o) + '": move tile without a tile');
+      if (g.tipo === 'move_tile' && projeto.salas[g.sala]?.pecas[g.peca] && !projeto.salas[g.marcaSala]?.pecas[g.marcaPeca]) p.push('"' + rotulo(o) + '": move tile without a marker');
+      if (g.tipo === 'move_object' && !projeto.salas[g.objSala]?.objetos[g.objIndex]) p.push('"' + rotulo(o) + '": move an object without an object');
+      if (g.tipo === 'move_object' && projeto.salas[g.objSala]?.objetos[g.objIndex] && !projeto.salas[g.marcaSala]?.objetos[g.marcaIndex] && !g.cell) p.push('"' + rotulo(o) + '": move an object without a marker');
+      if (g.tipo === 'remove_tile' && g.manter && projeto.salas[g.sala]?.pecas[g.peca] && !pecaSobreAlfombra(projeto.salas[g.sala].pecas[g.peca])) p.push('"' + rotulo(o) + '": remove tile keeping what stands on it, but the tile is not wholly over an underlay (warning)');
       if ((g.tipo === 'remove_enemy' || g.tipo === 'enemy_condition') && g.alvo === 'group' && !gruposDaMissao().some(x => x.id === g.grupo)) p.push('"' + rotulo(o) + '": ' + (g.tipo === 'remove_enemy' ? 'remove monsters' : 'monster conditions') + ' without a spawn group');
       if (g.tipo === 'mission' && g.modo !== 'map' && g.como === 'use_object' && !projeto.salas[g.objSala]?.objetos[g.objIndex]) p.push('"' + rotulo(o) + '": objective without its object');
       if (g.tipo === 'reserve' && !g.enemy) p.push('"' + rotulo(o) + '": change the spawn pool without a monster');

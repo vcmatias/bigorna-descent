@@ -129,6 +129,7 @@ function abrirCampanha(aba) {
   const no = noDaMissao(missaoAtual); if (no && !noSel) noSel = no.id;
   mudarAba(aba || (abaC === 'caixas' ? 'fluxo' : abaC));
 }
+function telaCampanhaAberta() { const t = document.getElementById('telaCampanha'); return !!t && !t.hidden; }
 function fecharCampanha() { antesDeSairDaCena(() => { esconderPainel('janelaVariaveis'); esconderPainel('janelaInventario'); if (abaC === 'caixas') trocarAba('fluxo'); fecharPopup(); $('#telaCampanha').hidden = true; camposDaMissao(); tudo(); }); }
 /* the boxes of a scene that have nothing to show yet */
 function caixasVazias(n) {
@@ -390,10 +391,11 @@ function renderCaixaProps(el, d) {
   el.innerHTML = `<div class="bloco"><h2>Box${d.id === n.dialogo ? ' (first)' : ''}</h2>
     <label class="campo">Kind <select id="d_tipo"><option value="normal" ${d.type === 'normal' || !d.type ? 'selected' : ''}>Plain box</option><option value="choice" ${d.type === 'choice' ? 'selected' : ''}>Question (the players choose an answer)</option><option value="video" ${video ? 'selected' : ''}>Video (your own film)</option></select></label>
     ${video ? `<div id="d_video"></div><p class="ajuda">The scene goes on with the next box when the film ends.</p>` : `
-    <label class="campo">Speaker <select id="d_speaker"><option value="">Narrator (no portrait)</option>${PERSONAGENS_B().map(p => `<option value="${esc(p.id)}" ${d.speaker === p.id ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</select>${PERSONAGENS_B().length ? '' : '<small class="ajuda">No NPCs yet: import or create them in the NPCs tab of the Workshop (top bar of the rooms screen).</small>'}</label>
+    <label class="campo">Speaker <select id="d_speaker"><option value="">Narrator (no portrait)</option><optgroup label="${esc(tr('Heroes of the party'))}">${HEROIS_DA_CAMPANHA.map(x => `<option value="${x.id}" ${d.speaker === x.id ? 'selected' : ''}>${esc(tr(x.nome))}</option>`).join('')}</optgroup>${PERSONAGENS_B().map(p => `<option value="${esc(p.id)}" ${d.speaker === p.id ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</select>${PERSONAGENS_B().length ? '' : '<small class="ajuda">No NPCs yet: import or create them in the NPCs tab of the Workshop (top bar of the rooms screen).</small>'}</label>
     <label class="campo">Title (optional) <input id="d_title" value="${esc(d.title || '')}"></label>
     <label class="campo">Text <textarea id="d_texto" rows="5">${esc(d.text || '')}</textarea></label>
-    <label class="campo">Others in the scene <select id="d_cast"><option value="">+ add…</option>${PERSONAGENS_B().filter(p => p.id !== d.speaker && !d.cast.includes(p.id)).map(p => `<option value="${esc(p.id)}">${esc(p.nome)}</option>`).join('')}</select></label>
+    <label class="campo">Others in the scene <select id="d_cast"><option value="">+ add…</option>${HEROIS_DA_CAMPANHA.filter(x => x.id !== d.speaker && !d.cast.includes(x.id)).map(x => `<option value="${x.id}">${esc(tr(x.nome))}</option>`).join('')}${PERSONAGENS_B().filter(p => p.id !== d.speaker && !d.cast.includes(p.id)).map(p => `<option value="${esc(p.id)}">${esc(p.nome)}</option>`).join('')}</select></label>
+    ${/^@hero/.test(d.speaker || '') || (d.cast || []).some(x => /^@hero/.test(x)) ? `<p class="ajuda">${esc(tr('Hero 1 is the first hero of the party, hero 2 the second, and so on. With fewer heroes, hero 3 speaks as hero 1 and hero 4 as hero 2. {hero1} to {hero4} in the text become their names.'))}</p>` : ''}
     <div>${d.cast.map(id => `<span class="tag">${esc(nomePersonagem(id))} <a href="#" data-delcast="${esc(id)}">✕</a></span>`).join('')}</div>
     <label class="campo">Background <select id="d_bg">${FUNDOS.map(f => `<option value="${f.id}" ${(d.background ?? FUNDO_PADRAO) === f.id ? 'selected' : ''}>${esc(f.name_en)}</option>`).join('')}</select></label>`}
     ${d.type === 'choice' ? '<div class="sub">Answers <button class="sm" id="d_addop">+ Answer</button></div><div id="d_ops"></div>' : ''}

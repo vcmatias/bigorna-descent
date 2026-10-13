@@ -85,7 +85,9 @@ function removerPecaComAnexos(si, pi) {
 }
 /* "Add / Remove a tile" triggers (objects, monsters, groups and counters) after tile pi of room si left it: null = deleted, or its new {sala, peca} */
 function acertarRefsDePeca(si, pi, novo) {
-  const olha = o => todosGatilhos(o).forEach(g => { if ((g.tipo === 'remove_tile' || g.tipo === 'add_tile') && g.sala === si && g.peca !== undefined) { if (g.peca === pi) { if (novo) { g.sala = novo.sala; g.peca = novo.peca; } else delete g.peca; } else if (g.peca > pi) g.peca--; } });
+  const olha = o => todosGatilhos(o).forEach(g => { if ((g.tipo === 'remove_tile' || g.tipo === 'add_tile' || g.tipo === 'move_tile') && g.sala === si && g.peca !== undefined) { if (g.peca === pi) { if (novo) { g.sala = novo.sala; g.peca = novo.peca; } else delete g.peca; } else if (g.peca > pi) g.peca--; }
+    // (the marker of a "Move a tile")
+    if (g.tipo === 'move_tile' && g.marcaSala === si && g.marcaPeca !== undefined) { if (g.marcaPeca === pi) { if (novo) { g.marcaSala = novo.sala; g.marcaPeca = novo.peca; } else delete g.marcaPeca; } else if (g.marcaPeca > pi) g.marcaPeca--; } });
   projeto.salas.forEach(ss => donosDaSala(ss).forEach(({ o }) => olha(o))); (projeto.contadores || []).forEach(olha);
 }
 /* new uids for the triggers of a copy (and its spawned monsters), with its outcome lists ("ok:<uid>", "op1:<uid>"…) following */
@@ -209,7 +211,6 @@ const DICAS = [
   { id: 'gat-item_pool', texto: 'Trigger <b>Change the item pool</b>: adds an item to (or removes one from) the pool the random loot comes from, for the rest of the map.', feita: () => usouGatilho('item_pool') },
   { id: 'gat-reserve', texto: 'Trigger <b>Change the spawn pool</b>: adds a monster to (or removes one from) the spawn pool, for the rest of the map: the villain calls new allies.', feita: () => usouGatilho('reserve') },
   { id: 'gat-end_map', texto: 'Trigger <b>End the map</b>: ends the map on the spot, in victory or in defeat: the villain escaped, the time ran out.', feita: () => usouGatilho('end_map') },
-  { id: 'gat-escort', texto: 'Trigger <b>Escort (a protected one)</b>: someone the heroes protect: the monsters may target it, and it falls when its health runs out.', feita: () => usouGatilho('escort') }
 ];
 /* a trigger kind the map already uses (kept once seen, so its hint stays gone) */
 function usouGatilho(id) {
@@ -312,7 +313,7 @@ function renderPaleta() {
       if (usada) dv.classList.add('usada'); if (noutra) dv.classList.add('noutra');
       dv.title = usada ? 'Tile ' + numeroDaPeca(t.id) + ' is already in this room (side A or B)' : noutra ? 'Tile ' + numeroDaPeca(t.id) + ' is in another room: reusing it here needs that room removed first' : t.w + '×' + t.h;
       dv.innerHTML = `<img src="${miniatura(t)}" alt=""><div>${t.id.toUpperCase()} <small>${t.w}×${t.h}${t.act === 2 ? ' · II' : ''}</small></div>`;
-      dv.onclick = () => { if (usada && typeof Tutorial !== 'undefined' && Tutorial.ativo() && Tutorial.explicar('pecas-mesma-sala')) return; if (usada) return aviso('Tile ' + numeroDaPeca(t.id) + ' is already in this room.'); pecaEscolhida = t.id; renderPaleta(); }; g.appendChild(dv);
+      dv.onclick = () => { if (usada && typeof Tutorial !== 'undefined' && Tutorial.ativo() && Tutorial.explicar('pecas-mesma-sala')) return; if (usada) aviso('Tile ' + numeroDaPeca(t.id) + ' is already in this room: laid again, it can only mark where that tile moves to (“Move the tile”).'); pecaEscolhida = t.id; renderPaleta(); }; g.appendChild(dv);
     });
     const vs = oficina().pecas.filter(v => !v.underlay); if (vs.length) { const st = document.createElement('div'); st.className = 'subtitulo'; st.textContent = 'Workshop tiles (made in the Workshop)'; g.after(st); const gv = document.createElement('div'); gv.className = 'grade'; st.after(gv);
       vs.forEach(v => { const t = defPeca(v.id); if (!t) return; const dv = document.createElement('div'); dv.className = 'item' + (v.id === pecaEscolhida ? ' ativo' : '');
@@ -595,6 +596,7 @@ function abrirMapa() {
   const fm = m.finalMission;
   modal('Map setup · ' + (m.name || 'Map'), `${(m.notasImportacao || []).length ? `<div class="secao notasImportacao"><h3>Import notes</h3><p class="ajuda">This map was converted from an original map of the game. What was simplified or left out:</p><ul>${m.notasImportacao.map(n => `<li data-sem-traducao>${esc(n)}</li>`).join('')}</ul><button class="sm" id="mp_semNotas">Clear these notes</button></div>` : ''}
     <label class="campo">Introduction (before the map starts) <textarea id="mp_intro" rows="3">${esc(m.intro || '')}</textarea></label>
+    <label class="campo">Special rule (a box of its own, after the introduction: rules of this map only) <textarea id="mp_regra" rows="2">${esc(m.regra || '')}</textarea></label>
     <label class="campo">Description (in the map list) <textarea id="mp_desc" rows="2">${esc(m.description || '')}</textarea></label>
     <div class="sub">Custom music</div>
     <div id="mp_musica"></div>
@@ -602,6 +604,10 @@ function abrirMapa() {
     <div class="secao">
       <h3>Balancing</h3>
       <p class="ajuda">What the monsters and the rewards of this map draw from, and how hard the game's rule makes the “Balanced from enemy pool” spaces.</p>
+      <div class="sub">Test this map</div>
+      <p class="ajuda">The same simulation as the Map generator: a small party plays this map as it is now, with 2, 3 and 4 heroes (standard: the easy rules; custom: the party you describe). ⚖ Automatic balance explains what it would change before changing anything.</p>
+      <div class="linha"><button id="mp_sim">Simulate</button><select id="mp_simModo"><option value="padrao">Standard simulation</option><option value="custom">Custom simulation</option></select><span style="flex:1"></span><button id="mp_auto">⚖ Automatic balance…</button></div>
+      <div id="mp_simCfg" hidden>${formularioSimulacao()}</div><div id="mp_simres"></div>
       <div class="sub">Campaign progression</div>
       <p class="ajuda">Sets the points of the balanced spaces: points = intensity of the room ÷ 10 × heroes × 1.5 × progression (the intensity is set on a balanced space, 1 to 10). The game's quest 1 uses 20 and each quest adds 2.</p>
       <div class="linha"><label class="campo">Progression <input id="mp_bprog" type="number" min="1" max="200" value="${regraDoBalanceio().progresso}" style="width:80px"></label>
@@ -621,6 +627,7 @@ function abrirMapa() {
     <label class="campo">Text shown for the mission <input id="mp_fmTexto" value="${esc(fm.texto || '')}" placeholder="Default text if empty"></label>
     <label class="campo">Round limit (defeat when reached) <input id="mp_limite" type="number" min="0" value="${m.limite || 0}" style="width:80px"> <small>0 = no limit</small></label>`, (el, fechar) => {
     el.querySelector('#mp_intro').oninput = e => { m.intro = e.target.value; };
+    el.querySelector('#mp_regra').oninput = e => { m.regra = e.target.value; };
     el.querySelector('#mp_desc').oninput = e => { m.description = e.target.value; };
     campoMusica(el.querySelector('#mp_musica'), m);
     el.querySelector('#mp_bg').onchange = e => { m.background = e.target.value; };
@@ -630,6 +637,12 @@ function abrirMapa() {
     widgetPool(el.querySelector('#mp_pool'), projeto.reserva, renderConferencia);
     const bal = () => { const r = regraDoBalanceio(); let a = +el.querySelector('#mp_bmin').value, b = +el.querySelector('#mp_bmax').value; if (b < a) { b = a; el.querySelector('#mp_bmax').value = String(b); } projeto.balanceio = { min: a, max: b, progresso: Math.max(1, Math.min(200, +el.querySelector('#mp_bprog').value || r.progresso)) }; renderPropriedades(); };
     ['#mp_bmin', '#mp_bmax', '#mp_bprog'].forEach(k => el.querySelector(k).onchange = bal);
+    // the simulation of the map in hand, and the automatic balance (it explains first; nothing changes until Apply)
+    const modoSim = el.querySelector('#mp_simModo'); try { modoSim.value = localStorage.getItem('bigorna-sim-modo') === 'custom' ? 'custom' : 'padrao'; } catch { }
+    const cfgSim = () => modoSim.value === 'custom' ? lerSimulacaoCustom('#mp_simCfg') : null;
+    modoSim.onchange = () => { el.querySelector('#mp_simCfg').hidden = modoSim.value !== 'custom'; try { localStorage.setItem('bigorna-sim-modo', modoSim.value); } catch { } }; modoSim.onchange();
+    el.querySelector('#mp_sim').onclick = () => { el.querySelector('#mp_simres').innerHTML = tabelaDaSimulacao(projeto, cfgSim()); };
+    el.querySelector('#mp_auto').onclick = () => balanceioAutomatico(cfgSim(), () => { el.querySelector('#mp_simres').innerHTML = tabelaDaSimulacao(projeto, cfgSim()); el.querySelector('#mp_bprog').value = regraDoBalanceio().progresso; });
     widgetPoolItens(el.querySelector('#mp_itens'), projeto.itensPool);
     const campos = () => {
       const c = el.querySelector('#mp_fmCampos');
@@ -648,6 +661,33 @@ function abrirMapa() {
     campos();
     el.querySelector('#mp_fm').onchange = e => { fm.tipo = e.target.value; if (fm.tipo === 'trigger') fm.uid = ms0(); campos(); renderConferencia(); };
   }, true);
+}
+/* ⚖ Automatic balance (Map setup > Balancing): first what it does, then (on request) the proposal with the simulation before
+   and after and every change, one line each; Apply changes the map, and the window offers to undo it while open */
+function balanceioAutomatico(custom, depois) {
+  modal('⚖ Automatic balance', `<p>What it does: the simulator plays this map with the parties of the simulation chosen (2, 3 and 4 heroes, or those ticked in the custom one) and looks for the adjustment that brings each party into the target of the easy level: lose between 25% and 80% of the health, never fall below 15%, as close as possible to half.</p>
+    <p><b>What it may change:</b></p><ul><li>the intensity of the rooms with monsters and of the triggers that call monsters from the pool, all by the same step (from −6 to +6, always within 1 to 10);</li><li>the tiers for 1–2, 3 and 4 heroes of the monsters placed by hand, by the game's rule (as ⚖ Balance on a monster).</li></ul>
+    <p><b>What stays:</b> the campaign progression, the monster and item pools, the monsters themselves, the objects, the triggers and the texts.</p>
+    <p class="ajuda">Nothing changes now. Work out the proposal to see the simulation before and after, and the list of changes; then Apply or Cancel.</p>
+    <div class="linha"><button class="primario" id="ab_calc">Work out the proposal</button></div><div id="ab_res"></div>`, (el, fechar) => {
+    el.querySelector('#ab_calc').onclick = () => {
+      const r = el.querySelector('#ab_res'); r.innerHTML = `<p class="ajuda">${tr('Simulating…')}</p>`;
+      setTimeout(() => {
+        const { atual, melhor } = propostaDeBalanceio(projeto, custom);
+        if (melhor.d === null) { r.innerHTML = `<p>${tr('No adjustment does better than the map as it is.')}</p>${tabelaDaSimulacao(projeto, custom)}`; return; }
+        r.innerHTML = `<div class="sub">${tr('Now')}</div>${tabelaDaSimulacao(projeto, custom)}<div class="sub">${tr('With the proposal')} (${tr('step')} ${melhor.d > 0 ? '+' : ''}${melhor.d})</div>${tabelaDaSimulacao(melhor.copia, custom)}
+          <div class="sub">${tr('What changes')} (${melhor.mud.length})</div><ul data-sem-traducao>${melhor.mud.map(x => `<li>${esc(textoDaMudanca(x))}</li>`).join('')}</ul>
+          <div class="linha"><button class="primario" id="ab_aplicar">Apply</button><button id="ab_cancelar">Cancel</button></div>`;
+        r.querySelector('#ab_cancelar').onclick = fechar;
+        r.querySelector('#ab_aplicar').onclick = () => {
+          const antes = clone(projeto.salas); passoDeBalanceio(projeto, melhor.d); tudo(); depois && depois();
+          r.innerHTML = `<p>${tr('Applied')}: ${melhor.mud.length} ${tr('change(s)')}.</p><div class="linha"><button id="ab_desfazer">Undo the balance</button><button class="primario" id="ab_ok">OK</button></div>`;
+          r.querySelector('#ab_ok').onclick = fechar;
+          r.querySelector('#ab_desfazer').onclick = () => { projeto.salas = antes; tudo(); depois && depois(); r.innerHTML = `<p>${tr('Undone: the map is as it was.')}</p>`; };
+        };
+      }, 30);
+    };
+  });
 }
 /* one object URL per file (the panels are redrawn often: a new URL each time would keep every old one alive) */
 const _urlsBlob = new WeakMap();

@@ -16,6 +16,10 @@ namespace Bigorna
 
         static bool? _escolhido;
         static bool _lido;
+        /// <summary>Liga quando o jogo chega a tela de titulo. Antes disso, perguntar a lingua ao jogo (FFGLocalization) no
+        /// meio do carregamento das traducoes derrubava o jogo na abertura; ate la vale a lingua do Windows.</summary>
+        public static bool JogoPronto;
+        static bool _linguaDoJogo; static float _consultaAte = -1f;
 
         /// <summary>true: portugues; false: ingles.</summary>
         public static bool Pt
@@ -24,7 +28,11 @@ namespace Bigorna
             {
                 if (!_lido) { _lido = true; _escolhido = Ler(); }
                 if (_escolhido.HasValue) return _escolhido.Value;
-                return Dados.DadosDoEditor.LinguaDoJogo().StartsWith("pt");   // sem escolha: a lingua do jogo (pode mudar no menu dele)
+                // sem escolha: a lingua do Windows ate a tela de titulo; depois, a do jogo (pode mudar no menu dele), relida a
+                // cada 2 s (o OnGUI pergunta varias vezes por quadro)
+                if (!JogoPronto) return Application.systemLanguage == SystemLanguage.Portuguese;
+                if (Time.unscaledTime >= _consultaAte) { _linguaDoJogo = Dados.DadosDoEditor.LinguaDoJogo().StartsWith("pt"); _consultaAte = Time.unscaledTime + 2f; }
+                return _linguaDoJogo;
             }
         }
 

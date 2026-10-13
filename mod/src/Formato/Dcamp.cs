@@ -44,6 +44,8 @@ namespace Bigorna.Formato
             [JsonProperty("author")] public string Autor;
             [JsonProperty("description")] public string Descricao;
             [JsonProperty("act")] public string Ato;
+            /// <summary>Extensao Bigorna: "II" quando algum mapa da campanha usa componentes da caixa do Ato II.</summary>
+            [JsonProperty("requiresAct")] public string AtoExigido;
             [JsonProperty("worldMap")] public MapaDaCampanha MapaProprio;
             [JsonProperty("city")] public ImagemDaCampanha Cidade;
         }

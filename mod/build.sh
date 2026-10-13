@@ -13,10 +13,12 @@ for f in "$REFS"/*.dll; do
   R="$R -r:$f"
 done
 VERSAO=$(cat VERSAO)
+# a versao do pacote dentro da DLL (o aviso de atualizacao compara com a do GitHub)
+echo "namespace Bigorna { static class VersaoDoPacote { public const string Texto = \"$VERSAO\"; } }" > out/VersaoDoPacote.cs
 # o editor publico (sem nada do jogo) vai embutido: o mod o grava na pasta Editor dos dados do jogo
 python3 ../editor/salas/montar_salas.py --publico >/dev/null
 EDITOR=../editor/dist/publico/Bigorna-Salas.html
 dotnet "$CSC" -nologo -target:library -out:out/Bigorna.dll -langversion:8.0 -nullable:disable -optimize+ -debug:portable \
   -nowarn:CS1701,CS1702,CS0618 -define:BIGORNA -resource:"$EDITOR",Bigorna.Salas.html \
-  $R $(find src -name '*.cs' | sort)
+  $R out/VersaoDoPacote.cs $(find src -name '*.cs' | sort)
 echo "Bigorna $VERSAO -> out/Bigorna.dll ($(stat -c %s out/Bigorna.dll) bytes)"

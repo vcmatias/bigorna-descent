@@ -10,14 +10,14 @@ using static Bigorna.Idioma;
 namespace Bigorna.Menu
 {
     /// <summary>Modo de teste: para conferir as salas de um mapa uma a uma, sem batalhar nem rolar dados. Liga e desliga com
-    /// Ctrl+Shift+D (fica guardado); com ele ligado, Ctrl+D abre o painel e os atalhos valem durante o encontro:
+    /// F7, junto com o painel de teste de sons e cenas (cada sessao do jogo comeca com ele desligado); com ele ligado, Ctrl+D
+    /// esconde e mostra o painel e os atalhos valem durante o encontro:
     /// Ctrl+N abre a proxima sala fechada (pelo gatilho que a abre, com as cenas e textos dela), Ctrl+K derrota todos os monstros
     /// em jogo (os gatilhos de derrota correm), Ctrl+T liga/desliga os testes que passam sozinhos, Ctrl+U usa o proximo objeto
     /// ainda nao usado da sala aberta mais recente, Ctrl+W vence o mapa.</summary>
     public static class Depuracao
     {
-        const string Chave = "bigorna-depuracao";
-        public static bool Ligada { get => PlayerPrefs.GetInt(Chave, 0) == 1; set { PlayerPrefs.SetInt(Chave, value ? 1 : 0); PlayerPrefs.Save(); } }
+        public static bool Ligada;
         /// <summary>Os testes de habilidade passam sem perguntar (com os sucessos que pedem).</summary>
         public static bool TestesPassam = true;
         public static bool Aberto;
@@ -32,19 +32,29 @@ namespace Bigorna.Menu
         /// <summary>Nos testes: com o modo ligado e a opcao marcada, o teste passa sozinho.</summary>
         public static bool PassarTeste => Ligada && TestesPassam;
 
+        /// <summary>F7: liga ou desliga o modo de teste e o painel de sons e cenas, juntos.</summary>
+        public static void Alternar()
+        {
+            Ligada = !Ligada; Aberto = Ligada; PainelSons.Aberto = Ligada;
+            if (Ligada) Avisar("modo de teste ligado, com sons e cenas (F7 desliga)", "test mode on, with sounds and cutscenes (F7 turns it off)"); else Avisar("modo de teste desligado", "test mode off");
+        }
+
         public static void Teclas()
         {
-            if (!Ctrl) return;
-            if (Shift && Input.GetKeyDown(KeyCode.D)) { Ligada = !Ligada; Aberto = Ligada; if (Ligada) Avisar("modo de teste ligado (Ctrl+D abre o painel)", "test mode on (Ctrl+D opens the panel)"); else Avisar("modo de teste desligado", "test mode off"); return; }
-            if (!Ligada) return;
+            if (!Ctrl || !Ligada) return;
             if (Input.GetKeyDown(KeyCode.D)) Aberto = !Aberto;
             if (Input.GetKeyDown(KeyCode.T)) { TestesPassam = !TestesPassam; Avisar("testes " + (TestesPassam ? "passam sozinhos" : "perguntam de novo"), "skill tests " + (TestesPassam ? "pass on their own" : "ask again")); }
             if (!Pronto) return;
+            // (com o jogo gravando, entrando inimigos ou um aviso aberto, os atalhos esperam: derrotar durante a gravacao travou o
+            // fim do teste 10)
+            if ((Input.GetKeyDown(KeyCode.N) || Input.GetKeyDown(KeyCode.K) || Input.GetKeyDown(KeyCode.U) || Input.GetKeyDown(KeyCode.W)) && Ocupado()) { Avisar("espere: o jogo está ocupado (gravando ou pondo peças e monstros)", "wait: the game is busy (saving or placing tiles and monsters)"); return; }
             if (Input.GetKeyDown(KeyCode.N)) AbrirProxima();
             if (Input.GetKeyDown(KeyCode.K)) DerrotarTodos();
             if (Input.GetKeyDown(KeyCode.U)) UsarProximo();
             if (Input.GetKeyDown(KeyCode.W)) { Roteiro.Completar(true); Avisar("mapa vencido", "map won"); }
         }
+
+        static bool Ocupado() => Jogo.Salvando || Inimigos.Gerando > 0 || Dialogos.Ocupado || Dialogos.NaFila > 0;
 
         /// <summary>Mostra o aviso no painel, na lingua do mod; o registro fica em portugues.</summary>
         static void Avisar(string pt, string en) { _ultimo = T(pt, en); Log.Info("[teste] " + pt); }
@@ -77,7 +87,8 @@ namespace Bigorna.Menu
         public static void DerrotarTodos()
         {
             int n = 0;
-            try { foreach (var e in Jogo.Inimigos.ToList()) { Acoes.Derrotar(e); n++; } } catch (Exception ex) { Log.Erro("derrotando no modo de teste", ex); }
+            if (Ocupado()) { Avisar("espere: o jogo está ocupado (gravando ou pondo peças e monstros)", "wait: the game is busy (saving or placing tiles and monsters)"); return; }
+            try { foreach (var e in Jogo.Inimigos.ToList()) { if (e == null || e.Health <= 0) continue; Acoes.Derrotar(e); n++; } } catch (Exception ex) { Log.Erro("derrotando no modo de teste", ex); }
             Avisar(n + " monstro(s) derrotado(s)", "enemies defeated: " + n);
         }
 
@@ -91,15 +102,15 @@ namespace Bigorna.Menu
         public static void Desenhar()
         {
             if (!Ligada) return;
-            if (!Aberto) { GUI.color = new Color(1f, 0.8f, 0.4f, 0.95f); GUI.Label(new Rect(12f, 30f, 600f, 22f), T("MODO DE TESTE · Ctrl+D painel · Ctrl+N abre sala · Ctrl+K derrota · Ctrl+U usa objeto · Ctrl+T testes · Ctrl+W vence", "TEST MODE · Ctrl+D panel · Ctrl+N opens room · Ctrl+K defeats · Ctrl+U uses object · Ctrl+T tests · Ctrl+W wins")); GUI.color = Color.white; return; }
+            if (!Aberto) { GUI.color = new Color(1f, 0.8f, 0.4f, 0.95f); GUI.Label(new Rect(12f, 30f, 600f, 22f), T("MODO DE TESTE (F7 desliga) · Ctrl+D painel · Ctrl+N abre sala · Ctrl+K derrota · Ctrl+U usa objeto · Ctrl+T testes · Ctrl+W vence", "TEST MODE (F7 turns off) · Ctrl+D panel · Ctrl+N opens room · Ctrl+K defeats · Ctrl+U uses object · Ctrl+T tests · Ctrl+W wins")); GUI.color = Color.white; return; }
             _janela = GUILayout.Window(77311, _janela, Janela, T("Bigorna · modo de teste", "Bigorna · test mode"));
         }
 
         static void Janela(int id)
         {
             if (_pequeno == null) _pequeno = new GUIStyle(GUI.skin.label) { fontSize = 11, wordWrap = true };
-            GUILayout.Label(T("Ctrl+N abre a próxima sala · Ctrl+K derrota todos · Ctrl+U usa o próximo objeto · Ctrl+T testes · Ctrl+W vence · Ctrl+D fecha · Ctrl+Shift+D desliga",
-                "Ctrl+N opens the next room · Ctrl+K defeats all · Ctrl+U uses the next object · Ctrl+T tests · Ctrl+W wins · Ctrl+D closes · Ctrl+Shift+D turns off"), _pequeno);
+            GUILayout.Label(T("Ctrl+N abre a próxima sala · Ctrl+K derrota todos · Ctrl+U usa o próximo objeto · Ctrl+T testes · Ctrl+W vence · Ctrl+D fecha · F7 desliga",
+                "Ctrl+N opens the next room · Ctrl+K defeats all · Ctrl+U uses the next object · Ctrl+T tests · Ctrl+W wins · Ctrl+D closes · F7 turns off"), _pequeno);
             TestesPassam = GUILayout.Toggle(TestesPassam, T(" Testes de habilidade passam sozinhos", " Skill tests pass on their own"));
             if (!Pronto) { GUILayout.Label(T("Entre num mapa do Bigorna para usar os atalhos.", "Enter a Bigorna map to use the shortcuts."), _pequeno); GUI.DragWindow(); return; }
             GUILayout.BeginHorizontal();

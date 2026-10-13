@@ -174,14 +174,14 @@ namespace Bigorna.Encontro
             {
                 foreach (var d in new[] { (0, 0), (-1, 0), (0, -1), (-1, -1) })
                 {
-                    var g = Tabuleiro.GrupoDe(o.X + d.Item1, o.Y + d.Item2);
+                    var g = Tabuleiro.GrupoDe(o.X + d.Item1, o.Y + d.Item2, o.Nivel);
                     if (!string.IsNullOrEmpty(g)) return g;
                 }
                 return null;
             }
             foreach (var (x, y) in Oficina.CasasDoObjeto(o, TamanhoDe(o.Tipo)))
             {
-                var g = Tabuleiro.GrupoDe(x, y);
+                var g = Tabuleiro.GrupoDe(x, y, o.Nivel);
                 if (!string.IsNullOrEmpty(g)) return g;
             }
             return null;
@@ -396,7 +396,7 @@ namespace Bigorna.Encontro
 
         /// <summary>Os objetos entram em grupos, como no jogo: um aviso por grupo (ate 4 objetos), com as casas de todos destacadas;
         /// eles aparecem juntos quando o aviso sai.</summary>
-        public const int PorGrupo = 4;
+        public const int PorGrupo = Tabuleiro.PorVez;   // (no maximo 3 por aviso)
         static void ApresentarEmGrupos(List<NaMesa> lista)
         {
             var todos = lista.Where(p => p != null && p.Dados != null).ToList();
@@ -470,6 +470,27 @@ namespace Bigorna.Encontro
 
         /// <summary>Uma peca (ou sala) saiu do tabuleiro: os objetos sobre as casas dela e os seus pilares ficam retirados para sempre,
         /// sem esconder o corpo (a mesa o tira na sua vez).</summary>
+        /// <summary>Os objetos (na mesa) de um nivel com alguma casa nas casas dadas.</summary>
+        public static List<NaMesa> NasCasas(HashSet<(int, int)> casas, int nivel)
+        {
+            var r = new List<NaMesa>();
+            foreach (var p in Postos)
+            {
+                var o = p.Dados; if (o == null || !o.TemPosicao || o.Nivel != nivel) continue;
+                bool esta = o.NoCruzamento ? new[] { (0, 0), (-1, 0), (0, -1), (-1, -1) }.Any(d => casas.Contains((o.X + d.Item1, o.Y + d.Item2)))
+                    : Oficina.CasasDoObjeto(o, TamanhoDe(o.Tipo)).Any(c => casas.Contains(c));
+                if (esta) r.Add(p);
+            }
+            return r;
+        }
+        /// <summary>Os objetos do chao (nivel 0) nas casas dadas descem dy (o chao que saiu: ficam sobre a subcamada).</summary>
+        public static void DescerNasCasas(HashSet<(int, int)> casas, float dy)
+        {
+            int n = 0;
+            foreach (var p in NasCasas(casas, 0)) { if (p.Corpo == null) continue; try { p.Corpo.transform.position -= new Vector3(0f, dy, 0f); n++; } catch { } }
+            if (n > 0) Log.Info("  " + n + " objeto(s) descem para o que está embaixo");
+        }
+
         public static List<NaMesa> RetirarNasCasas(HashSet<(int, int)> casas, HashSet<int> pecas)
         {
             var saem = new List<NaMesa>();
@@ -609,6 +630,8 @@ namespace Bigorna.Encontro
             p.Vezes++;
             if (heroi != null) QuemUsou = heroi;   // ("@actor" nas cenas: o heroi que usou o objeto)
             var tipo = p.Dados?.Tipo ?? "";
+            // como no jogo: usar um objeto marca a acao de interacao no retrato do heroi (explorar um ponto de interesse, nao)
+            if (heroi != null && tipo != "SightToken") try { SingletonBehaviour<UIGame>.Instance.HeroMenu.OnMiniViewActionIconChange(ActionIconType.Interact, heroi.Model); } catch (Exception ex) { Log.Info("  ícone de ação: " + ex.Message); }
             if (Gasto(p)) p.Usado = true;
             if (!string.IsNullOrEmpty(p.Dados?.Texto)) Dialogos.Mensagem(p.Dados.Texto, null, p.Rotulo);
             // sem texto de uso e sem gatilho que faca algo: mostra o texto de olhar, para o uso nao passar em branco
@@ -622,10 +645,12 @@ namespace Bigorna.Encontro
         }
 
         /// <summary>Leva um objeto a outra casa (o protegido da escolta vai ao lado do marco que ativou). A figura desliza.</summary>
-        public static void Mover(int indice, int x, int y, int nivel)
+        public static void Mover(int indice, int x, int y, int nivel, int rot = -1)
         {
             var p = Pegar(indice); if (p?.Dados == null) { Log.Info("  mover: objeto #" + indice + " não existe"); return; }
             p.Dados.Pos = new[] { x, y }; p.Dados.Nivel = nivel;
+            // (the marker of the editor gives the turn too)
+            if (rot >= 0) { p.Dados.Rot = rot % 360; if (p.Corpo != null) p.Corpo.transform.rotation = Quaternion.Euler(0f, p.Dados.Rot + (EhEscadaDeMao(p.Dados.Tipo) ? 180 : 0), 0f); }
             if (p.Corpo == null) return;
             var o = p.Dados; var centro = o.NoCruzamento ? new Vector2(o.X - 0.5f, o.Y - 0.5f) : Centro(o);
             var alvo = new Vector3(centro.x, Tabuleiro.AlturaEm(o.X, o.Y, o.Nivel), -centro.y);

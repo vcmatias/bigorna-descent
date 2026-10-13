@@ -67,7 +67,7 @@ namespace Bigorna.Encontro
             {
                 if (!string.IsNullOrEmpty(e.Grupo) && porGatilho.Contains(e.Grupo)) continue;
                 // o monstro posto numa sala fechada espera a sala abrir (pela casa, ou pelo grupo room-N da sala onde foi posto)
-                var sala = Tabuleiro.GrupoDe(e.Pos);
+                var sala = e.Pos != null && e.Pos.Length >= 2 ? Tabuleiro.GrupoDe(e.Pos[0], e.Pos[1], e.Nivel) : null;
                 var grupoSala = e.Grupo != null && e.Grupo.EndsWith("-pool", StringComparison.OrdinalIgnoreCase) ? e.Grupo.Substring(0, e.Grupo.Length - 5) : e.Grupo;   // o grupo balanceado da sala (room-N-pool)
                 if (string.IsNullOrEmpty(sala) && !string.IsNullOrEmpty(grupoSala) && Tabuleiro.GrupoOculto(grupoSala)) sala = grupoSala;
                 if (!string.IsNullOrEmpty(sala)) { _emSalaOculta.Add((e, sala)); continue; }
@@ -164,7 +164,18 @@ namespace Bigorna.Encontro
                 Dialogos.Mensagem(Idioma.T("Todas as miniaturas de <b>" + NomeDe(modelo) + "</b> já estão no tabuleiro: este não entra.", "All the <b>" + NomeDe(modelo) + "</b> miniatures are already on the board: this one does not enter."), null, Idioma.T("Inimigo", "Enemy"));
                 yield break;
             }
+            if (e.Pos != null && e.Pos.Length >= 2 && Tabuleiro.CasaSemChao(e.Pos[0], e.Pos[1])) { Log.Info("  " + e.Id + ": a casa " + e.Pos[0] + "," + e.Pos[1] + " saiu da mesa com a sala dela; não entra"); yield break; }
             var pos = Jogo.Mundo(e.Pos, e.Pos != null && e.Pos.Length >= 2 ? Tabuleiro.AlturaEm(e.Pos[0], e.Pos[1], e.Nivel) : Jogo.Altura(e.Nivel));
+            // um monstro grande (o centuriao, os chefes do fim dos atos) ocupa 2x2 casas: como o jogo, a figura vai no meio de quatro
+            // casas livres perto da pedida, de preferencia com chao livre em volta (para ele poder andar)
+            List<Transform> grandes = null;
+            bool grande = false; try { grande = modelo.Size == EnemySize.TwoByTwo; } catch { }
+            if (grande && e.Pos != null && e.Pos.Length >= 2)
+            {
+                var lg = LugarGrande(e.Pos[0], e.Pos[1], e.Nivel);
+                if (lg != null) { grandes = lg; pos = new Vector3(lg.Average(t => t.position.x), lg.Average(t => t.position.y), lg.Average(t => t.position.z)); }
+                else Log.Info("  " + e.Id + ": monstro grande sem quatro casas livres perto de " + e.Pos[0] + "," + e.Pos[1]);
+            }
             SerializedEnemy inimigo;
             try
             {
@@ -203,7 +214,8 @@ namespace Bigorna.Encontro
                     Jogo.Som("Place_Generic");
                 }
                 else Log.Info("  sem figura de " + modelo.Type + " carregada; só o aviso e a marca na casa");
-                if (casa != null) Jogo.Cena?.AddPersistentHighlight(casa);
+                if (grandes != null) foreach (var c in grandes) Jogo.Cena?.AddPersistentHighlight(c);
+                else if (casa != null) Jogo.Cena?.AddPersistentHighlight(casa);
                 Jogo.Cena?.CameraEncounter?.FocusOn(pos);
             }
             catch (Exception ex) { Log.Info("  figura de " + e.Id + ": " + ex.Message); }
@@ -212,7 +224,8 @@ namespace Bigorna.Encontro
             var cor = NomeCor(inimigo.PlasticId);
             Log.Info("  entra " + e.Id + " (" + modelo.Type + ") em " + Jogo.Casa(pos) + (string.IsNullOrEmpty(e.Grupo) ? "" : " [grupo " + e.Grupo + "]") + " · base " + cor);
             bool fechou = false;
-            Dialogos.Mensagem((Idioma.Pt ? "Coloquem <b>" + nome + "</b> na casa marcada (" + Jogo.Casa(pos) + "), base " + cor + "." : "Place <b>" + nome + "</b> on the marked space (" + Jogo.Casa(pos) + "), " + NomeCor(inimigo.PlasticId, false) + " base.") + (string.IsNullOrEmpty(e.Texto) ? "" : "\n\n" + e.Texto), () => fechou = true, Idioma.T("Inimigo", "Enemy"));
+            Dialogos.Mensagem((grandes != null ? (Idioma.Pt ? "Coloquem <b>" + nome + "</b>, um monstro grande, nas quatro casas marcadas, base " + cor + "." : "Place <b>" + nome + "</b>, a large monster, on the four marked spaces, " + NomeCor(inimigo.PlasticId, false) + " base.")
+                : Idioma.Pt ? "Coloquem <b>" + nome + "</b> na casa marcada (" + Jogo.Casa(pos) + "), base " + cor + "." : "Place <b>" + nome + "</b> on the marked space (" + Jogo.Casa(pos) + "), " + NomeCor(inimigo.PlasticId, false) + " base.") + (string.IsNullOrEmpty(e.Texto) ? "" : "\n\n" + e.Texto), () => fechou = true, Idioma.T("Inimigo", "Enemy"));
             limite = Time.unscaledTime + 180f;
             while (!fechou && Time.unscaledTime < limite) yield return null;
             while (Jogo.Salvando) yield return null;
@@ -260,6 +273,43 @@ namespace Bigorna.Encontro
         }
 
         static Transform CasaDaGrade(Vector3 pos) => Jogo.CasaDaGrade(pos);
+
+        /// <summary>Uma casa onde um monstro pode ficar: com peca naquele nivel, sem objeto em cima (escadaria e ponte sao chao) e de
+        /// uma sala ainda na mesa.</summary>
+        static Transform CasaLivre(int x, int y, int nivel)
+        {
+            if (Tabuleiro.CasaSemChao(x, y)) return null;
+            var t = Tabuleiro.CasaNaGrade(x, y, nivel); if (t == null) return null;
+            if (Mathf.Abs(t.position.y - Tabuleiro.AlturaEm(x, y, nivel)) > 0.35f) return null;
+            if (!string.IsNullOrEmpty(Tabuleiro.GrupoDe(x, y, nivel))) return null;
+            foreach (var p in Objetos.NasCasas(new HashSet<(int, int)> { (x, y) }, nivel))
+            {
+                if (p == null || p.Dados == null || p.EscondidoPorAcao || p.Usado && p.Corpo == null) continue;
+                var tipo = p.Dados.Tipo ?? ""; if (tipo.StartsWith("Staircase") || tipo.StartsWith("Bridge")) continue;
+                return null;
+            }
+            return t;
+        }
+
+        /// <summary>As quatro casas (2x2) para um monstro grande perto de (x, y): a mais perto, e entre as mais perto a com mais chao
+        /// livre em volta.</summary>
+        static List<Transform> LugarGrande(int x, int y, int nivel)
+        {
+            List<Transform> melhor = null; float nota = float.MaxValue;
+            for (int bx = x - 5; bx <= x + 4; bx++)
+                for (int by = y - 5; by <= y + 4; by++)
+                {
+                    var q = new List<Transform>();
+                    for (int dx = 0; dx < 2 && q.Count == dx * 2; dx++) for (int dy = 0; dy < 2; dy++) { var c = CasaLivre(bx + dx, by + dy, nivel); if (c == null) break; q.Add(c); }
+                    if (q.Count < 4) continue;
+                    int volta = 0;
+                    for (int dx = -1; dx <= 2; dx++) for (int dy = -1; dy <= 2; dy++) if ((dx < 0 || dx > 1 || dy < 0 || dy > 1) && CasaLivre(bx + dx, by + dy, nivel) != null) volta++;
+                    float d = Mathf.Max(Mathf.Abs(bx - x), Mathf.Abs(by - y));   // (o canto de cima, à esquerda: como o editor desenha)
+                    float n = (volta >= 8 ? 0f : 1000f - volta * 50f) + d;   // (espaco em volta primeiro, para ele poder andar; depois o mais perto)
+                    if (n < nota) { nota = n; melhor = q; }
+                }
+            return melhor;
+        }
 
         static void Pintar(GameVisibility figura, PlasticIds id)
         {

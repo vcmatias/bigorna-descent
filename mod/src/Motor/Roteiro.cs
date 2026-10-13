@@ -99,6 +99,7 @@ namespace Bigorna.Motor
             Objetos.AoUsar = AoUsarObjeto;
             MostrarObjetivo();
             if (!string.IsNullOrEmpty(m.Metadados.Intro)) Dialogos.Mensagem(m.Metadados.Intro, null, m.NomeVisivel);
+            if (!string.IsNullOrEmpty(m.Metadados.Regras)) Dialogos.Mensagem(m.Metadados.Regras, null, Idioma.T("Regra especial", "Special rule"));
             Log.Info("roteiro em marcha: " + m.Gatilhos.Count + " gatilhos, " + _principais.Count + " objetivo(s)" + (_opcionais.Count > 0 ? " e " + _opcionais.Count + " opcional(is)" : "") + ", " + m.Roteiro.Derrota.Count + " condição(ões) de derrota");
             Disparar("mapStart");
             AgendarTemporizadores();
@@ -718,6 +719,8 @@ namespace Bigorna.Motor
             catch { return false; }
         }
 
+        static readonly HashSet<string> _termosDoFim = new HashSet<string>();
+
         static void FecharSeForHora()
         {
             if (!_fecharCom.HasValue || Time.unscaledTime - _fecharDesde < 0.5f) return;
@@ -735,6 +738,10 @@ namespace Bigorna.Motor
             {
                 var fim = SingletonBehaviour<GameDefaultDialogueTrees>.IsInitialized ? SingletonBehaviour<GameDefaultDialogueTrees>.Instance.EndOfQuestTree : null;
                 if (fim != null && fim.isRunning) { Log.Info("  o jogo já está fechando; não chamo por cima"); return; }
+                // (na cena emprestada as chaves do quadro de fim faltam e apareciam cruas, "END_ENCOUNTER": antes de fechar, elas
+                // ganham o texto do resultado, e o proprio jogo o mostra)
+                var palavra = vitoria ? Idioma.T("Vitória! O mapa está concluído.", "Victory! The map is complete.") : Idioma.T("Derrota. Os heróis recuam, feridos, e o mapa se perde.", "Defeat. The heroes fall back, wounded, and the map is lost.");
+                foreach (var chave in new[] { "END_ENCOUNTER", "END_OF_QUEST" }) if (_termosDoFim.Contains(chave) || Jogo.Texto(chave, chave) == chave) { Jogo.Termo(chave, palavra); _termosDoFim.Add(chave); }
                 Jogo.Controle.EndQuest(vitoria);
                 Log.Info("  EndQuest(" + vitoria + ") chamado");
             }

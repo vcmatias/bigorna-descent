@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -126,6 +126,16 @@ namespace Bigorna.Encontro
             m.Activations = Ativacoes(j["activations"] as JArray, basee.Activations, id);
             m.ManualActivations = Ativacoes(j["tactics"] as JArray, basee.ManualActivations, id);
             LogicaPropria.Registrar(id, basee, _novas);
+            // as taticas criadas na Oficina: o Bigorna escolhe entre elas (condicao "quando" e efeitos ao revelar de cada uma)
+            var proprias = new List<LogicaPropria.TaticaPropria>();
+            foreach (var t in (j["tactics"] as JArray) ?? new JArray())
+            {
+                var tid = (string)t["id"]; if (string.IsNullOrEmpty(tid) || !_criadas.Contains(tid)) continue;
+                var tp = new LogicaPropria.TaticaPropria { Id = tid, Quando = (string)t["quando"] ?? "sempre" };
+                foreach (var f in (t["efeitos"] as JArray) ?? new JArray()) tp.Efeitos.Add(new LogicaPropria.EfeitoDeDefesa { Tipo = (string)f["tipo"], N = (int?)f["n"] ?? 1 });
+                proprias.Add(tp);
+            }
+            LogicaPropria.DefinirTaticas(id, proprias);
             var efeitos = new List<LogicaPropria.EfeitoDeDefesa>();
             foreach (var f in (j["defenseEffects"] as JArray) ?? new JArray()) efeitos.Add(new LogicaPropria.EfeitoDeDefesa { Tipo = (string)f["kind"], N = (int?)f["amount"] ?? 1 });
             LogicaPropria.DefinirDefesa(id, (string)j["defenseEffect"], efeitos);

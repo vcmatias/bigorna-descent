@@ -36,17 +36,16 @@ function desenhar3dCorpo() {
   const dpr = devicePixelRatio; planoTela();
   const W = tela.width / dpr, H = tela.height / dpr;
   ctx.fillStyle = COR.fundo; ctx.fillRect(0, 0, W, H);
-  const lista = [];                       // what is drawn, far to near
+  // every piece of the scene is a volume { min, max } (x and y in squares, z in px) with its drawing; they are drawn in the
+  // order the volumes stand against each other (ordem3d), so a tile, a step, a pillar or a gate is never painted over
+  // something in front of it. Tiles go square by square (a tile is not a box: a raised platform can be in front of one
+  // part of a floor tile and behind another), and the squares of one tile drawn in a row are painted together
+  const itens = [];
   const fundo = [];                       // the underlays, drawn first (the tiles lie over them)
-  const lajes = [];                       // the tiles, to hang what sits on them (a piece on a tile is always drawn right after it)
-  // the 3D view is for looking, not editing: every room at full strength; the room the user clicked gets an outline
-  const alfaSala = () => 1;
+  const alfaSala = () => 1;               // the 3D view is for looking, not editing: every room at full strength
   const foco = vista3d.foco != null && projeto.salas[vista3d.foco] ? vista3d.foco : null;
   const casasFoco = foco != null ? new Set(projeto.salas[foco].pecas.filter(q => !ehAlfombra(q.tile)).flatMap(casasDaPeca).map(c => c.join(','))) : null;
-  /* the entry of the tile under a square at the given level (the highest one covering it, if none at that level) */
-  const lajesDaCasa = new Map();          // square -> the tiles covering it, in the order of `lajes`
-  const lajeDe = (x, y, lv) => { let melhor = null; (lajesDaCasa.get(x + ',' + y) || []).forEach(t => { if (t.lv === lv) melhor = t; else if (!melhor || (melhor.lv !== lv && t.lv > melhor.lv)) melhor = t; }); return melhor; };
-  const pendurar = (x, y, lv, item) => { const t = lajeDe(x, y, lv); if (t) t.filhos.push(item); else lista.push(item); };
+  const vol = (x0, y0, x1, y1, z0, z1, fn, extra) => { const it = { min: [x0, y0, z0], max: [x1, y1, z1], perto: proj3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2).perto, fn, ...(extra || {}) }; itens.push(it); return it; };
   // ground grid around the map
   const todas = projeto.salas.flatMap(s => s.pecas.flatMap(casasDaPeca).concat(s.objetos.flatMap(casasDoObjeto)));
   const xs = todas.map(c => c[0]), ys = todas.map(c => c[1]);
@@ -54,95 +53,89 @@ function desenhar3dCorpo() {
   planoEm(0); ctx.lineWidth = 1 / vista3d.zoom;
   for (let x = gx0; x <= gx1; x++) { ctx.strokeStyle = x % 5 ? COR.grade : COR.gradeForte; ctx.beginPath(); ctx.moveTo(x * C, gy0 * C); ctx.lineTo(x * C, gy1 * C); ctx.stroke(); }
   for (let y = gy0; y <= gy1; y++) { ctx.strokeStyle = y % 5 ? COR.grade : COR.gradeForte; ctx.beginPath(); ctx.moveTo(gx0 * C, y * C); ctx.lineTo(gx1 * C, y * C); ctx.stroke(); }
-  // tiles (slabs) and their pillars
-  const adicionadas = pecasAdicionadas();
+  // tiles (square by square) and their pillars
+  const adicionadas = pecasAdicionadas(); const marcas = marcasDoMapa();   // (tiles added by a trigger and the markers of a "Move": faded)
   projeto.salas.forEach((s, si) => s.pecas.forEach((p, pi) => {
-    const alf = ehAlfombra(p.tile); const aAd = adicionadas.has(si + ':' + pi) ? 0.55 : 1; const lv = alf ? 0 : (p.level || 0); const casas = casasDaPeca(p); if (!casas.length) return;
-    const cx = casas.reduce((a, c) => a + c[0], 0) / casas.length + 0.5, cy = casas.reduce((a, c) => a + c[1], 0) / casas.length + 0.5;
+    const alf = ehAlfombra(p.tile); const aAd = (adicionadas.has(si + ':' + pi) ? 0.55 : 1) * (marcas.pecas.has(si + ':' + pi) ? 0.4 : 1); const lv = alf ? 0 : (p.level || 0); const casas = casasDaPeca(p); if (!casas.length) return;
     const topo = alturaDe(lv) + (alf ? 0.5 : 0);
-    const selecionada = sel && sel.tipo === 'peca' && sel.sala === si && sel.i === pi;
-    const entrada = { perto: proj3(cx, cy, topo).perto - (alf ? 0.01 : 0), casas: new Set(casas.map(c => c.join(','))), lv: alf ? -1 : lv, filhos: [], fn: () => {
-      if (!alf && lv > 0) lados(casas, ehCaixa(p.tile) ? 0 : topo - LAJE, topo, alfaSala(si) * aAd, p);
-      planoEm(topo); ctx.globalAlpha = 1; desenharPeca(p, alfaSala(si) * aAd, false, false); ctx.globalAlpha = 1;
-      // the walls of a walled tile (the vault): a ring two levels high, drawn over its floor
-      const mu = murosDaPeca(p); if (mu) { const zt = alturaDe(lv + mu.altura); lados(mu.casas, topo, zt, alfaSala(si) * aAd, p); planoEm(zt); ctx.globalAlpha = alfaSala(si) * aAd;
-        mu.casas.forEach(([x, y]) => { ctx.fillStyle = '#bfae8c'; ctx.fillRect(x * C, y * C, C, C); ctx.strokeStyle = 'rgba(60,45,30,.7)'; ctx.lineWidth = 1 / vista3d.zoom; ctx.strokeRect(x * C, y * C, C, C); }); ctx.globalAlpha = 1; planoEm(topo); }
-      if (si === foco && !alf) contornoDoFoco(casas, casasFoco);
-      entrada.filhos.sort((a, b) => a.perto - b.perto).forEach(it => it.fn());
-    } };
-    // an underlay lies under the tiles (a sheet slid beneath them): all of them are drawn before anything else
-    (alf ? fundo : lista).push(entrada); if (!alf) { lajes.push(entrada); entrada.casas.forEach(k => { const l = lajesDaCasa.get(k); if (l) l.push(entrada); else lajesDaCasa.set(k, [entrada]); }); }
+    if (alf) { const cx = casas.reduce((a, c) => a + c[0], 0) / casas.length + 0.5, cy = casas.reduce((a, c) => a + c[1], 0) / casas.length + 0.5;
+      fundo.push({ perto: proj3(cx, cy, topo).perto, fn: () => { planoEm(topo); ctx.globalAlpha = 1; desenharPeca(p, alfaSala(si) * aAd, false, false); ctx.globalAlpha = 1; } }); return; }
+    const mu = murosDaPeca(p); const zMuro = mu ? alturaDe(lv + mu.altura) : 0;
+    const peca = { p, si, lv, topo, aAd, todas: new Set(casas.map(c => c.join(','))), mu, zMuro, z0: ehCaixa(p.tile) ? 0 : topo - LAJE };
+    casas.forEach(([x, y]) => { const muro = mu && mu.chaves.has(x + ',' + y);
+      vol(x, y, x + 1, y + 1, lv > 0 ? peca.z0 : topo - LAJE, muro ? zMuro : topo, null, { peca, casa: [x, y], muro }); });
     (p.pilares || []).forEach(q => {
       const z1 = topo - LAJE; const [vx, vy] = q.pos;
       const selecionado = sel && sel.tipo === 'pilar' && sel.sala === si && sel.pos[0] === vx && sel.pos[1] === vy;
-      lista.push({ perto: proj3(vx, vy, z1 * 0.5).perto, fn: () => pilarCruz(vx, vy, 0, z1, alfaSala(si), selecionado, SUPORTES[q.type]?.nivel || 1) });
+      vol(vx - MEIA_CRUZ, vy - MEIA_CRUZ, vx + MEIA_CRUZ, vy + MEIA_CRUZ, 0, z1, () => pilarCruz(vx, vy, 0, z1, alfaSala(si), selecionado, SUPORTES[q.type]?.nivel || 1));
     });
   }));
   // heroes
   projeto.salas.forEach((s, si) => s.herois.forEach((h, hi) => {
     const z = alturaDe(h[2]) + 0.6; const selecionado = sel && sel.tipo === 'heroi' && sel.sala === si && sel.i === hi;
-    pendurar(h[0], h[1], h[2] || 0, { perto: proj3(h[0] + .5, h[1] + .5, z).perto + 0.05, fn: () => { planoEm(z); ctx.globalAlpha = alfaSala(si);
+    vol(h[0], h[1], h[0] + 1, h[1] + 1, z - 0.3, z + 0.3, () => { planoEm(z); ctx.globalAlpha = alfaSala(si);
       ctx.fillStyle = COR.heroi; ctx.beginPath(); ctx.arc(h[0] * C + C / 2, h[1] * C + C / 2, C * 0.36, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#10261f'; ctx.font = `bold 12px system-ui`; ctx.textAlign = 'center'; ctx.fillText('H' + (hi + 1), h[0] * C + C / 2, h[1] * C + C / 2 + 4.5); ctx.textAlign = 'left'; ctx.globalAlpha = 1;
-      if (selecionado) marcarSelecao(h[0], h[1], 1, 1); } });
+      if (selecionado) marcarSelecao(h[0], h[1], 1, 1); });
   }));
-  // objects, flat on their level
+  // objects
   projeto.salas.forEach((s, si) => s.objetos.forEach((o, oi) => {
     const casas = casasDoObjeto(o); const xs = casas.map(c => c[0]), ys = casas.map(c => c[1]); const x0 = Math.min(...xs), y0 = Math.min(...ys), w = Math.max(...xs) - x0 + 1, h = Math.max(...ys) - y0 + 1;
     const terreno = ehTerreno(o); const z = alturaDe(o.level) + (terreno ? 0.4 : 0.8); const vObj = varObj(o.type);
-    const selecionado = sel && sel.tipo === 'objeto' && sel.sala === si && sel.i === oi;
-    // a column standing on a square is the same crossed cardboard pillar, one level tall
-    // a staircase: stone steps rising from the ribbon level to the next one, towards the arrow
-    // it stands on the tiles of its level: drawn after the last of them (so no tile covers it), steps among themselves far to near
-    if (ehTipo(o, 'Staircase')) { const zb = alturaDe(o.level), lv = o.level || 0;
-      const sob = casas.map(([cx, cy]) => lajeDe(cx, cy, lv)).filter(t => t && t.lv === lv).sort((a, b) => b.perto - a.perto)[0];
-      const degraus = degrausDaEscadaria(o, x0, y0, w, h, zb, alfaSala(si) * (o.hidden ? 0.55 : 1), selecionado); degraus.forEach(it => sob ? sob.filhos.push(it) : lista.push(it));
-      // the tile the staircase climbs to lies over its last step: drawn after the steps
-      const [ux, uy] = SOBE[((o.rot || 0) % 360 + 360) % 360 / 90] || [1, 0]; const depois = sob ? sob.perto : Math.max(...degraus.map(it => it.perto));
-      const cima = new Set(); casas.forEach(([cx, cy]) => [[cx, cy], [cx + ux, cy + uy]].forEach(([a, b]) => { const t = lajeDe(a, b, lv + 1); if (t && t.lv === lv + 1) cima.add(t); }));
-      cima.forEach(t => { if (t.perto <= depois) t.perto = depois + 1e-4; }); return; }
+    const selecionado = sel && sel.tipo === 'objeto' && sel.sala === si && sel.i === oi; const alfa = alfaSala(si) * (o.hidden ? 0.55 : 1) * (marcas.objetos.has(si + ':' + oi) ? 0.45 : 1);
+    // a staircase: stone steps rising from its level to the next one, towards the arrow, each step a volume of its own
+    if (ehTipo(o, 'Staircase')) { degrausDaEscadaria(o, x0, y0, w, h, alturaDe(o.level), alfa, selecionado).forEach(it => vol(it.min[0], it.min[1], it.max[0], it.max[1], it.min[2], it.max[2], it.fn)); return; }
     // a ladder: two rails leaning from the square towards the arrow's side, one level tall (short) or two (medium)
-    if (ehTipo(o, 'Ladder') || ehTipo(o, 'LadderMedium')) { const zb = alturaDe(o.level); const n = ehTipo(o, 'LadderMedium') ? 2 : 1; pendurar(o.pos[0], o.pos[1], o.level || 0, { perto: proj3(o.pos[0] + .5, o.pos[1] + .5, zb + ALTURA_NIVEL * n / 2).perto + 0.08, fn: () => escadaDeMao(o, zb, n, alfaSala(si) * (o.hidden ? 0.55 : 1), selecionado) }); return; }
-    if (ehTipo(o, 'PillarObj') || ehTipo(o, 'PillarPush')) { const zb = alturaDe(o.level); pendurar(o.pos[0], o.pos[1], o.level || 0, { perto: proj3(o.pos[0] + .5, o.pos[1] + .5, zb + ALTURA_NIVEL / 2).perto + 0.08, fn: () => pilarCruz(o.pos[0] + .5, o.pos[1] + .5, zb, zb + ALTURA_NIVEL * (SUPORTES[o.tamanho || 'Pillar']?.nivel || 2) / 2, alfaSala(si) * (o.hidden ? 0.55 : 1), selecionado) }); return; }
-    // a game object with its own 3D stand-in (texturas.js): boxes and cylinders, textured on top
+    if (ehTipo(o, 'Ladder') || ehTipo(o, 'LadderMedium')) { const zb = alturaDe(o.level); const n = ehTipo(o, 'LadderMedium') ? 2 : 1; vol(o.pos[0], o.pos[1], o.pos[0] + 1, o.pos[1] + 1, zb, zb + ALTURA_NIVEL * n, () => escadaDeMao(o, zb, n, alfa, selecionado)); return; }
+    // a column standing on a square is the same crossed cardboard pillar
+    if (ehTipo(o, 'PillarObj') || ehTipo(o, 'PillarPush')) { const zb = alturaDe(o.level); const z1 = zb + ALTURA_NIVEL * (SUPORTES[o.tamanho || 'Pillar']?.nivel || 2) / 2;
+      vol(o.pos[0] + .5 - MEIA_CRUZ, o.pos[1] + .5 - MEIA_CRUZ, o.pos[0] + .5 + MEIA_CRUZ, o.pos[1] + .5 + MEIA_CRUZ, zb, z1, () => pilarCruz(o.pos[0] + .5, o.pos[1] + .5, zb, z1, alfa, selecionado)); return; }
+    // a game object with its own 3D stand-in (papelao.js): its cardboard parts
     const modelo = !vObj && modeloDoObjeto(o.type);
-    if (modelo) { const zb = alturaDe(o.level); const alto = alturaDoModelo(modelo);
-      pendurar(o.pos[0], o.pos[1], o.level || 0, { perto: proj3(x0 + w / 2, y0 + h / 2, zb + alto * C / 2).perto + 0.08, fn: () => desenharModelo(o, modelo, x0, y0, w, h, zb, alfaSala(si) * (o.hidden ? 0.55 : 1), selecionado) }); return; }
-    (terreno ? it => lista.push(it) : it => pendurar(o.pos[0], o.pos[1], o.level || 0, it))({ perto: proj3(x0 + w / 2, y0 + h / 2, z).perto + (terreno ? 0.02 : 0.08), fn: () => { planoEm(z); ctx.globalAlpha = alfaSala(si) * (o.hidden ? 0.55 : 1);
+    if (modelo) { const zb = alturaDe(o.level); const altura = alturaDoModelo(modelo);
+      // (a piece as tall as a walkway over it reaches into the slab: for the order, it stops under the slab)
+      vol(x0, y0, x0 + w, y0 + h, zb, Math.max(zb + 1, zb + altura * C - LAJE * 1.05), () => desenharModelo(o, modelo, x0, y0, w, h, zb, alfa, selecionado)); return; }
+    // flat on its level (with the block, the model or the standing card of a Workshop object, when it has one)
+    const alto = vObj ? Math.max(vObj.exibir === 'block' ? (vObj.alturaBloco || 0.6) * C : 0, vObj.exibir === 'model' && vObj.modelo ? (vObj.alturaModelo || 1) * C : 0, vObj.exibir === 'standee' && vObj.standee ? (vObj.alturaStandee || 1.4) * C : 0) : 0;
+    vol(x0, y0, x0 + w, y0 + h, z - 0.3, z + Math.max(0.3, alto), () => { planoEm(z); ctx.globalAlpha = alfa;
       const img = imagemObj(o.type); const tex = !vObj && texturaDoObjeto(o.type);
       if (tex) desenharTexturaGirada(tex, o, x0, y0, w, h);
       else if (terreno) { ctx.fillStyle = 'rgba(120,110,95,.7)'; ctx.fillRect(x0 * C, y0 * C, w * C, h * C); ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1; casas.forEach(([x, y]) => ctx.strokeRect(x * C + .5, y * C + .5, C - 1, C - 1)); }
       else if (vObj) { ctx.fillStyle = vObj.cor || '#6a5a48'; casas.forEach(([x, y]) => ctx.fillRect(x * C + 1.5, y * C + 1.5, C - 3, C - 3)); }
       else { ctx.fillStyle = 'rgba(20,18,24,.8)'; arredondado(x0 * C + 2, y0 * C + 2, w * C - 4, h * C - 4, 5); ctx.fill(); }
       if (!tex && img && img.complete && img.naturalWidth) desenharImagemGirada(img, o, x0, y0, w, h);
-      if (ehTipo(o, 'Staircase')) desenharSeta(o, x0, y0, w, h);
       if ((o.gatilhos || []).length) { ctx.strokeStyle = o.gatilhos.some(g => g.tipo === 'open_room') ? COR.abre : COR.gatilho; ctx.lineWidth = 2.5; arredondado(x0 * C + 1.5, y0 * C + 1.5, w * C - 3, h * C - 3, 5); ctx.stroke(); }
       ctx.globalAlpha = 1; if (selecionado) marcarSelecao(x0, y0, w, h);
-      // a standing card: the picture upright over the centre of its squares, turned to the viewer
-      const vb = vObj; if (vb && vb.exibir === 'block') desenharBloco(vb, casas, z - 0.8 + 0.4, alfaSala(si) * (o.hidden ? 0.55 : 1), x0, y0, w, h);
-      const vm = vObj; if (vm && vm.exibir === 'model' && vm.modelo) desenharMalhaDoObjeto(vm, o, casas, z, alfaSala(si) * (o.hidden ? 0.55 : 1));
+      const vb = vObj; if (vb && vb.exibir === 'block') desenharBloco(vb, casas, z - 0.8 + 0.4, alfa, x0, y0, w, h);
+      const vm = vObj; if (vm && vm.exibir === 'model' && vm.modelo) desenharMalhaDoObjeto(vm, o, casas, z, alfa);
       const vo = vObj; if (vo && vo.exibir === 'standee' && vo.standee) { const im = retratoImg('standee:' + vo.id, vo.standee);
         if (im && im.complete && im.naturalWidth) { const cx = casas.reduce((a, c) => a + c[0], 0) / casas.length + 0.5, cy = casas.reduce((a, c) => a + c[1], 0) / casas.length + 0.5;
-          const H = (vo.alturaStandee || 1.4) * C; const [bx, by] = naTela(proj3(cx, cy, z)); const [, ty] = naTela(proj3(cx, cy, z + H));
-          const hp = by - ty, wp = H * vista3d.zoom * im.naturalWidth / im.naturalHeight; planoTela(); ctx.globalAlpha = alfaSala(si) * (o.hidden ? 0.55 : 1);
-          if (hp > 2) ctx.drawImage(im, bx - wp / 2, ty, wp, hp); ctx.globalAlpha = 1; } } } });
+          const Hs = (vo.alturaStandee || 1.4) * C; const [bx, by] = naTela(proj3(cx, cy, z)); const [, ty] = naTela(proj3(cx, cy, z + Hs));
+          const hp = by - ty, wp = Hs * vista3d.zoom * im.naturalWidth / im.naturalHeight; planoTela(); ctx.globalAlpha = alfa;
+          if (hp > 2) ctx.drawImage(im, bx - wp / 2, ty, wp, hp); ctx.globalAlpha = 1; } } });
   }));
-  // monsters, flat too
+  // monsters, flat too (a standing card when the monster has one)
   projeto.salas.forEach((s, si) => inimigosDaSala(s).forEach(({ e, origem }) => {
     const [x, y] = e.pos; const z = alturaDe(e.level) + 0.9; const spawn = origem.tipo === 'gat';
     const selecionado = sel && sel.tipo === 'inimigo' && sel.sala === si && ((origem.tipo === 'sala' && sel.g === undefined && sel.i === origem.i) || (origem.tipo === 'gat' && sel.g === origem.g && sel.obj === origem.obj && (sel.l || 'gatilhos') === origem.l && sel.i === origem.k));
-    pendurar(x, y, e.level || 0, { perto: proj3(x + .5, y + .5, z).perto + 0.1, fn: () => { planoEm(z); const img = retratoImg('ini:' + e.enemy, iconeIni(e.enemy));
+    const mm = monstro(e.enemy); const Hs = mm && mm.figura === 'standee' && mm.standee ? [1.1, 1.4, 1.9, 2.6][mm.size || 0] * (mm.escalaStandee || 1) * C : 0;
+    vol(x, y, x + 1, y + 1, z - 0.3, z + Math.max(0.3, Hs), () => { planoEm(z); const img = retratoImg('ini:' + e.enemy, iconeIni(e.enemy));
       ctx.globalAlpha = alfaSala(si) * (spawn ? 0.85 : 1);
       ctx.fillStyle = ehPool(e.enemy) ? COR.pool : spawn ? COR.spawn : COR.inimigo; ctx.beginPath(); ctx.arc(x * C + C / 2, y * C + C / 2, C * 0.44, 0, Math.PI * 2); ctx.fill();
       if (img && img.complete && img.naturalWidth) { ctx.save(); ctx.beginPath(); ctx.arc(x * C + C / 2, y * C + C / 2, C * 0.38, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(img, x * C + C * 0.12, y * C + C * 0.12, C * 0.76, C * 0.76); ctx.restore(); }
       ctx.globalAlpha = 1; if (selecionado) marcarSelecao(x, y, 1, 1);
-      // a monster with a standing card: the picture upright on its space (height by the monster size)
-      const mm = monstro(e.enemy); if (mm && mm.figura === 'standee' && mm.standee) { const im = retratoImg('standee:' + mm.id, mm.standee);
-        if (im && im.complete && im.naturalWidth) { const H = [1.1, 1.4, 1.9, 2.6][mm.size || 0] * (mm.escalaStandee || 1) * C; const [bx, by] = naTela(proj3(x + .5, y + .5, z)); const [, ty] = naTela(proj3(x + .5, y + .5, z + H));
-          const hp = by - ty, wp = H * vista3d.zoom * im.naturalWidth / im.naturalHeight; planoTela(); ctx.globalAlpha = alfaSala(si); if (hp > 2) ctx.drawImage(im, bx - wp / 2, ty, wp, hp); ctx.globalAlpha = 1; } } } });
+      if (Hs) { const im = retratoImg('standee:' + mm.id, mm.standee);
+        if (im && im.complete && im.naturalWidth) { const [bx, by] = naTela(proj3(x + .5, y + .5, z)); const [, ty] = naTela(proj3(x + .5, y + .5, z + Hs));
+          const hp = by - ty, wp = Hs * vista3d.zoom * im.naturalWidth / im.naturalHeight; planoTela(); ctx.globalAlpha = alfaSala(si); if (hp > 2) ctx.drawImage(im, bx - wp / 2, ty, wp, hp); ctx.globalAlpha = 1; } } });
   }));
   fundo.sort((a, b) => a.perto - b.perto).forEach(it => it.fn());
-  lista.sort((a, b) => a.perto - b.perto).forEach(it => it.fn());
+  // the squares of one tile that come in a row are painted together (one clip, one painting of the tile)
+  const ordem = ordem3d(itens);
+  for (let i = 0; i < ordem.length; i++) {
+    const it = ordem[i]; if (!it.peca) { it.fn(); continue; }
+    const run = [it]; while (i + 1 < ordem.length && ordem[i + 1].peca === it.peca) run.push(ordem[++i]);
+    desenharCasas(it.peca, run, foco, casasFoco, alfaSala(it.peca.si));
+  }
   // room labels, upright, at the ground
   planoTela();
   projeto.salas.forEach((s, si) => {
@@ -155,6 +148,63 @@ function desenhar3dCorpo() {
   });
   // level scale in the corner
   ctx.fillStyle = COR.texto; ctx.font = '11px system-ui'; ctx.fillText('3D view · drag moves the map · right-drag or Alt+drag turns it · Q/E turn 45° · W/S tilt · wheel zooms · Esc back to the plan', 12, H - 12);
+}
+/* some squares of a tile, drawn together: their sides (only the edges the tile leaves open), the walls of a vault on them,
+   then the tile itself clipped to them */
+function desenharCasas(pc, run, foco, casasFoco, alfaSala) {
+  const { p, si, lv, topo, aAd, todas, mu, zMuro } = pc; const alfa = alfaSala * aAd; const casas = run.map(it => it.casa);
+  if (lv > 0) lados(casas, pc.z0, topo, alfa, p, todas);
+  planoEm(topo); ctx.save(); ctx.beginPath(); casas.forEach(([x, y]) => ctx.rect(x * C, y * C, C, C)); ctx.clip();
+  ctx.globalAlpha = 1; desenharPeca(p, alfa, false, false); ctx.globalAlpha = 1;
+  if (si === foco) contornoDoFoco(casas, casasFoco);
+  ctx.restore();
+  // the walls of a walled tile (the vault): a ring two levels high, drawn over its floor
+  const muros = mu ? casas.filter(([x, y]) => mu.chaves.has(x + ',' + y)) : [];
+  if (muros.length) { lados(muros, topo, zMuro, alfa, p, mu.chaves); planoEm(zMuro); ctx.globalAlpha = alfa;
+    muros.forEach(([x, y]) => { ctx.fillStyle = '#bfae8c'; ctx.fillRect(x * C, y * C, C, C); ctx.strokeStyle = 'rgba(60,45,30,.7)'; ctx.lineWidth = 1 / vista3d.zoom; ctx.strokeRect(x * C, y * C, C, C); }); ctx.globalAlpha = 1; }
+}
+/* the drawing order of the volumes of the scene: each one after those behind it where they meet on the screen (a gap along
+   some axis: the one on the far side is behind; two that cut into each other go by their centres); among the free ones,
+   the farthest first */
+function ordem3d(itens) {
+  const n = itens.length; if (n < 2) return itens;
+  const sa = Math.sin(vista3d.yaw), ca = Math.cos(vista3d.yaw), sp = Math.sin(vista3d.pitch), cp = Math.cos(vista3d.pitch);
+  const D = [sa * sp * C, ca * sp * C, cp];   // (x and y in squares, z in px)
+  // the box of each one on the screen
+  const tela = itens.map(it => { let a0 = Infinity, a1 = Infinity, b0 = -Infinity, b1 = -Infinity;
+    for (const x of [it.min[0], it.max[0]]) for (const y of [it.min[1], it.max[1]]) for (const z of [it.min[2], it.max[2]]) { const p = proj3(x, y, z); if (p.sx < a0) a0 = p.sx; if (p.sx > b0) b0 = p.sx; if (p.sy < a1) a1 = p.sy; if (p.sy > b1) b1 = p.sy; }
+    return [a0, a1, b0, b1]; });
+  // who meets whom on the screen: a grid of cells
+  const lado = C * 1.5, grade = new Map();
+  tela.forEach((t, i) => { for (let gx = Math.floor(t[0] / lado); gx <= Math.floor(t[2] / lado); gx++) for (let gy = Math.floor(t[1] / lado); gy <= Math.floor(t[3] / lado); gy++) { const k = gx + ',' + gy; const l = grade.get(k); if (l) l.push(i); else grade.set(k, [i]); } });
+  const antes = new Int32Array(n), depois = itens.map(() => []), visto = new Set(), m = 0.5;
+  const rel = (A, B) => { let r = 0, gap = false;
+    for (let k = 0; k < 3; k++) { if (Math.abs(D[k]) < 1e-9) { if (A.max[k] <= B.min[k] + 1e-3 || B.max[k] <= A.min[k] + 1e-3) gap = true; continue; }
+      let s = 0; if (A.max[k] <= B.min[k] + 1e-3) s = D[k] > 0 ? 1 : -1; else if (B.max[k] <= A.min[k] + 1e-3) s = D[k] > 0 ? -1 : 1;
+      if (!s) continue; gap = true; if (r && s !== r) return 0; r = s; }
+    if (r) return r; if (gap) return 0;
+    return A.perto < B.perto ? 1 : A.perto > B.perto ? -1 : 0; };
+  grade.forEach(l => { for (let a = 0; a < l.length; a++) for (let b = a + 1; b < l.length; b++) {
+    const i = Math.min(l[a], l[b]), j = Math.max(l[a], l[b]); if (i === j) continue; const k = i * n + j; if (visto.has(k)) continue; visto.add(k);
+    const P = tela[i], Q = tela[j]; if (!(P[0] < Q[2] - m && Q[0] < P[2] - m && P[1] < Q[3] - m && Q[1] < P[3] - m)) continue;
+    const r = rel(itens[i], itens[j]); if (r > 0) { depois[i].push(j); antes[j]++; } else if (r < 0) { depois[j].push(i); antes[i]++; } } });
+  // the free ones by distance (a heap on perto); a cycle: the farthest of the rest goes
+  const heap = []; const sobe = () => { let c = heap.length - 1; while (c > 0) { const p = (c - 1) >> 1; if (itens[heap[p]].perto <= itens[heap[c]].perto) break; [heap[p], heap[c]] = [heap[c], heap[p]]; c = p; } };
+  const tira = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let c = 0; for (;;) { const l = 2 * c + 1, r = l + 1; let s = c; if (l < heap.length && itens[heap[l]].perto < itens[heap[s]].perto) s = l; if (r < heap.length && itens[heap[r]].perto < itens[heap[s]].perto) s = r; if (s === c) break; [heap[s], heap[c]] = [heap[c], heap[s]]; c = s; } } return top; };
+  // (the squares of the tile just drawn that are free go first: the tile is painted in fewer pieces)
+  const feito = new Uint8Array(n), r = []; const livresDa = new Map();
+  const solta = i => { heap.push(i); sobe(); const pc = itens[i].peca; if (pc) { const l = livresDa.get(pc); if (l) l.push(i); else livresDa.set(pc, [i]); } };
+  for (let i = 0; i < n; i++) if (!antes[i]) solta(i);
+  let ultima = null;
+  while (r.length < n) {
+    let i = -1; const l = ultima && livresDa.get(ultima);
+    while (l && l.length) { const k = l.pop(); if (!feito[k]) { i = k; break; } }
+    if (i < 0) { while (heap.length) { const k = tira(); if (!feito[k]) { i = k; break; } } }
+    if (i < 0) { for (let k = 0; k < n; k++) if (!feito[k] && (i < 0 || itens[k].perto < itens[i].perto)) i = k; }
+    feito[i] = 1; r.push(itens[i]); ultima = itens[i].peca || null;
+    for (const j of depois[i]) if (--antes[j] === 0 && !feito[j]) solta(j);
+  }
+  return r;
 }
 /* the outline of the clicked room: the edges of its floor, drawn on the plane of each tile */
 function contornoDoFoco(casas, todas) {
@@ -186,8 +236,8 @@ function salaEm3d(mx, my) {
   return melhor;
 }
 /* the vertical faces of a slab between heights z0 and z1 around the given squares (only edges with no neighbour, facing the viewer) */
-function lados(casas, z0, z1, alfa, p) {
-  const S = new Set(casas.map(c => c.join(','))); const v = varPeca(p.tile); const cor = v?.cor || null;
+function lados(casas, z0, z1, alfa, p, todas) {
+  const S = todas || new Set(casas.map(c => c.join(','))); const v = varPeca(p.tile); const cor = v?.cor || null;
   planoTela(); ctx.globalAlpha = alfa;
   const face = (ax, ay, bx, by, nx, ny) => {
     if (!olhaParaMim(nx, ny)) return;
@@ -240,7 +290,8 @@ function degrausDaEscadaria(o, x0, y0, w, h, z0, alfa, selecionado) {
   const face = (pts, cor) => { const q = pts.map(naTela); ctx.fillStyle = cor; ctx.beginPath(); ctx.moveTo(...q[0]); q.slice(1).forEach(p => ctx.lineTo(...p)); ctx.closePath(); ctx.fill(); ctx.strokeStyle = 'rgba(20,18,16,.75)'; ctx.lineWidth = 1; ctx.stroke(); };
   for (let k = 0; k < n; k++) {
     const t0 = k * L / n, t1 = (k + 1) * L / n, z1 = z0 + (k + 1) * H / n;
-    itens.push({ perto: P((t0 + t1) / 2, W / 2, (z0 + z1) / 2).perto + 0.02, fn: () => {
+    const cantos = [[t0, 0], [t1, 0], [t0, W], [t1, W]].map(([t, s]) => [cx + dx * (t - L / 2) + px * (s - W / 2), cy + dy * (t - L / 2) + py * (s - W / 2)]);
+    itens.push({ min: [Math.min(...cantos.map(c => c[0])), Math.min(...cantos.map(c => c[1])), z0], max: [Math.max(...cantos.map(c => c[0])), Math.max(...cantos.map(c => c[1])), z1], perto: P((t0 + t1) / 2, W / 2, (z0 + z1) / 2).perto + 0.02, fn: () => {
       planoTela(); ctx.globalAlpha = alfa;
       if (olhaParaMim(px, py)) face([P(t0, W, z0), P(t1, W, z0), P(t1, W, z1), P(t0, W, z1)], '#8d857a'); else face([P(t0, 0, z0), P(t1, 0, z0), P(t1, 0, z1), P(t0, 0, z1)], '#8d857a');
       if (olhaParaMim(dx, dy)) face([P(t1, 0, z0), P(t1, W, z0), P(t1, W, z1), P(t1, 0, z1)], '#6f685f');
@@ -353,10 +404,13 @@ function desenharModelo(o, pecas, x0, y0, w, h, zb, alfa, selecionado) {
   const D = [sa * sp, ca * sp, cp]; const L = [-0.35, -0.55, 0.76]; const nl = Math.hypot(...L);
   const dot = (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2]; const unit = p => { const m = Math.hypot(...p) || 1; return p.map(x => x / m); };
   const pertoDe = P => (P[0] * sa + P[1] * ca) * sp + P[2] * cp;
-  const itens = [];
+  // each part belongs to a block (the box it is a face of; a card or a round part is a block of its own) with its extent in
+  // the object's own squares: blocks are ordered by where they stand against each other, faces inside a block far to near
+  const blocos = new Map(); const blocoDe = q => { const k = q.caixa || q; let b = blocos.get(k); if (!b) { b = { ext: extensaoDaParte(q), itens: [] }; blocos.set(k, b); } return b; };
+  const pushItem = (q, it) => blocoDe(q).itens.push(it);
   pecas.forEach(q => {
     if (q.cil) {
-      itens.push({ perto: pertoDe(ponto([q.c[0], q.c[1], (q.z[0] + q.z[1]) / 2])), fn: () => {
+      pushItem(q, { perto: pertoDe(ponto([q.c[0], q.c[1], (q.z[0] + q.z[1]) / 2])), fn: () => {
         const z0 = zb + q.z[0] * C, z1 = zb + q.z[1] * C, H = z1 - z0; const n = Math.max(2, Math.min(60, Math.ceil(H * vista3d.zoom / 2)));
         const local = z => { planoEm(z); ctx.translate(cx * C, cy * C); ctx.rotate(rot); ctx.translate(-dw * C / 2, -dh * C / 2); };
         const disco = k => { ctx.beginPath(); ctx.arc(q.c[0] * C, q.c[1] * C, Math.max(0.5, (q.r[0] + (q.r[1] - q.r[0]) * k) * C), 0, Math.PI * 2); };
@@ -376,16 +430,53 @@ function desenharModelo(o, pecas, x0, y0, w, h, zb, alfa, selecionado) {
     const Us = U.map(x => x / sw), Vs = V.map(x => x / sh);
     const centro = [O[0] + U[0] / 2 + V[0] / 2, O[1] + U[1] / 2 + V[1] / 2, O[2] + U[2] / 2 + V[2] / 2];
     const brilho = Math.min(1, q.n ? 0.6 + 0.45 * Math.max(0, dot(N, L) / nl) : 0.7 + 0.35 * Math.abs(dot(N, L)) / nl);
-    itens.push({ perto: pertoDe(centro), fn: () => {
+    pushItem(q, { perto: pertoDe(centro), fn: () => {
       if (!q.n) { const lado = dot(N, D) >= 0 ? -1 : 1; const e = CARTAO_ESPESSURA * C * lado;
         [0.5, 1].forEach(t => { planoLivre([O[0] + N[0] * e * t, O[1] + N[1] * e * t, O[2] + N[2] * e * t], Us, Vs); ctx.drawImage(im.borda, sx, 0, sw, sh, 0, 0, sw, sh); }); }
       planoLivre(O, Us, Vs); ctx.drawImage(im.img, sx, 0, sw, sh, 0, 0, sw, sh);
       if (brilho < 0.99) { const a0 = ctx.globalAlpha; ctx.globalAlpha = a0 * Math.min(0.6, 1 - brilho); ctx.drawImage(im.sombra, sx, 0, sw, sh, 0, 0, sw, sh); ctx.globalAlpha = a0; } } });
   });
+  // the viewer's direction in the object's own squares (perto grows towards the viewer)
+  const Dl = [(cr * sa + sr * ca) * sp, (cr * ca - sr * sa) * sp, cp];
+  const lista = [...blocos.values()]; lista.forEach(b => { b.itens.sort((a, c) => a.perto - c.perto); b.perto = b.itens.reduce((s, it) => s + it.perto, 0) / Math.max(1, b.itens.length); });
   ctx.globalAlpha = alfa;
-  itens.sort((a, b) => a.perto - b.perto).forEach(it => it.fn());
+  ordemDeBlocos(lista, Dl).forEach(b => b.itens.forEach(it => it.fn()));
   ctx.globalAlpha = 1;
   if (selecionado) { planoEm(zb + 1); marcarSelecao(x0, y0, w, h); }
+}
+/* the extent of a part in the object's own squares: { min, max } */
+function extensaoDaParte(q) {
+  if (q.caixa) return q.caixa;
+  if (q.cil) { const r = Math.max(q.r[0], q.r[1]); return { min: [q.c[0] - r, q.c[1] - r, q.z[0]], max: [q.c[0] + r, q.c[1] + r, q.z[1]] }; }
+  const pts = [q.o, q.o.map((x, k) => x + q.u[k]), q.o.map((x, k) => x + q.v[k]), q.o.map((x, k) => x + q.u[k] + q.v[k])];
+  return { min: [0, 1, 2].map(k => Math.min(...pts.map(p => p[k]))), max: [0, 1, 2].map(k => Math.max(...pts.map(p => p[k]))) };
+}
+/* is block A behind block B, seen along D (per unit of each axis, growing towards the viewer)? Two blocks that do not cut into
+   each other have a gap along some axis: the one on the far side of it is behind. 1: A behind; -1: B behind; 0: no gap, or
+   gaps that disagree (then neither hides the other) */
+function atrasDe(A, B, D, eps = 1e-6) {
+  let r = 0;
+  for (let k = 0; k < 3; k++) {
+    if (Math.abs(D[k]) < 1e-9) continue;
+    let s = 0;
+    if (A.max[k] <= B.min[k] + eps) s = D[k] > 0 ? 1 : -1;
+    else if (B.max[k] <= A.min[k] + eps) s = D[k] > 0 ? -1 : 1;
+    if (!s) continue; if (r && s !== r) return 0; r = s;
+  }
+  return r;
+}
+/* the blocks in drawing order: each one after those behind it; among the free ones, the farthest first (by perto) */
+function ordemDeBlocos(lista, D) {
+  const n = lista.length; if (n < 2) return lista;
+  const antes = lista.map(() => 0), depois = lista.map(() => []);
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { const r = atrasDe(lista[i].ext, lista[j].ext, D); if (r > 0) { depois[i].push(j); antes[j]++; } else if (r < 0) { depois[j].push(i); antes[i]++; } }
+  const feito = lista.map(() => false), r = [];
+  for (let passo = 0; passo < n; passo++) {
+    let m = -1; for (let i = 0; i < n; i++) if (!feito[i] && !antes[i] && (m < 0 || lista[i].perto < lista[m].perto)) m = i;
+    if (m < 0) for (let i = 0; i < n; i++) if (!feito[i] && (m < 0 || lista[i].perto < lista[m].perto)) m = i;   // (a cycle: the farthest goes)
+    feito[m] = true; r.push(lista[m]); depois[m].forEach(j => antes[j]--);
+  }
+  return r;
 }
 function desenharBloco(v, casas, z0, alfa, x0, y0, w, h) {
   const H = (v.alturaBloco || 0.6) * C, cor = v.cor || '#6a5a48'; const n = Math.max(3, Math.ceil(H / 3));

@@ -17,12 +17,14 @@ const cartaPlano = (o, u, v, arte, extra) => ({ o, u, v, arte, ...extra });
 /* a folded box: four sides and the top ('textura' on the top shows the object's texture from above) */
 function caixaCartao(x, y, w, h, z0, z1, lados, topo, frente) {
   const H = z1 - z0; const L = typeof lados === 'function' ? lados : pintaCor(lados);
+  // (the faces of one box share `caixa`: the 3D view orders whole boxes against each other, then the faces of each)
+  const caixa = { min: [x, y, z0], max: [x + w, y + h, z1] };
   return [
-    { o: [x, y + h, z1], u: [w, 0, 0], v: [0, 0, -H], arte: frente || L, n: [0, 1, 0] },
-    { o: [x + w, y, z1], u: [-w, 0, 0], v: [0, 0, -H], arte: L, n: [0, -1, 0] },
-    { o: [x, y, z1], u: [0, h, 0], v: [0, 0, -H], arte: L, n: [-1, 0, 0] },
-    { o: [x + w, y + h, z1], u: [0, -h, 0], v: [0, 0, -H], arte: L, n: [1, 0, 0] },
-    { o: [x, y, z1], u: [w, 0, 0], v: [0, h, 0], arte: topo === 'textura' ? recorteDaTextura(x, y, w, h) : typeof topo === 'function' ? topo : topo ? pintaCor(topo) : L, n: [0, 0, 1] }
+    { o: [x, y + h, z1], u: [w, 0, 0], v: [0, 0, -H], arte: frente || L, n: [0, 1, 0], caixa },
+    { o: [x + w, y, z1], u: [-w, 0, 0], v: [0, 0, -H], arte: L, n: [0, -1, 0], caixa },
+    { o: [x, y, z1], u: [0, h, 0], v: [0, 0, -H], arte: L, n: [-1, 0, 0], caixa },
+    { o: [x + w, y + h, z1], u: [0, -h, 0], v: [0, 0, -H], arte: L, n: [1, 0, 0], caixa },
+    { o: [x, y, z1], u: [w, 0, 0], v: [0, h, 0], arte: topo === 'textura' ? recorteDaTextura(x, y, w, h) : typeof topo === 'function' ? topo : topo ? pintaCor(topo) : L, n: [0, 0, 1], caixa }
   ];
 }
 /* two cards slotted in a cross at (cx, cy): split at the slot, so each half can be drawn in the right order */

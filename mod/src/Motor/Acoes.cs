@@ -262,10 +262,15 @@ namespace Bigorna.Motor
                     Escolta.Comecar(P.Texto(p, "name"), P.Inteiro(p, "chance", 25), P.Textos(p, "hunters") ?? new List<string>());
                     break;
                 case "escortEnd": Escolta.Parar(); break;
+                case "targetProtected":
+                    // um protegido como alvo dos monstros de um grupo (ou de todos), com uma chance por rodada
+                    Escolta.Mirar(P.Texto(p, "name"), P.Inteiro(p, "chance", 25), P.Texto(p, "group"));
+                    break;
+                case "targetProtectedEnd": Escolta.PararDe(P.Texto(p, "name")); break;
                 case "moveObject":
                 {
                     var c = P.Celula(p); if (c == null) break;
-                    Objetos.Mover(P.Inteiro(p, "interactable", -1), c[0], c[1], P.Inteiro(p, "level", 0));
+                    Objetos.Mover(P.Inteiro(p, "interactable", -1), c[0], c[1], P.Inteiro(p, "level", 0), P.Inteiro(p, "rot", -1));
                     break;
                 }
                 case "enemyBonus":
@@ -370,7 +375,8 @@ namespace Bigorna.Motor
                 // ------------------------------------------------ tabuleiro
                 case "revealTiles": Tabuleiro.Revelar(P.Texto(p, "group")); break;
                 case "removeRoom": Tabuleiro.RemoverGrupo(P.Texto(p, "group")); break;
-                case "removeTile": Tabuleiro.RemoverPeca(P.Inteiro(p, "tile", -1)); break;
+                case "removeTile": Tabuleiro.RemoverPeca(P.Inteiro(p, "tile", -1), P.Booleano(p, "keep", false)); break;
+                case "moveTile": { var c = P.Celula(p, "pos"); if (c != null) Tabuleiro.MoverPeca(P.Inteiro(p, "tile", -1), c[0], c[1], P.Inteiro(p, "rot", 0), P.Inteiro(p, "level", 0)); break; }
                 case "setVar": Roteiro.Vars[P.Texto(p, "var") ?? ""] = P.Inteiro(p, "value", 1); break;
                 case "announceMission": Roteiro.AnunciarMissao(P.Texto(p, "mission")); break;
                 case "blockCells":
@@ -575,8 +581,13 @@ namespace Bigorna.Motor
         /// <summary>Modo de teste: da o monstro por derrotado, como se tivesse caido em combate.</summary>
         public static void Derrotar(SerializedEnemy e) => Morrer(e);
 
+        // (um inimigo ja dado por morto, com a arvore de derrota ainda na fila, nao morre de novo: duas arvores para o mesmo
+        // inimigo travaram a gravacao do fim de rodada no teste 10)
+        static readonly HashSet<string> _mortos = new HashSet<string>();
         static void Morrer(SerializedEnemy e)
         {
+            if (e == null || string.IsNullOrEmpty(e.GUID)) return;
+            if (!_mortos.Add(e.GUID)) { Log.Info("  «" + e.ModelId + "» já caiu; a derrota dele ainda corre"); return; }
             try
             {
                 var gc = Jogo.Controle;

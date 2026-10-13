@@ -45,6 +45,16 @@ namespace Bigorna.Encontro
         static List<GameTile> _porSoltar;
 
         public static IEnumerable<string> GruposOcultos => _ocultas.Keys;
+
+        // as casas de pecas que sairam da mesa (uma sala deixada para tras): um monstro chamado para uma delas, sem outra peca
+        // embaixo, ficaria no vazio
+        static readonly HashSet<(int, int)> _tiradas = new HashSet<(int, int)>();
+        public static bool CasaSemChao(int x, int y)
+        {
+            if (!_tiradas.Contains((x, y))) return false;
+            foreach (var t in _postas) if (t != null && t.gameObject.activeInHierarchy && CasasDe(t).Contains((x, y))) return false;
+            return true;
+        }
         public static bool GrupoOculto(string g) => !string.IsNullOrEmpty(g) && _ocultas.ContainsKey(g);
 
         public static void Reiniciar()
@@ -52,11 +62,12 @@ namespace Bigorna.Encontro
             Montado = false;
             NossaCena = false;
             _postas.Clear();
+            _tiradas.Clear();
             _pecaDe.Clear();
             _indiceDe.Clear();
             _ocultas.Clear();
             _terrenoDaBase.Clear();
-            GrupoDaCasa.Clear();
+            GrupoDaCasa.Clear(); _grupoNoNivel.Clear(); _comPeca.Clear();
             _topoDaCaixa.Clear();
             PorColocar.Clear();
             _porSoltar = null;
@@ -100,10 +111,22 @@ namespace Bigorna.Encontro
                     Esconder(tile, true);
                     if (!_ocultas.TryGetValue(p.Grupo, out var lista)) _ocultas[p.Grupo] = lista = new List<GameTile>();
                     lista.Add(tile);
-                    foreach (var casa in CasasDe(tile)) GrupoDaCasa[casa] = p.Grupo;
+                    foreach (var casa in CasasDe(tile)) { GrupoDaCasa[casa] = p.Grupo; _grupoNoNivel[(casa.Item1, casa.Item2, p.Nivel)] = p.Grupo; }
                 }
                 else Esconder(tile, false); // fica invisivel ate soltar
+                foreach (var casa in CasasDe(tile)) _comPeca.Add((casa.Item1, casa.Item2, p.Nivel));
             }
+            // uma subcamada oculta embaixo de uma peca (a agua que entra depois) nao toma para o seu grupo as casas dessa peca:
+            // o que esta nelas e da peca de cima (sala aberta desde o inicio, ou a sua propria sala oculta)
+            var cobertas = new HashSet<(int, int)>(_postas.Where(t => Ordem(_pecaDe[t]) != 0).SelectMany(CasasDe));
+            var cobertasNoNivel = new HashSet<(int, int, int)>(_postas.Where(t => Ordem(_pecaDe[t]) != 0).SelectMany(t => CasasDe(t).Select(c => (c.Item1, c.Item2, _pecaDe[t].Nivel))));
+            foreach (var t in _postas.Where(t => Ordem(_pecaDe[t]) == 0 && !string.IsNullOrEmpty(_pecaDe[t].Grupo)))
+                foreach (var casa in CasasDe(t))
+                {
+                    if (cobertas.Contains(casa) && GrupoDaCasa.TryGetValue(casa, out var g0) && g0 == _pecaDe[t].Grupo) GrupoDaCasa.Remove(casa);
+                    var kn = (casa.Item1, casa.Item2, _pecaDe[t].Nivel);
+                    if (cobertasNoNivel.Contains(kn) && _grupoNoNivel.TryGetValue(kn, out var g1) && g1 == _pecaDe[t].Grupo) _grupoNoNivel.Remove(kn);
+                }
             if (_ocultas.Count > 0) Log.Info("salas que aparecem depois: " + string.Join(", ", _ocultas.Select(kv => kv.Key + " (" + kv.Value.Count + ")").ToArray()));
             if (_postas.Count == 0) { Log.Info("nenhuma peça do mapa pôde ser posta"); yield break; }
 
@@ -266,15 +289,18 @@ namespace Bigorna.Encontro
             UmaAUma(lista);
         }
 
-        /// <summary>As pecas entram em grupos, como no jogo: um aviso por grupo (ate 4 pecas) com a lista delas; todas aparecem juntas
+        /// <summary>No maximo 3 pecas por aviso (com 4, a montagem se perdia); os objetos seguem a mesma conta.</summary>
+        public const int PorVez = 3;
+
+        /// <summary>As pecas entram em grupos, como no jogo: um aviso por grupo (ate 3 pecas) com a lista delas; todas aparecem juntas
         /// quando o aviso sai (a fila e a mesma dos outros avisos, na ordem). Antes era um aviso por peca.</summary>
         static void UmaAUma(List<GameTile> lista)
         {
             var pecas = lista.Where(t => t != null).ToList();
-            for (int k = 0; k < pecas.Count; k += 4)
+            for (int k = 0; k < pecas.Count; k += PorVez)
             {
-                var grupo = pecas.Skip(k).Take(4).ToList();
-                bool ultimo = k + 4 >= pecas.Count;
+                var grupo = pecas.Skip(k).Take(PorVez).ToList();
+                bool ultimo = k + PorVez >= pecas.Count;
                 string texto = (grupo.Count == 1 ? Idioma.T("Coloquem a peça:\n", "Place the tile:\n") : k == 0 ? Idioma.T("Coloquem as peças:\n", "Place the tiles:\n") : Idioma.T("E também:\n", "And also:\n")) + string.Join("\n", grupo.Select(t => "• " + LinhaDaPeca(t)).ToArray());
                 Dialogos.Mensagem(texto, ultimo ? (Action)(() => Nucleo.Instancia?.StartCoroutine(RefazerGrade(1.2f))) : null, Idioma.T("Montagem", "Setup"), () =>
                 {
@@ -334,7 +360,8 @@ namespace Bigorna.Encontro
                     try { cena?.AddDynamicBlockingPositions(v.BlockingPositions); } catch { }
                 PorColocar.Add(t.name);
             }
-            foreach (var casa in lista.SelectMany(CasasDe).ToList()) GrupoDaCasa.Remove(casa);
+            // (so as casas deste grupo: uma subcamada por baixo de outra sala ainda fechada nao abre as casas dela)
+            foreach (var casa in lista.SelectMany(CasasDe).ToList()) if (GrupoDaCasa.TryGetValue(casa, out var g0) && string.Equals(g0, grupo, StringComparison.OrdinalIgnoreCase)) GrupoDaCasa.Remove(casa);
             UmaAUma(lista);           // as pecas, em grupos
             Objetos.Revelar(grupo);   // depois os objetos da sala, um por aviso
             Inimigos.Revelar(grupo);  // por fim os inimigos, que esperam a fila esvaziar
@@ -446,7 +473,7 @@ namespace Bigorna.Encontro
             if (_ocultas.TryGetValue(grupo, out var escondidas))
             {
                 _ocultas.Remove(grupo);
-                foreach (var t in escondidas) { _postas.Remove(t); foreach (var c in CasasDe(t)) GrupoDaCasa.Remove(c); }
+                foreach (var t in escondidas) { _postas.Remove(t); foreach (var c in CasasDe(t)) { GrupoDaCasa.Remove(c); _tiradas.Add(c); } }
                 Inimigos.RemoverNasCasas(new HashSet<(int, int)>(), grupo);
                 Log.Info("sala «" + grupo + "» descartada antes de aparecer");
                 return;
@@ -456,13 +483,111 @@ namespace Bigorna.Encontro
             RemoverPecas(alvo, "a sala " + grupo.Replace("room-", ""), grupo);
         }
 
-        /// <summary>Tira uma peca (indice no .dmap) com tudo o que esta sobre ela.</summary>
-        public static void RemoverPeca(int indice)
+        /// <summary>Tira uma peca (indice no .dmap) com tudo o que esta sobre ela; com "manter", so a peca sai e o que estava sobre
+        /// ela (objetos, monstros) fica onde esta, sobre o que houver embaixo (uma subcamada: agua, brasas...).</summary>
+        public static void RemoverPeca(int indice, bool manter = false)
         {
             // so uma peca ainda no tabuleiro (uma ja removida continua no indice e seria "retirada" de novo)
-            var t = _indiceDe.FirstOrDefault(kv => kv.Value == indice && kv.Key != null && _postas.Contains(kv.Key)).Key;
+            var t = PecaNaMesa(indice);
             if (t == null) { Log.Info("removeTile: a peça #" + indice + " não está no tabuleiro"); return; }
-            RemoverPecas(new List<GameTile> { t }, null, null);
+            if (manter) TirarSoAPeca(t); else RemoverPecas(new List<GameTile> { t }, null, null);
+        }
+        static GameTile PecaNaMesa(int indice) => _indiceDe.FirstOrDefault(kv => kv.Value == indice && kv.Key != null && _postas.Contains(kv.Key)).Key;
+
+        /// <summary>So a peca sai: a grade e refeita e cada casa passa a ser do que estava embaixo (a subcamada, com as regras do
+        /// proprio jogo para aquele terreno). Objetos e monstros ficam; os objetos do chao descem a altura da peca. As casas
+        /// continuam da sala em que estavam.</summary>
+        static void TirarSoAPeca(GameTile t)
+        {
+            var casas = new HashSet<(int, int)>(CasasDe(t));
+            var v0 = t.GetComponent<GameVisibility>();
+            if (v0 != null && v0.BlockingPositions != null && v0.BlockingPositions.Length > 0) try { Jogo.Cena?.RemoveDynamicBlockingPositions(v0.BlockingPositions); } catch { }
+            _postas.Remove(t);
+            var enc = Jogo.Encontro; if (enc != null) enc.AllTiles = _postas.ToArray();
+            var nome = NomeNaMesa(t);
+            Log.Info("removida só a peça " + nome + " (" + casas.Count + " casas); o que estava sobre ela fica");
+            var realce = new List<Transform>();
+            Dialogos.Mensagem(Idioma.T("Retirem do tabuleiro a peça <b>", "Remove from the board the tile <b>") + nome
+                + Idioma.T("</b>. Tudo o que estava sobre ela (objetos, heróis, monstros) fica onde está, sobre o que houver embaixo.", "</b>. Everything that was on it (objects, heroes, monsters) stays where it is, on whatever lies below."),
+                () =>
+                {
+                    var cena = Jogo.Cena;
+                    foreach (var tr in realce) try { cena?.RemovePersitentHighlight(tr); } catch { }
+                    try { cena?.RemoveOutline(t.gameObject); } catch { }
+                    try { if (t.TextTileId != null) cena?.RemoveTextCallout(t.TextTileId); } catch { }
+                    Jogo.Som("Place_Generic");
+                    Nucleo.Instancia?.StartCoroutine(Levantar(t.gameObject, 0.1f, () =>
+                    {
+                        try { t.GetComponent<GameVisibility>()?.SetVisibility(false, false); } catch { }
+                        t.gameObject.SetActive(false);
+                        RefazerGradeAgora(); Objetos.DescerNasCasas(casas, DescidaDaSubcamada);
+                    }));
+                }, Idioma.T("Peça retirada", "Tile removed"),
+                () =>
+                {
+                    var cena = Jogo.Cena;
+                    try { cena?.CameraEncounter?.FocusOn(Centro(new List<GameTile> { t })); } catch { }
+                    try { cena?.AddOutline(t.gameObject); } catch { }
+                    if (t.LocalGridCoords != null) foreach (var c in t.LocalGridCoords) if (c != null) try { cena?.AddPersistentHighlight(c.transform); realce.Add(c.transform); } catch { }
+                });
+        }
+        /// <summary>Quanto o chao desce de uma peca para a subcamada embaixo dela (a subcamada e posta 0,1 abaixo do chao).</summary>
+        const float DescidaDaSubcamada = 0.1f;
+
+        /// <summary>Move uma peca (indice no .dmap) para outro lugar (a marca do editor: a mesma peca posta de novo), com o que esta
+        /// sobre ela (os objetos do nivel dela nas casas dela e os pilares dela). Na mesa, como no jogo: um aviso, a camera nela;
+        /// ao fechar, ela desliza ate o lugar novo e a grade e refeita. As figuras (herois, monstros) a mesa move a mao.</summary>
+        public static void MoverPeca(int indice, int x, int y, int rot, int nivel)
+        {
+            var t = PecaNaMesa(indice);
+            if (t == null || !_pecaDe.TryGetValue(t, out var p0)) { Log.Info("moveTile: a peça #" + indice + " não está no tabuleiro"); return; }
+            var velhas = new HashSet<(int, int)>(CasasDe(t));
+            var tr = t.transform; var dePos = tr.position; var deRot = tr.rotation;
+            var novo = new Dmap.Peca { Tile = p0.Tile, Pos = new[] { x, y }, Rot = rot, Nivel = nivel, Revelar = p0.Revelar, GrupoAlt = p0.GrupoAlt, Pilares = p0.Pilares };
+            tr.rotation = Quaternion.Euler(0f, rot, 0f); Alinhar(t, novo); var atePos = tr.position; var ateRot = tr.rotation; tr.position = dePos; tr.rotation = deRot;
+            var junto = Objetos.NasCasas(velhas, p0.Nivel).Concat(Objetos.PilaresDaPeca(indice)).Where(o => o != null && o.Corpo != null).Distinct().ToList();
+            var locais = junto.Select(o => (o, pos: tr.InverseTransformPoint(o.Corpo.transform.position), rot: Quaternion.Inverse(tr.rotation) * o.Corpo.transform.rotation,
+                ancora: o.Dados != null && o.Dados.TemPosicao ? tr.InverseTransformPoint(new Vector3(o.Dados.X + 0.5f, tr.position.y, -(o.Dados.Y + 0.5f))) : Vector3.zero)).ToList();
+            var nome = NomeNaMesa(t); var grupo = velhas.Select(c => GrupoDaCasa.TryGetValue(c, out var g) ? g : null).FirstOrDefault(g => g != null);
+            Log.Info("movendo a peça " + nome + " para " + x + "," + y + " (rot " + rot + ", nível " + nivel + "), com " + junto.Count + " objeto(s)");
+            Dialogos.Mensagem(Idioma.T("Movam a peça <b>", "Move the tile <b>") + nome + Idioma.T("</b> para o lugar novo, com o que está sobre ela (objetos e figuras).", "</b> to its new place, with what stands on it (objects and figures)."),
+                () =>
+                {
+                    var v = t.GetComponent<GameVisibility>();
+                    if (v != null && v.BlockingPositions != null && v.BlockingPositions.Length > 0) try { Jogo.Cena?.RemoveDynamicBlockingPositions(v.BlockingPositions); } catch { }
+                    try { Jogo.Cena?.RemoveOutline(t.gameObject); } catch { }
+                    Jogo.Som("Place_Generic");
+                    Nucleo.Instancia?.StartCoroutine(DeslizarPeca(t, dePos, deRot, atePos, ateRot, locais.Select(l => (l.o.Corpo.transform, l.pos, l.rot)).ToList(), () =>
+                    {
+                        _pecaDe[t] = novo;
+                        foreach (var c in velhas) GrupoDaCasa.Remove(c);
+                        if (grupo != null) foreach (var c in CasasDe(t)) GrupoDaCasa[c] = grupo;
+                        int dr = ((rot - p0.Rot) % 360 + 360) % 360;
+                        foreach (var l in locais)
+                        {
+                            var o = l.o.Dados; if (o == null || !o.TemPosicao) continue;
+                            var w = t.transform.TransformPoint(l.ancora);
+                            o.Pos = new[] { Mathf.FloorToInt(w.x), Mathf.FloorToInt(-w.z) }; o.Rot = (o.Rot + dr) % 360; if (o.Nivel == p0.Nivel) o.Nivel = nivel;
+                        }
+                        if (v != null && v.BlockingPositions != null && v.BlockingPositions.Length > 0) try { Jogo.Cena?.AddDynamicBlockingPositions(v.BlockingPositions); } catch { }
+                        RefazerGradeAgora();
+                        Log.Info("  peça " + nome + " no lugar novo");
+                    }));
+                }, Idioma.T("Peça movida", "Tile moved"),
+                () => { try { Jogo.Cena?.CameraEncounter?.FocusOn(Centro(new List<GameTile> { t })); } catch { } try { Jogo.Cena?.AddOutline(t.gameObject); } catch { } });
+        }
+        static System.Collections.IEnumerator DeslizarPeca(GameTile t, Vector3 dePos, Quaternion deRot, Vector3 atePos, Quaternion ateRot, List<(Transform tr, Vector3 pos, Quaternion rot)> junto, Action fim)
+        {
+            var tr = t.transform; float d = 0.8f;
+            for (float k = 0; k <= d && tr != null; k += Time.deltaTime)
+            {
+                float s = Mathf.SmoothStep(0, 1, Mathf.Min(1f, k / d));
+                tr.position = Vector3.Lerp(dePos, atePos, s) + Vector3.up * (1.5f * Mathf.Sin(Mathf.PI * s)); tr.rotation = Quaternion.Slerp(deRot, ateRot, s);
+                foreach (var j in junto) if (j.tr != null) { j.tr.position = tr.TransformPoint(j.pos); j.tr.rotation = tr.rotation * j.rot; }
+                yield return null;
+            }
+            if (tr != null) { tr.position = atePos; tr.rotation = ateRot; foreach (var j in junto) if (j.tr != null) { j.tr.position = tr.TransformPoint(j.pos); j.tr.rotation = tr.rotation * j.rot; } }
+            fim?.Invoke();
         }
 
         /// <summary>O nome de uma peca para quem joga: o numero dela; o terreno posto como peca (escadaria, ponte), pelo nome.</summary>
@@ -483,6 +608,11 @@ namespace Bigorna.Encontro
         {
             if (pecas.Count == 0) { Log.Info("nada a remover" + (rotulo != null ? " em " + rotulo : "")); return; }
             var casas = new HashSet<(int, int)>(pecas.SelectMany(CasasDe));
+            foreach (var c in casas) _tiradas.Add(c);
+            // uma subcamada que sai de baixo de uma peca que fica (a agua de uma sala que estava sob a peca de outra) nao leva o que
+            // esta sobre essa peca: o que esta ali e da peca de cima
+            if (pecas.All(t => _pecaDe.TryGetValue(t, out var q) && Ordem(q) == 0))
+                foreach (var c in _postas.Where(t => t != null && !pecas.Contains(t) && _pecaDe.TryGetValue(t, out var q) && Ordem(q) != 0 && q.Nivel == 0).SelectMany(CasasDe).ToList()) casas.Remove(c);
             var indices = new HashSet<int>(pecas.Where(t => _indiceDe.ContainsKey(t)).Select(t => _indiceDe[t]));
             var objetos = Objetos.RetirarNasCasas(casas, indices);        // marcados como retirados; o corpo continua a vista
             var inimigos = Inimigos.RetirarNasCasas(casas, grupo);         // idem: saem da mesa junto com a peca deles
@@ -568,6 +698,17 @@ namespace Bigorna.Encontro
         }
 
         public static string GrupoDe(int x, int y) => GrupoDaCasa.TryGetValue((x, y), out var g) ? g : null;
+
+        // a sala oculta de uma casa num nivel: um viaduto ainda fechado (nivel 2) passa por cima do chao de uma sala aberta, e o
+        // que esta nesse chao (nivel 0) nao espera o viaduto. Sem peca nenhuma naquele nivel, vale a regra de antes (a casa)
+        static readonly Dictionary<(int, int, int), string> _grupoNoNivel = new Dictionary<(int, int, int), string>();
+        static readonly HashSet<(int, int, int)> _comPeca = new HashSet<(int, int, int)>();
+        public static string GrupoDe(int x, int y, int nivel)
+        {
+            if (_grupoNoNivel.TryGetValue((x, y, nivel), out var g) && GrupoOculto(g)) return g;
+            if (_comPeca.Contains((x, y, nivel))) return null;
+            return GrupoDe(x, y);
+        }
 
         public static string GrupoDe(int[] pos) => pos != null && pos.Length >= 2 ? GrupoDe(pos[0], pos[1]) : null;
     }

@@ -23,6 +23,11 @@ namespace Bigorna.Formato
             [JsonProperty("heroCount")] public int[] Herois;
             [JsonProperty("estimatedMinutes")] public int Minutos;
             [JsonProperty("intro")] public string Intro;
+            /// <summary>Extensao Bigorna: as regras proprias do mapa (limite de rodadas, o escuro que cansa…), numa caixa so delas,
+            /// "Regra especial", logo depois da introducao (que fica so com a narracao).</summary>
+            [JsonProperty("rules")] public string Regras;
+            /// <summary>Extensao Bigorna: "II" quando o mapa usa pecas, objetos ou monstros da caixa do Ato II.</summary>
+            [JsonProperty("requiresAct")] public string AtoExigido;
             [JsonProperty("music")] public Musica Musica;
             /// <summary>Extensao Bigorna v3: cena base pedida, fundo dos quadros narrativos.</summary>
             [JsonProperty("scene")] public string Cena;

@@ -11,7 +11,8 @@ namespace Bigorna
     public class Nucleo : MonoBehaviour
     {
         public static Nucleo Instancia { get; private set; }
-        bool _mostrar = true;
+        /// <summary>F8: false esconde tudo o que o mod desenha na tela (rotulo, avisos, paineis, botoes); F8 de novo mostra.</summary>
+        public static bool Visivel = true;
         Scene? _cenaAnterior;
         float _proximaVigilia;
         GUIStyle _rotulo;
@@ -24,11 +25,13 @@ namespace Bigorna
 
         void Update()
         {
-            if (Input.GetKeyDown(KeyCode.F8)) _mostrar = !_mostrar;
-            if (Input.GetKeyDown(KeyCode.F7)) PainelSons.Aberto = !PainelSons.Aberto;
-            if (Input.GetKeyDown(KeyCode.F9)) Relatos.Alternar();
+            if (Input.GetKeyDown(KeyCode.F8)) { Visivel = !Visivel; Log.Info(Visivel ? "informações do mod na tela (F8)" : "informações do mod escondidas (F8)"); }
+            if (Input.GetKeyDown(KeyCode.F7)) { Depuracao.Alternar(); if (Depuracao.Ligada) Visivel = true; }
+            if (Input.GetKeyDown(KeyCode.F9)) { Relatos.Alternar(); if (Relatos.Aberto) Visivel = true; }
             try { Depuracao.Teclas(); } catch (Exception ex) { Log.Erro("modo de teste", ex); }
             try { VigiarCena(); } catch (Exception ex) { Log.Erro("vigiando a cena", ex); }
+            try { Menu.BotaoDoMenu.Batimento(); } catch (Exception ex) { Log.Erro("botão do menu", ex); }
+            try { Menu.Atualizacao.Batimento(); } catch (Exception ex) { Log.Erro("atualização", ex); }
             try { MusicaPropria.Batimento(); } catch { }
             try { PacoteVirtual.Garantir(); } catch { }
             try { HeroisProprios.RetratosNaTela(); } catch { }
@@ -68,6 +71,7 @@ namespace Bigorna
             if (antes == Scene.Game && cena != Scene.Game && !Lancador.Preparando) { Lancador.Encerrar(); try { HeroisProprios.DesfazerArmas(); } catch (Exception ex) { Log.Erro("devolvendo as armas", ex); } try { MusicaPropria.Parar(); } catch (Exception ex) { Log.Erro("parando a música", ex); } }
             try { PacoteVirtual.Instalar(); } catch { }
             bool mundo = cena == Scene.Worldmap || cena == Scene.City;
+            if (cena == Scene.Titlescene) Idioma.JogoPronto = true;
             if (cena == Scene.Titlescene) { try { HeroisProprios.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando os heróis", ex); } try { ReceitasProprias.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando as receitas", ex); } try { FacanhasProprias.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando as façanhas", ex); } try { PericiasProprias.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando as perícias", ex); } PainelMapas.Reler(); Campanha.Campanha.Fechar(); Campanha.MapaMundi.RegistrarTodas(); try { Dados.DadosDoEditor.NoTitulo(); } catch (Exception ex) { Log.Erro("dados do editor", ex); } }
             if (mundo)
             {
@@ -105,11 +109,11 @@ namespace Bigorna
         {
             try
             {
-                if (_mostrar)
+                if (!Visivel) return;
                 {
                     if (_rotulo == null) _rotulo = new GUIStyle(GUI.skin.label) { fontSize = 13 };
                     GUI.color = new Color(0.55f, 0.85f, 1f, 0.95f);
-                    GUI.Label(new Rect(12f, 10f, 720f, 22f), "Bigorna " + Bootstrap.Versao + (Lancador.Atual != null ? " · " + Lancador.Atual.NomeVisivel : "") + Idioma.T("  (F9 relatar um problema · F8 esconde · F7 teste de som e cenas · Ctrl+Shift+D modo de teste)", "  (F9 report a problem · F8 hide · F7 sound and cutscene test · Ctrl+Shift+D test mode)"), _rotulo);
+                    GUI.Label(new Rect(12f, 10f, 720f, 22f), "Bigorna " + Bootstrap.Versao + (Lancador.Atual != null ? " · " + Lancador.Atual.NomeVisivel : "") + Idioma.T("  (F9 relatar um problema · F8 esconde tudo · F7 modo de teste, sons e cenas)", "  (F9 report a problem · F8 hide everything · F7 test mode, sounds and cutscenes)"), _rotulo);
                     GUI.color = Color.white;
                 }
                 PainelMapas.Desenhar();
@@ -117,6 +121,7 @@ namespace Bigorna
                 Mesa.Desenhar();
                 PainelSons.Desenhar();
                 Relatos.Desenhar();
+                Menu.Atualizacao.Desenhar();
                 Depuracao.Desenhar();
             }
             catch (Exception ex) { Log.Erro("OnGUI", ex); }

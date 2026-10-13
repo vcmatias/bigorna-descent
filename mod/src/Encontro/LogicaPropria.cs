@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -27,7 +27,11 @@ namespace Bigorna.Encontro
             public string Id; public EnemyModel Base; public HashSet<string> Novas = new HashSet<string>(StringComparer.Ordinal);
             /// <summary>"game": a regra do monstro de comportamento; "none": nenhuma; "custom": os efeitos abaixo.</summary>
             public string ModoDefesa = "game"; public List<EfeitoDeDefesa> Efeitos = new List<EfeitoDeDefesa>();
+            /// <summary>Taticas criadas na Oficina: com alguma, a escolha de tatica do monstro passa a ser a do Bigorna.</summary>
+            public List<TaticaPropria> Taticas = new List<TaticaPropria>();
         }
+        /// <summary>Uma tatica da Oficina: quando ela pode sair e o que o app aplica sozinho ao revela-la.</summary>
+        public class TaticaPropria { public string Id; public string Quando = "sempre"; public List<EfeitoDeDefesa> Efeitos = new List<EfeitoDeDefesa>(); }
 
         static readonly Dictionary<string, Registro> _monstros = new Dictionary<string, Registro>(StringComparer.Ordinal);
         static readonly Dictionary<string, float> _esperaDesde = new Dictionary<string, float>(StringComparer.Ordinal);
@@ -46,6 +50,30 @@ namespace Bigorna.Encontro
             if (string.IsNullOrEmpty(id) || !_monstros.TryGetValue(id, out var r)) return;
             r.ModoDefesa = string.IsNullOrEmpty(modo) ? "game" : modo.ToLowerInvariant();
             r.Efeitos = efeitos ?? new List<EfeitoDeDefesa>();
+        }
+
+        public static void DefinirTaticas(string id, List<TaticaPropria> taticas)
+        {
+            if (string.IsNullOrEmpty(id) || !_monstros.TryGetValue(id, out var r)) return;
+            r.Taticas = taticas ?? new List<TaticaPropria>();
+        }
+        internal static List<TaticaPropria> TaticasDe(string id) => id != null && _monstros.TryGetValue(id, out var r) ? r.Taticas : null;
+        internal static bool EhTaticaPropria(string idMonstro, string ativacao) { var l = TaticasDe(idMonstro); return l != null && ativacao != null && l.Any(t => t.Id == ativacao); }
+
+        internal static void AplicarEfeitos(SerializedEnemy e, List<EfeitoDeDefesa> efeitos, List<string> feitos)
+        {
+            foreach (var f in efeitos ?? new List<EfeitoDeDefesa>())
+            {
+                int n = Mathf.Clamp(f.N, -9, 9); if (n == 0) continue;
+                switch ((f.Tipo ?? "").ToLowerInvariant())
+                {
+                    case "damage": e.BaseAttack += n; feitos.Add("dano +" + n); break;
+                    case "nextdamage": { var d = e.ActivationDeltas; d.Damage += n; e.ActivationDeltas = d; feitos.Add("dano +" + n + " na próxima ativação"); break; }
+                    case "defense": e.Defense += n; feitos.Add("defesa +" + n); break;
+                    case "rounddefense": e.TemporaryRoundDefense += n; feitos.Add("defesa +" + n + " até o fim da rodada"); break;
+                    case "heal": e.Health = Mathf.Min(e.StartingHealth, e.Health + n); feitos.Add("recupera " + n); break;
+                }
+            }
         }
 
         internal static List<EfeitoDeDefesa> EfeitosDe(string id) => id != null && _monstros.TryGetValue(id, out var r) ? r.Efeitos : null;
@@ -97,6 +125,13 @@ namespace Bigorna.Encontro
             no.Original = dele != null ? dele.DTActivations : null;
             arvA.primeNode = no;
             lg.DTActivations = dtc;
+            // as taticas da Oficina: a escolha passa a ser nossa (as do jogo dependem das condicoes da arvore do monstro base)
+            if (r.Taticas.Count > 0)
+            {
+                var arvT = NovaArvore(go, "DT Taticas", "Bigorna Taticas " + r.Id, out var dtt, "EnemyGUID");
+                arvT.primeNode = arvT.AddNode<NoDeTatica>();
+                lg.DTTacticSelection = dtt;
+            }
             // a defesa: a regra do jogo (monstro de comportamento), nenhuma, ou os efeitos escolhidos na Oficina
             if (r.ModoDefesa == "none") lg.DTPreemptive = null;
             else if (r.ModoDefesa == "custom")
@@ -107,6 +142,7 @@ namespace Bigorna.Encontro
             }
             go.SetActive(true);
             Log.Info("lógica do monstro «" + r.Id + "»: " + (dele != null ? "a de " + r.Base.Id + " (ativações da Oficina mostradas pelo Bigorna)" : "só a nossa (a do " + r.Base.Id + " não carregou)")
+                + (r.Taticas.Count > 0 ? "; táticas próprias: " + string.Join(", ", r.Taticas.Select(t => t.Id + " (" + t.Quando + ")").ToArray()) : "")
                 + "; defesa " + (r.ModoDefesa == "custom" ? "própria: " + string.Join(", ", r.Efeitos.Select(e => e.Tipo + " +" + e.N).ToArray()) : r.ModoDefesa == "none" ? "sem efeito automático" : "do jogo"));
             return lg;
         }
@@ -133,11 +169,11 @@ namespace Bigorna.Encontro
         }
 
         /// <summary>Texto de uma ativacao para a tela, com as vagas {n} preenchidas.</summary>
-        internal static string TextoDaAtivacao(SerializedEnemy e)
+        internal static string TextoDaAtivacao(SerializedEnemy e, string sufixo = "_ACTIVATION")
         {
             string aid = e.ActivationId ?? "";
             string texto = null;
-            foreach (var k in new[] { aid + "_ACTIVATION", aid })
+            foreach (var k in sufixo == "_ACTIVATION" ? new[] { aid + "_ACTIVATION", aid } : new[] { aid + sufixo })
             {
                 try { if (LocalizationManager.GetTermData(k) != null) { texto = LocalizationManager.GetTranslation(k); if (!string.IsNullOrEmpty(texto)) break; } } catch { }
             }
@@ -148,7 +184,7 @@ namespace Bigorna.Encontro
             {
                 var herois = Jogo.Partida?.ActivePlayers;
                 if (herois != null && e.TargetPlayerIndex >= 0 && e.TargetPlayerIndex < herois.Count)
-                    heroi = !string.IsNullOrEmpty(e.TempTargetOverride) ? e.TempTargetOverride : FFGLocalization.Get(herois[e.TargetPlayerIndex].Model.KeyName, false);
+                    heroi = !string.IsNullOrEmpty(e.TempTargetOverride) ? FFGLocalization.Get(e.TempTargetOverride, false) : FFGLocalization.Get(herois[e.TargetPlayerIndex].Model.KeyName, false);
             }
             catch { }
             var limpo = Regex.Replace(texto, "<[^>]+>", "");
@@ -178,18 +214,7 @@ namespace Bigorna.Encontro
                 if (e != null && efeitos != null)
                 {
                     var feitos = new List<string>();
-                    foreach (var f in efeitos)
-                    {
-                        int n = Mathf.Clamp(f.N, -9, 9); if (n == 0) continue;
-                        switch ((f.Tipo ?? "").ToLowerInvariant())
-                        {
-                            case "damage": e.BaseAttack += n; feitos.Add("dano +" + n); break;
-                            case "nextdamage": { var d = e.ActivationDeltas; d.Damage += n; e.ActivationDeltas = d; feitos.Add("dano +" + n + " na próxima ativação"); break; }
-                            case "defense": e.Defense += n; feitos.Add("defesa +" + n); break;
-                            case "rounddefense": e.TemporaryRoundDefense += n; feitos.Add("defesa +" + n + " até o fim da rodada"); break;
-                            case "heal": e.Health = Mathf.Min(e.StartingHealth, e.Health + n); feitos.Add("recupera " + n); break;
-                        }
-                    }
+                    LogicaPropria.AplicarEfeitos(e, efeitos, feitos);
                     try { Jogo.UI?.EnemyMenu?.SyncTo(Jogo.Partida.Enemies); } catch { }
                     Log.Info("  defesa própria de " + e.ModelId + ": " + string.Join(", ", feitos.ToArray()));
                 }
@@ -242,11 +267,73 @@ namespace Bigorna.Encontro
                 CallbackContinue = () =>
                 {
                     try { SingletonBehaviour<UndoController>.Instance.RecordUndo(); } catch { }
+                    if (LogicaPropria.EhTaticaPropria(e.ModelId, e.ActivationId)) { e.HasTactic = false; try { Jogo.UI?.EnemyMenu?.SyncTo(Jogo.Partida.Enemies); } catch { } }
                     status = Status.Success; DLGTree.Continue();
                 },
                 CallbackUndo = () => { status = Status.Resting; try { SingletonBehaviour<UndoController>.Instance.PerformUndo(); } catch { } }
             };
             Jogo.UI.ShowEnemyActivation(pedido, new EnemyActivationSettings { HideTarget = false });
+            return Status.Running;
+        }
+    }
+
+    /// <summary>
+    /// Escolha de tatica dos monstros com taticas da Oficina, no lugar da arvore do monstro base: como no jogo, sorteia entre
+    /// as taticas cuja condicao vale agora e "nenhuma" (a ultima revelada por este monstro fica de fora, se houver outra);
+    /// a escolhida vira a proxima ativacao dele, a aba ganha o brilho de tatica, os efeitos automaticos entram e a dica aparece.
+    /// </summary>
+    public class NoDeTatica : DTNode
+    {
+        static readonly Dictionary<string, string> _ultima = new Dictionary<string, string>(StringComparer.Ordinal);
+        static readonly Dictionary<string, int> _vidaAntes = new Dictionary<string, int>(StringComparer.Ordinal);
+        static readonly System.Random _sorte = new System.Random();
+
+        internal static bool Vale(string quando, SerializedEnemy e)
+        {
+            int outros = 0;
+            try { foreach (var x in Jogo.Inimigos) if (x != null && x != e && x.Health > 0) outros++; } catch { }
+            switch ((quando ?? "sempre").ToLowerInvariant())
+            {
+                case "ferido": return e.Health * 2 < e.StartingHealth;
+                case "ileso": return e.Health >= e.StartingHealth;
+                case "sozinho": return outros == 0;
+                case "bando": return outros >= 2;
+                case "atingido": return _vidaAntes.TryGetValue(e.GUID ?? "", out var antes) && e.Health < antes;
+                default: return true;
+            }
+        }
+
+        protected override Status OnExecute(Component agent, IBlackboard bb)
+        {
+            SerializedEnemy e = null;
+            try { var guid = bb?.GetValue<string>("EnemyGUID"); if (!string.IsNullOrEmpty(guid)) e = GameEntity.GetEntity(guid) as SerializedEnemy; } catch { }
+            var taticas = e != null ? LogicaPropria.TaticasDe(e.ModelId) : null;
+            if (e == null || e.Health <= 0 || taticas == null || taticas.Count == 0) { DLGTree.Stop(false); return Status.Failure; }
+            string chave = e.GUID ?? "";
+            var validas = taticas.Where(t => Vale(t.Quando, e)).ToList();
+            _vidaAntes[chave] = e.Health;
+            if (validas.Count > 1 && _ultima.TryGetValue(chave, out var ult)) validas.RemoveAll(t => t.Id == ult);
+            int k = _sorte.Next(validas.Count + 1);
+            if (k >= validas.Count) { Log.Info("  tática de " + e.ModelId + ": nenhuma (" + validas.Count + " possível(is))"); DLGTree.Stop(false); return Status.Failure; }
+            var t0 = validas[k];
+            _ultima[chave] = t0.Id;
+            e.ActivationId = t0.Id;
+            e.HasTactic = true;
+            try
+            {
+                var tbb = NodeCanvas.Framework.GlobalBlackboard.Find("Tactic_BB");
+                var lista = tbb?.GetVariable<List<string>>("Active Activations")?.value;
+                if (lista != null && !lista.Contains(t0.Id)) lista.Add(t0.Id);
+            }
+            catch (Exception ex) { Log.Info("  Tactic_BB: " + ex.Message); }
+            var feitos = new List<string>();
+            try { LogicaPropria.AplicarEfeitos(e, t0.Efeitos, feitos); } catch (Exception ex) { Log.Erro("efeitos da tática", ex); }
+            try { Jogo.UI?.EnemyMenu?.SyncTo(Jogo.Partida.Enemies); } catch { }
+            Log.Info("  tática de " + e.ModelId + ": " + t0.Id + " (" + t0.Quando + ")" + (feitos.Count > 0 ? ", " + string.Join(", ", feitos.ToArray()) : ""));
+            string dica = null;
+            try { dica = LogicaPropria.TextoDaAtivacao(e, "_HINT"); } catch { }
+            if (string.IsNullOrEmpty(dica)) { DLGTree.Continue(); return Status.Success; }
+            Dialogos.Mensagem(dica, () => { status = Status.Success; DLGTree.Continue(); });
             return Status.Running;
         }
     }

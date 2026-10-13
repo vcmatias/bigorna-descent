@@ -75,9 +75,11 @@ function simularPartida(pm, cfg, H) {
       case 'give_item': if (g.acao === 'remove') { if (g.modo === 'gold') ouro -= g.amount || 0; break; }
         if (g.modo === 'gold') { ouro += g.amount || 0; R.ouro += g.amount || 0; } else if (g.modo === 'newitem') { if ((g.requisitos || []).some(r => r.tipo === 'gold')) R.comprados = (R.comprados || 0) + (g.amount || 1); else R.itens += g.amount || 1; } else R.pontosEspolio += g.points || 0; break;
       case 'move_heroes': local = g._sala ?? (salaDasCasas(g.cells) ?? local); break;
-      case 'remove_room': removidas.add(g.sala); vivos.forEach(m => { if (m.sala === g.sala) m.hp = 0; }); break;
-      case 'enemy_condition': { const alvo = vivos.filter(m => m.hp > 0);
-        if (g.acao === 'heal') { alvo.filter(m => g.alvo !== 'group' || ('room-' + (m.sala + 1)) === g.grupo || m.grupo === g.grupo).forEach(m => { m.hp += g.amount || 0; }); break; }
+      case 'remove_room': removidas.add(g.sala); if (g.sala > 0) abertas.delete(g.sala); vivos.forEach(m => { if (m.sala === g.sala) m.hp = 0; }); break;
+      case 'enemy_condition': { if (g.acao === 'mirar' || g.acao === 'desmirar') break; const doGrupo = m => g.alvo !== 'group' || ('room-' + (m.sala + 1)) === g.grupo || m.grupo === g.grupo; const alvo = vivos.filter(m => m.hp > 0);
+        if (g.acao === 'heal') { alvo.filter(doGrupo).forEach(m => { m.hp += g.amount || 0; }); break; }
+        // (a named group, the villain who hunts: only it, and nothing to say when it is not in play)
+        if (g.alvo === 'group' && /^gp/.test(g.grupo || '')) { if (g.acao === 'damage') alvo.filter(doGrupo).forEach(m => { m.hp -= g.amount || 1; }); mortes(); break; }
         if (!alvo.length) R.efeitosVazios.push('room ' + (si + 1) + ': ' + (g.acao === 'damage' ? 'damage' : g.condition || g.acao));
         if (g.acao === 'damage') alvo.forEach(m => { m.hp -= g.amount || 1; }); mortes(); break; }
       case 'end_map': if (g.resultado === 'derrota') { perdeu = true; R.motivo = 'end_map (defeat)'; } else { venceu = true; } break;
@@ -103,7 +105,7 @@ function simularPartida(pm, cfg, H) {
     const valor = i => { const t = texto(i); let v = 0; if (/open_room|"counter"|move_heroes/.test(t)) v += 10; if (/newitem/.test(t)) v += 4; if (/"random"/.test(t)) v += 2; if (/"gold"/.test(t) && !/"remove"/.test(t)) v += 1;
       if (/(cura|heals?)\s+\d/i.test(t)) v += vida < H * cfg.vida - 2 ? 5 : -2; if (/enemy_condition/.test(t) && !/"acao":"heal"/.test(t)) v += vivos.some(m => m.hp > 0) ? 3 : -6;
       // (a status question, "the guide fell": never the bad news by choice)
-      if (/"tipo":"escort","acao":"fim"|"acao":"set","n":0/.test(t)) v -= 20; if (/"remove".*"gold"|"acao":"remove"/.test(t)) v -= 1; if (/(Ainda não|Not yet|Nada, obrigado|Nothing, thanks|Seguir sem|Go on without|Deixar|Leave it)/i.test(g.options[i].text || '')) v -= 5; return v; };
+      if (/"acao":"set","n":0/.test(t)) v -= 20; if (/"remove".*"gold"|"acao":"remove"/.test(t)) v -= 1; if (/(Ainda não|Not yet|Nada, obrigado|Nothing, thanks|Seguir sem|Go on without|Deixar|Leave it)/i.test(g.options[i].text || '')) v -= 5; return v; };
     const melhor = livres.slice().sort((a, b) => valor(b) - valor(a))[0];
     return g.umaVez && valor(melhor) < 0 ? -2 : melhor;
   };
@@ -161,7 +163,7 @@ function simularPartida(pm, cfg, H) {
     timers.forEach(t => { const n = t.g.n || 1; const passou = rodada - t.desde; if (t.g.modo === 'uma') { if (!t.feitas && passou >= n) { t.feitas = 1; executar(t.o, 'rodada:' + t.g.uid, t.si, {}); } }
       else if (passou > 0 && passou % n === 0 && (!t.g.vezes || t.feitas < t.g.vezes)) { t.feitas++; executar(t.o, 'rodada:' + t.g.uid, t.si, {}); } });
     (pm.eventos || []).forEach(ev => { const r0 = ev.rodada || 1; if (rodada < r0) return; if (rodada === r0 || (ev.cada && (rodada - r0) % ev.cada === 0)) executar(ev, 'gatilhos', ev.sala || 0, {}); });
-    const pr = pm.meta.pressao; if (pr && pr.tipo === 'fadiga' && rodada >= pr.desde) fadiga += H;
+    const pr = pm.meta.pressao; if (pr && pr.tipo === 'fadiga' && rodada >= pr.desde) fadiga += H * (pr.pior && rodada >= pr.pior ? 2 : 1);
     mortes(); contadores(); if (venceuJa()) { venceu = true; break; } if (perdeu) break;
     // the heroes' actions
     let acoes = H * cfg.acoes; let fez = false;
@@ -201,7 +203,7 @@ function simularPartida(pm, cfg, H) {
 function olharEstatico(pm) {
   const out = { efeitosSemMonstros: [], curasNoInicio: 0 }; const com = salasComMonstros(pm); const temMonstro = si => com.has(si);
   pm.salas.forEach((s, si) => s.objetos.forEach(o => { const gs = todosGatilhos(o);
-    if (!temMonstro(si) && gs.some(g => g.tipo === 'enemy_condition' && g.acao !== 'heal')) out.efeitosSemMonstros.push(si + 1);
+    if (!temMonstro(si) && gs.some(g => g.tipo === 'enemy_condition' && !['heal', 'mirar', 'desmirar'].includes(g.acao) && !(g.alvo === 'group' && /^gp/.test(g.grupo || '')))) out.efeitosSemMonstros.push(si + 1);
     if (si === 0 && JSON.stringify(gs).match(/(cura|heals?) \d/i)) out.curasNoInicio++; }));
   return out;
 }
@@ -257,9 +259,61 @@ function formularioSimulacao() {
     <div class="grade2">${CAMPOS_SIM.map(([k, rot, def, mi, ma, pa]) => `<label class="campo"><span>${tr(rot)}</span><input type="number" data-sim="${k}" min="${mi}" max="${ma}" step="${pa}" value="${g[k] != null ? g[k] : def}"></label>`).join('')}</div>
     <p class="ajuda">${tr('An attack deals the average damage minus the share of the monster’s defence (at least 1); a test passes when the average successes reach what it asks. The findings (too easy, too hard) keep the measures of the easy level.')}</p></div>`;
 }
-function lerSimulacaoCustom() {
-  const c = {}; document.querySelectorAll('#gm_simCfg [data-sim]').forEach(i => { const v = parseFloat(i.value); const campo = CAMPOS_SIM.find(x => x[0] === i.dataset.sim); c[i.dataset.sim] = isFinite(v) ? Math.min(campo[4], Math.max(campo[3], v)) : campo[2]; });
-  c.listaHerois = [...document.querySelectorAll('#gm_simCfg [data-simh]:checked')].map(i => +i.dataset.simh); if (!c.listaHerois.length) c.listaHerois = [2, 3, 4];
+function lerSimulacaoCustom(sel = '#gm_simCfg') {
+  const c = {}; document.querySelectorAll(sel + ' [data-sim]').forEach(i => { const v = parseFloat(i.value); const campo = CAMPOS_SIM.find(x => x[0] === i.dataset.sim); c[i.dataset.sim] = isFinite(v) ? Math.min(campo[4], Math.max(campo[3], v)) : campo[2]; });
+  c.listaHerois = [...document.querySelectorAll(sel + ' [data-simh]:checked')].map(i => +i.dataset.simh); if (!c.listaHerois.length) c.listaHerois = [2, 3, 4];
   try { localStorage.setItem('bigorna-sim-custom', JSON.stringify(c)); } catch { }
   return c;
+}
+
+/* the automatic balance of the map in hand (Map setup > Balancing): the simulator plays the map with 2, 3 and 4 heroes and
+   looks for the step that brings each party into the window of the easy level (health lost between 25% and 80%, never
+   below 15%), the middle (half the health) as close as it gets. What it may change: the intensity of the rooms with
+   monsters and of the triggers that call monsters from the pool (all by the same step, within 1 to 10), and the tiers by the
+   number of heroes of the monsters placed by hand (the game's rule, as ⚖ Balance on a monster). Nothing else: the
+   progression, the pools, the monsters, the objects and the texts stay. Nothing changes until Apply */
+const META_BAL = { perdaMin: 25, perdaMax: 80, vidaMin: 15, alvo: 50, passos: 6 };
+/* the step d applied to p (changed in place): returns what changed, one line each */
+function passoDeBalanceio(p, d) {
+  const mud = []; const lim = x => Math.max(1, Math.min(10, x));
+  const tiers = (e, intensidade, divisao, onde) => { const m = monstro(e.enemy); if (!m || ehPool(e.enemy)) return; const t = tiersPelaRegra(m, intensidade, divisao, p); if (!t) return;
+    const antes = e.tierPorHerois ? [e.tierPorHerois[1], e.tierPorHerois[2], e.tierPorHerois[3]] : [e.tier || 1, e.tier || 1, e.tier || 1];
+    if (antes[0] === t[1] && antes[1] === t[2] && antes[2] === t[3]) return;
+    e.tierPorHerois = t; e.tier = t[1]; mud.push({ tipo: 'tier', onde, nome: nomeIni(e.enemy), de: antes, para: [t[1], t[2], t[3]] }); };
+  p.salas.forEach((s, si) => {
+    const fixos = (s.inimigos || []).filter(e => !ehPool(e.enemy)); const vagas = vagasPoolDaSala(s);
+    if (vagas || fixos.length) { const base = vagas ? intensidadeDaSala(s) : intensidadeParaMonstros(s, s.inimigos); const nova = lim(base + d);
+      if (nova !== base) { s.intensidade = nova; mud.push({ tipo: 'sala', onde: si, de: base, para: nova }); }
+      fixos.forEach(e => tiers(e, intensidadeParaMonstros(s, s.inimigos), monstrosComuns(s.inimigos), si)); }
+    s.objetos.forEach(o => todosGatilhos(o).forEach(g => { if (g.tipo !== 'spawn') return;
+      if (g.fonte === 'pool') { const base = intensidadeDoGatilho(g), nova = lim(base + d); if (nova !== base) { g.intensidade = nova; mud.push({ tipo: 'gatilho', onde: si, nome: rotulo(o), de: base, para: nova }); } }
+      else (g.inimigos || []).forEach(e => tiers(e, lim(intensidadeDoGatilho(g) + d), Math.max(1, (g.inimigos || []).length), si)); }));
+  });
+  return mud;
+}
+/* how far a map is from the window, for the parties asked (0: inside, at the middle) */
+function notaDeBalanceio(pm, custom) {
+  const lista = custom && custom.listaHerois && custom.listaHerois.length ? custom.listaHerois : [2, 3, 4]; let nota = 0; const por = [];
+  lista.forEach(H => { const R = simularMapa(pm, { ...(custom || {}), herois: H }); const perda = R.danoSofrido / R.vidaMax * 100, vmin = Math.max(0, R.vidaMin / R.vidaMax * 100);
+    let n = Math.abs(perda - META_BAL.alvo) * 0.1;
+    if (!R.venceu) n += 1000; if (perda < META_BAL.perdaMin) n += META_BAL.perdaMin - perda; if (perda > META_BAL.perdaMax) n += perda - META_BAL.perdaMax; if (vmin < META_BAL.vidaMin) n += META_BAL.vidaMin - vmin;
+    nota += n; por.push({ H, venceu: R.venceu, perda: Math.round(perda), vidaMin: Math.round(vmin) }); });
+  return { nota, por };
+}
+/* the proposal: every step from -6 to +6 tried on a copy; the best one, or none when nothing does better than the map as it is */
+function propostaDeBalanceio(pm, custom) {
+  const atual = notaDeBalanceio(pm, custom); let melhor = { d: null, nota: atual.nota, por: atual.por, mud: [] };
+  for (let d = -META_BAL.passos; d <= META_BAL.passos; d++) {
+    const c = clone(pm); const mud = passoDeBalanceio(c, d); if (!mud.length) continue;
+    const n = notaDeBalanceio(c, custom);
+    if (n.nota < melhor.nota - 0.01 || (Math.abs(n.nota - melhor.nota) <= 0.01 && melhor.d !== null && Math.abs(d) < Math.abs(melhor.d))) melhor = { d, nota: n.nota, por: n.por, mud, copia: c };
+  }
+  return { atual, melhor };
+}
+/* one line per change, for the window */
+function textoDaMudanca(x, p = projeto) {
+  const sala = si => tr('room') + ' ' + (si + 1) + (p.salas[si]?.nome ? ' · ' + p.salas[si].nome : '');
+  if (x.tipo === 'sala') return sala(x.onde) + ': ' + tr('intensity') + ' ' + x.de + ' → ' + x.para;
+  if (x.tipo === 'gatilho') return sala(x.onde) + ', “' + tr(x.nome) + '”: ' + tr('intensity of the monsters it calls') + ' ' + x.de + ' → ' + x.para;
+  return sala(x.onde) + ', ' + tr(x.nome) + ': ' + tr('tiers for 1–2, 3 and 4 heroes') + ' ' + x.de.join('/') + ' → ' + x.para.join('/');
 }

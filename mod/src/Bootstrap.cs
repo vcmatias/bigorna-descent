@@ -7,7 +7,7 @@ namespace Bigorna
     /// <summary>Ponto de entrada. O Unity chama Init() por causa do registro em RuntimeInitializeOnLoads.json.</summary>
     public static class Bootstrap
     {
-        public const string Versao = "0.1.0";
+        public const string Versao = VersaoDoPacote.Texto;   // (do arquivo mod/VERSAO, pelo build.sh)
         static bool _iniciado;
 
         public static string PastaMapas => Path.Combine(Application.persistentDataPath, "CustomMaps");

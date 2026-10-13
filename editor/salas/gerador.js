@@ -280,8 +280,8 @@ const TEMAS_SALA = {
   qualquer: { nome: 'Any', pisos: null, objetos: null, lugar: { en: 'the depths', pt: 'as profundezas' }, abridores: { Door: 3, Gate: 1, SightToken: 2, Archway: 1 }, decor: ['Statue', 'Fire', 'Bell', 'BloodShrine', 'Wagon', 'Well', 'Tree', 'Cauldron', 'DragonHead'] },
   masmorra: { nome: 'Dungeon', pisos: ['flagstone', 'wood'], objetos: ['Chest', 'Shelf', 'Lectern', 'Cauldron', 'StoneTable', 'RoundTable', 'Barricade', 'Statue', 'Archway', 'Fire', 'BloodShrine', 'Bell', 'InteractToken', 'Well'], lugar: { en: 'the halls', pt: 'os salões' }, abridores: { Door: 3, Gate: 2, SightToken: 1, Archway: 1 }, decor: ['Statue', 'Fire', 'Cauldron', 'Shelf'] },
   cripta: { nome: 'Crypt', pisos: ['flagstone'], objetos: ['Chest', 'Lectern', 'Statue', 'Archway', 'BloodShrine', 'Bell', 'Fire', 'Cauldron', 'StoneTable', 'InteractToken', 'Barricade', 'DragonHead'], lugar: { en: 'the tombs', pt: 'os túmulos' }, abridores: { Gate: 3, Archway: 2, Door: 1, SightToken: 1 }, decor: ['Statue', 'BloodShrine', 'Bell', 'Fire', 'DragonHead'] },
-  fortaleza: { nome: 'Keep', pisos: ['flagstone', 'wood'], objetos: ['Chest', 'Shelf', 'StoneTable', 'RoundTable', 'Barricade', 'Bell', 'Statue', 'Fire', 'Wagon', 'Lectern', 'InteractToken', 'Archway'], lugar: { en: 'the keep', pt: 'a fortaleza' }, abridores: { Door: 3, Gate: 2, Archway: 1, SightToken: 1 }, decor: ['Barricade', 'Bell', 'Wagon', 'Fire', 'RoundTable'] },
-  aldeia: { nome: 'Village', pisos: ['grass', 'dirt', 'wood'], objetos: ['Wagon', 'Well', 'Tree', 'RoundTable', 'Barricade', 'Fire', 'Chest', 'Bell', 'InteractToken', 'Cauldron', 'Statue'], lugar: { en: 'the village', pt: 'a aldeia' }, abridores: { SightToken: 3, Gate: 2, Archway: 1, Door: 1 }, decor: ['Wagon', 'Well', 'Tree', 'Fire', 'Bell'] },
+  fortaleza: { nome: 'Keep', pisos: ['flagstone', 'wood'], objetos: ['Chest', 'Shelf', 'StoneTable', 'RoundTable', 'Barricade', 'Bell', 'Statue', 'Fire', 'Wagon', 'Lectern', 'InteractToken', 'Archway'], lugar: { en: 'the corridors of the keep', pt: 'os corredores da fortaleza' }, abridores: { Door: 3, Gate: 2, Archway: 1, SightToken: 1 }, decor: ['Barricade', 'Bell', 'Wagon', 'Fire', 'RoundTable'] },
+  aldeia: { nome: 'Village', pisos: ['grass', 'dirt', 'wood'], objetos: ['Wagon', 'Well', 'Tree', 'RoundTable', 'Barricade', 'Fire', 'Chest', 'Bell', 'InteractToken', 'Cauldron', 'Statue'], lugar: { en: 'the village lanes', pt: 'as ruas da aldeia' }, abridores: { SightToken: 3, Gate: 2, Archway: 1, Door: 1 }, decor: ['Wagon', 'Well', 'Tree', 'Fire', 'Bell'] },
   caverna: { nome: 'Cave', pisos: ['dirt', 'flagstone'], objetos: ['Chest', 'Barricade', 'Cauldron', 'Fire', 'Well', 'InteractToken', 'Statue', 'BloodShrine', 'DragonHead'], lugar: { en: 'the caves', pt: 'as cavernas' }, abridores: { SightToken: 3, Archway: 1, Gate: 1 }, decor: ['Fire', 'Cauldron', 'DragonHead', 'BloodShrine'] },
   ermo: { nome: 'Wilderness', pisos: ['dirt', 'grass'], objetos: ['Tree', 'Barricade', 'Well', 'Wagon', 'Fire', 'Chest', 'InteractToken', 'RoundTable', 'Statue'], lugar: { en: 'the wilds', pt: 'as terras selvagens' }, abridores: { SightToken: 3, Gate: 1, Archway: 1 }, decor: ['Tree', 'Wagon', 'Well', 'Fire', 'Statue'] }
 };
@@ -374,11 +374,12 @@ const naCaixaAte = (tipo, atos) => caixaDoTerreno(tipo, atos) ?? 0;
 function objetoLivre(p, salas, tipo, atos) {
   const g0 = grupoDoTerreno(tipo); const caixa = g => caixaDoTerreno(g, atos);
   if (caixa(g0) === null) return Infinity;
-  const contar = (g, filtro) => { let n = 0; salas.forEach(i => { const s = p.salas[i]; const vistos = new Set(); (s?.objetos || []).forEach(o => { if (grupoDoTerreno(o.type) !== g || (filtro && !filtro(o, s))) return; const k = o.pos.join(',') + ':' + (o.level || 0); if (!vistos.has(k)) { vistos.add(k); n++; } }); }); return n; };
+  const mk = marcasDoMapa(p);   // (the marker of a "Move an object" is the same physical piece: it does not count)
+  const contar = (g, filtro) => { let n = 0; salas.forEach(i => { const s = p.salas[i]; const vistos = new Set(); (s?.objetos || []).forEach((o, oi) => { if (mk.objetos.has(i + ':' + oi)) return; if (grupoDoTerreno(o.type) !== g || (filtro && !filtro(o, s))) return; const k = o.pos.join(',') + ':' + (o.level || 0); if (!vistos.has(k)) { vistos.add(k); n++; } }); }); return n; };
   if (g0 === 'Bell' || g0 === 'BellFrame') return caixa(g0) - usoDosSinos(g0, g => contar(g), () => contar('Bell', sinoNoArco), caixa);
   return caixa(g0) - usoPartilhado(g0, contar, caixa);
 }
-function pecasLivres(p, salas, tipo, atos) { let n = 0; salas.forEach(i => { const vistos = new Set(); (p.salas[i]?.objetos || []).forEach(o => { if (grupoDoTerreno(o.type) !== grupoDoTerreno(tipo)) return; const k = o.pos.join(',') + ':' + (o.level || 0); if (!vistos.has(k)) { vistos.add(k); n++; } }); }); return Math.max(0, naCaixaAte(tipo, atos) - n); }
+function pecasLivres(p, salas, tipo, atos) { let n = 0; const mk = marcasDoMapa(p); salas.forEach(i => { const vistos = new Set(); (p.salas[i]?.objetos || []).forEach((o, oi) => { if (mk.objetos.has(i + ':' + oi)) return; if (grupoDoTerreno(o.type) !== grupoDoTerreno(tipo)) return; const k = o.pos.join(',') + ':' + (o.level || 0); if (!vistos.has(k)) { vistos.add(k); n++; } }); }); return Math.max(0, naCaixaAte(tipo, atos) - n); }
 function pilaresLivres(p, salas, atos) { const r = {}; Object.keys(SUPORTES).forEach(t => { r[t] = caixaDoPilar(t, atos); });
   salas.forEach(i => { const s = p.salas[i]; if (!s) return; s.pecas.forEach(q => (q.pilares || []).forEach(x => { r[x.type] = (r[x.type] || 0) - 1; })); s.objetos.forEach(o => { const k = pilarDoObjeto(o); if (k) r[k] = (r[k] || 0) - 1; }); });
   Object.keys(r).forEach(t => { r[t] = Math.max(0, r[t]); }); return r; }
@@ -670,7 +671,8 @@ function gerarSala(opts) {
     }
     // 4. an underlay on the floor (water, embers…), clear of the entry
     // (a rule of the map may ask for one: the water of a rising tide)
-    if ((opts.alfombraForcada || []).length || rng() < (arq.alfombra || 0)) {
+    // (a room the tide will take keeps its floor clear: the tide brings its own water)
+    if (!opts.semAlfombra && ((opts.alfombraForcada || []).length || rng() < (arq.alfombra || 0))) {
       const tipos = (opts.alfombraForcada || []).length ? opts.alfombraForcada : tema === 'ermo' ? ['underlay-water', 'underlay-fetidwater'] : tema === 'masmorra' ? ['underlay-embers', 'underlay-water', 'underlay-spikes'] : ['underlay-water', 'underlay-embers', 'underlay-fetidwater', 'underlay-spikes'];
       const usadas = t => p.salas.reduce((n, s) => n + s.pecas.filter(q => q.tile === t || (PAR_ALFOMBRA[q.tile] === t)).length, 0);
       const tipo = rng.pick(tipos.filter(t => PECA[t] && usadas(t) < 3));
@@ -834,6 +836,11 @@ function gerarSala(opts) {
   // the map as it would be with this room (to measure it and check it)
   const pTemp = () => ({ ...p, salas: p.salas.map((s, i) => abridor && i === abridor.sala ? { ...s, objetos: s.objetos.concat(abridor.moldura ? [abridor.moldura] : [], [{ ...abridor.objeto, gatilhos: [{ uid: 'tmp', tipo: 'open_room', sala: idx, requisitos: [] }] }], abridor.gemeo ? [abridor.gemeo] : []) } : s).concat([sala]) });
   // 5. the objects
+  const naMesa = [...new Set(convivem.concat([idx]))];
+  // (the chest is a reward; shelves and lecterns stand against a wall)
+  const ehCobertura = t => !!BUSCAS[t] && !!BLOQUEIO_OBJETO[t]?.move && !/^(Chest|Gate|Door|Shelf|Lectern)$/.test(t);
+  const lutaPrevista = !['respiro', 'abertura'].includes(arq.id) && (opts.inimigos || 'balanceado') !== 'nenhum' && !['nenhum', 'armadilha'].includes(arq.inimigos?.como || 'sala') && entrada.length > 0;
+  const cobertura = [];
   const temTema = t => (!temaObj.objetos || temaObj.objetos.includes(t)) && daCaixa(t, atos);
   const escala = { poucos: 0.6, normal: 1, muitos: 1.5 }[opts.objetos || 'normal'] || 1;
   if (base && trava.objetos && trava.pecas) sala.objetos = clone(base.sala.objetos);
@@ -848,8 +855,10 @@ function gerarSala(opts) {
     // (only those with a default script that does something: an object with no programming would sit there saying nothing)
     const proprios = daOficina(atos).objetos.filter(v => padraoPortatil(v.id)); const it = escolhidos.indexOf('InteractToken');
     if (proprios.length && it >= 0 && rng() < 0.5) escolhidos[it] = rng.pick(proprios).id;
-    const naMesa = [...new Set(convivem.concat([idx]))];
-    for (const t of escolhidos) { if (!daCaixa(t, atos) || objetoLivre(pTemp(), naMesa, t, atos) <= 0) continue; const o = porObjeto(t, sala, idx, entrada, rng, pTemp); if (o) sala.objetos.push(o); }
+    // (a fight room: the objects that stop a figure or a line of sight, all but the chest, are its cover; they wait for the
+    // monsters and go between them and the way in, in 6b. The others are placed now)
+    for (const t of escolhidos) { if (!daCaixa(t, atos)) continue; if (lutaPrevista && ehCobertura(t)) { cobertura.push(t); continue; }
+      if (objetoLivre(pTemp(), naMesa, t, atos) <= 0) continue; const o = porObjeto(t, sala, idx, entrada, rng, pTemp); if (o) sala.objetos.push(o); }
     if (arq.id !== 'abertura') noAlto(sala, idx, entrada, rng, pTemp, naMesa, atos);   // (the opening room stays bare)
     textosDosObjetos(sala, arq, rng, p, idx > 0 && !lig && (opts.inimigos || 'balanceado') !== 'nenhum', opts.tagsRoupas || { t: tema !== 'qualquer' ? tema : null, a: atos });
   }
@@ -879,29 +888,39 @@ function gerarSala(opts) {
     sala.inimigos = lista;
     if (lista.some(e => ehPool(e.enemy)) || arq.inimigos.como === 'armadilha') sala.intensidade = Math.max(1, Math.min(10, opts.intensidade || 5));
   }
-  // 6b. cover in a fight: a few objects between the way in and the monsters (a barricade, a statue, a wagon…), so the heroes
-  // go round, take cover or push through, instead of a straight line of blows. Never cutting anything off. Its own draws
-  if (!(base && trava.objetos) && !['respiro', 'abertura'].includes(arq.id) && (sala.inimigos || []).length && entrada.length) {
-    const rngC = rngDe(opts.semente + '#cobertura'); const ch = chaoDaSala(idx, pTemp());
-    const mon = sala.inimigos.map(e => e.pos); const mx = mon.reduce((a, c) => a + c[0], 0) / mon.length, my = mon.reduce((a, c) => a + c[1], 0) / mon.length;
-    const ex = entrada.reduce((a, c) => a + c[0], 0) / entrada.length, ey = entrada.reduce((a, c) => a + c[1], 0) / entrada.length;
+  // 6b. the cover of a fight: the objects of the room that stop a figure or a line of sight (drawn in 5 with the others)
+  // go between the way in and the monsters, so the heroes go round, take cover or push through, instead of a straight line
+  // of blows; each with its search. Never cutting anything off. A fight room that drew none of them gets one of the theme.
+  // What finds no place there (no monsters after all, no room in between) is placed as any other object. Its own draws
+  if (!(base && trava.objetos)) {
+    const rngC = rngDe(opts.semente + '#cobertura'); const ch = chaoDaSala(idx, pTemp()); let pendentes = cobertura.slice();
+    const mon = (sala.inimigos || []).map(e => e.pos);
+    const ex = entrada.length ? entrada.reduce((a, c) => a + c[0], 0) / entrada.length : 0, ey = entrada.length ? entrada.reduce((a, c) => a + c[1], 0) / entrada.length : 0;
+    const mx = mon.length ? mon.reduce((a, c) => a + c[0], 0) / mon.length : ex, my = mon.length ? mon.reduce((a, c) => a + c[1], 0) / mon.length : ey;
     const vx = mx - ex, vy = my - ey, L2v = vx * vx + vy * vy;
-    const tipos = ['Barricade', 'Statue', 'StoneTable', 'Wagon', 'Tree', 'Cauldron', 'Well', 'Fire'].filter(t => OBJETO[t] && temTema(t) && objetoLivre(p, convivem, t, atos) - sala.objetos.filter(o => o.type === t).length > 1);   // (one of each kind stays in the box for the rooms ahead)
-    if (L2v >= 16 && tipos.length) {
-      const tomadas = new Set(); sala.objetos.forEach(o => casasDoObjeto(o).forEach(([x, y]) => tomadas.add(kc(x, y)))); mon.forEach(([x, y]) => VIZ8.concat([[0, 0]]).forEach(([dx, dy]) => tomadas.add(kc(x + dx, y + dy))));
-      entrada.forEach(([x, y]) => VIZ8.concat([[0, 0]]).forEach(([dx, dy]) => tomadas.add(kc(x + dx, y + dy)))); (sala.herois || []).forEach(h => VIZ8.concat([[0, 0]]).forEach(([dx, dy]) => tomadas.add(kc(h[0] + dx, h[1] + dy))));
+    if (lutaPrevista && mon.length && L2v >= 16) {
+      const tomadas = new Set(); const junto = (x, y) => VIZ8.concat([[0, 0]]).forEach(([dx, dy]) => tomadas.add(kc(x + dx, y + dy)));
+      sala.objetos.forEach(o => casasDoObjeto(o).forEach(([x, y]) => tomadas.add(kc(x, y)))); mon.forEach(([x, y]) => junto(x, y)); entrada.forEach(([x, y]) => junto(x, y)); (sala.herois || []).forEach(h => junto(h[0], h[1]));
       const livre = c => c && !c.alfombra && !c.escada && !c.ponte && !c.muro && !c.degrau && !c.bloqueia && !tomadas.has(kc(c.x, c.y));
       const meio = [...ch.values()].filter(c => { if (!livre(c)) return false; const t = ((c.x - ex) * vx + (c.y - ey) * vy) / L2v; const perp = Math.abs((c.x - ex) * vy - (c.y - ey) * vx) / Math.sqrt(L2v); return t >= 0.3 && t <= 0.75 && perp <= 2.5; });
+      // (nothing cut off: every object still reached, and no free square lost from the way in)
+      const presos = () => { const pt = pTemp(); const c2 = chaoDaSala(idx, pt); return [foraDeAlcance(idx, pt, entrada).length, [...c2.values()].filter(c => !c.bloqueia && !c.muro).length - distancias(c2, entrada).size]; };
+      const antes = presos(); const corta = () => { const [a, b] = presos(); return a > antes[0] || b > antes[1]; };
+      if (!pendentes.length) { const tipos = ['Barricade', 'Statue', 'StoneTable', 'Wagon', 'Tree', 'Cauldron', 'Well', 'Fire'].filter(t => OBJETO[t] && BUSCAS[t] && temTema(t) && objetoLivre(p, convivem, t, atos) - sala.objetos.filter(o => o.type === t).length > 1);   // (one of each kind stays in the box for the rooms ahead)
+        if (tipos.length) pendentes = [rngC.pick(tipos)]; }
       const quer = Math.min(3, 1 + Math.floor(ch.size / 30) + (rngC() < 0.4 ? 1 : 0));
       let postos = 0;
-      for (let t = 0; t < 14 && postos < quer && meio.length; t++) {
-        const c = rngC.pick(meio); const tipo = rngC.pick(tipos); const o = { type: tipo, pos: [c.x, c.y], rot: rngC.pick([0, 90]), level: c.nivel, name: '', textClick: textoDeOlhar(tipo, rngC), textUse: '', gatilhos: [], requisitos: [], senao: [] };
-        if (!casasDoObjeto(o).every(([x, y]) => { const k = ch.get(kc(x, y)); return livre(k) && k.nivel === c.nivel; })) continue;
-        sala.objetos.push(o);
-        if (foraDeAlcance(idx, pTemp(), entrada).length) { sala.objetos.pop(); continue; }   // (nothing cut off)
-        casasDoObjeto(o).forEach(([x, y]) => VIZ8.concat([[0, 0]]).forEach(([dx, dy]) => tomadas.add(kc(x + dx, y + dy)))); postos++;
+      for (const tipo of pendentes.slice()) {
+        if (postos >= quer) break; if (objetoLivre(pTemp(), naMesa, tipo, atos) <= 0) { pendentes.splice(pendentes.indexOf(tipo), 1); continue; }
+        for (let t = 0; t < 14 && meio.length; t++) {
+          const c = rngC.pick(meio); const o = { type: tipo, pos: [c.x, c.y], rot: rngC.pick([0, 90]), level: c.nivel, name: '', textClick: textoDeOlhar(tipo, rngC), textUse: '', gatilhos: [], requisitos: [], senao: [] };
+          if (!casasDoObjeto(o).every(([x, y]) => { const k = ch.get(kc(x, y)); return livre(k) && k.nivel === c.nivel; })) continue;
+          sala.objetos.push(o); if (corta()) { sala.objetos.pop(); continue; }
+          busca(o, BUSCAS[tipo]); casasDoObjeto(o).forEach(([x, y]) => junto(x, y)); postos++; pendentes.splice(pendentes.indexOf(tipo), 1); break;
+        }
       }
     }
+    for (const tipo of pendentes) { if (objetoLivre(pTemp(), naMesa, tipo, atos) <= 0) continue; const o = porObjeto(tipo, sala, idx, entrada, rng, pTemp); if (o) { sala.objetos.push(o); busca(o, BUSCAS[tipo]); } }
   }
   // the fragile bridge: a point of interest at its end, on the side of the way in, warns it; explored, the hero who explored
   // it calls the others across (a scene), and some rounds later the bridge gives way into the underlay (a text says so)
@@ -919,7 +938,7 @@ function gerarSala(opts) {
       const cx = (id, t, next) => ({ id, type: 'normal', speaker: '@actor', title: '', text: t, cast: ['@hero1'], background: FUNDO_DO_TEMA[opts.tema] ?? FUNDO_PADRAO, next, options: [] });
       const cena = { uid: uid(), tipo: 'scene', inicio: 's1', requisitos: [], caixas: [
         cx('s1', L2('This bridge will not hold for long: the boards are splitting under my feet!', 'Esta ponte não vai aguentar muito: as tábuas estão rachando sob os meus pés!'), 's2'),
-        cx('s2', L2('Everyone across, now! We have ' + n + ' rounds at most before it falls into ' + oQue + '!', 'Todos para o outro lado, agora! Temos ' + n + ' rodadas, no máximo, antes que ela caia sobre ' + oQue + '!'), '')] };
+        cx('s2', L2('Everyone across, now! It will not take us much longer before it falls into ' + oQue + '!', 'Todos para o outro lado, agora! Ela não vai nos aguentar por muito tempo antes de cair sobre ' + oQue + '!'), '')] };
       const rodadas = { uid: uid(), tipo: 'rounds', modo: 'uma', n, requisitos: [] };
       const poi = { type: 'SightToken', pos: [lugar.x, lugar.y], rot: 0, level: 0, name: L2('Fragile bridge', 'Ponte frágil'),
         textClick: L2('The bridge creaks and sways over ' + oQue + '. It looks ready to give way.', 'A ponte range e balança sobre ' + oQue + '. Parece prestes a ceder.'),
@@ -1233,6 +1252,14 @@ function semBusca(o) {
 }
 /* a raised tile is worth the climb: when nothing stands on it, a chest (or a token to search) goes up there, on a square
    away from where the ladder or staircase arrives, and only where the room stays whole. Before, a ledge could be empty */
+/* a piece with a front (a chest, a shelf…) turns its back to the wall: in the game it faces north at rotation 0 */
+function costasNaParede(o, ch) {
+  const w1 = (defObj(o.type)?.w || 1) === (defObj(o.type)?.h || 1);
+  const costas = r => [[0, 1], [-1, 0], [0, -1], [1, 0]][((r % 360) + 360) % 360 / 90];
+  const nota = r => { const [bx, by] = costas(r); return casasDoObjeto({ ...o, rot: r }).filter(([x, y]) => !ch.has(kc(x + bx, y + by))).length; };
+  const giros = w1 ? [0, 90, 180, 270] : [o.rot || 0, ((o.rot || 0) + 180) % 360];
+  o.rot = giros.reduce((a, r) => nota(r) > nota(a) ? r : a, giros.includes(o.rot || 0) ? o.rot || 0 : giros[0]);
+}
 function noAlto(sala, idx, entrada, rng, pTemp, naMesa, atos) {
   const altos = sala.pecas.filter(q => !ehAlfombra(q.tile) && (q.level || 0) > 0); if (!altos.length) return;
   const subida = o => ehTerreno(o) || ehTipo(o, 'Ladder') || ehTipo(o, 'LadderMedium');
@@ -1250,7 +1277,7 @@ function noAlto(sala, idx, entrada, rng, pTemp, naMesa, atos) {
     let feito = false;
     for (const t of ['Chest', 'InteractToken']) { if (feito || !daCaixa(t, atos) || !OBJETO[t] || objetoLivre(pt, naMesa, t, atos) <= 0) continue;
       for (const [x, y] of ordem) { const o = { type: t, pos: [x, y], rot: 0, level: q.level || 0, name: '', textClick: '', textUse: '', gatilhos: [], requisitos: [], senao: [] };
-        sala.objetos.push(o); if (foraDeAlcance(idx, pTemp(), entrada).length <= antes) { feito = true; break; } sala.objetos.pop(); } }
+        sala.objetos.push(o); if (foraDeAlcance(idx, pTemp(), entrada).length <= antes) { feito = true; if (OBJ_PAREDE.has(t)) costasNaParede(o, ch); break; } sala.objetos.pop(); } }
   }
 }
 /* what the room shows after it is set up: its interaction tokens (and other things the heroes should notice) */

@@ -13,9 +13,9 @@ const TIPOS_GATILHO = [
   { id: 'mission', nome: 'Add an objective', expl: 'A goal on this map, announced when the object is used and listed with the objectives. An objective does not end the map: the mission does (Map setup). An objective can be chosen there as the mission.' },
   { id: 'unlock_map', nome: 'Unlock a campaign map', expl: 'A map of the campaign (a card of the story flow) stays locked until this trigger runs. Unlocked, it appears on the world map as soon as the cards before it in the story flow are completed.' },
   { id: 'remove_room', nome: 'Remove a room', expl: 'Takes a whole room off the board during play: its tiles, pillars, objects and monsters. Frees those tiles for reuse in a later room; the heroes cannot go back there.' },
-  { id: 'remove_tile', nome: 'Remove a tile', expl: 'Takes one tile off the board with everything on it (objects, pillars, monsters). Frees it for reuse in a later room.' },
+  { id: 'remove_tile', nome: 'Remove a tile', expl: 'Takes one tile off the board with everything on it (objects, pillars, monsters), or only the tile, keeping what stands on it on whatever lies below (an underlay: water, embers…). Frees it for reuse in a later room.' },
   { id: 'remove_enemy', nome: 'Remove monsters', expl: 'Takes monsters off the board without counting them as defeated: one specific monster (click it), a spawn group, the monsters of this room, or all.' },
-  { id: 'enemy_condition', nome: 'Change monster conditions', expl: 'Heal, damage, apply or remove a condition on a spawn group, on the monsters of this room or on all. Heroes are healed at the table (use a text).' },
+  { id: 'enemy_condition', nome: 'Change monster conditions', expl: 'Heal, damage, apply or remove a condition on a spawn group, on the monsters of this room or on all, or make them target a protected one (a token the heroes guard: the activation window shows its name in place of the hero). Heroes are healed at the table (use a text).' },
   { id: 'move_heroes', nome: 'Move the heroes', expl: 'Lights up the spaces you click in the game and tells the table to move the heroes there (one hero per space), every time it fires.' },
   { id: 'add_tile', nome: 'Add a tile', expl: 'A tile appears on the board when this object is used, with the objects and monsters placed on it (a bridge, a collapsed wall, a secret passage). Lay the tile in any room first: it stays faded in the editor and out of play until the trigger fires. Then click it here.' },
   { id: 'add_object', nome: 'Add an object', expl: 'A new object appears on the board when this one is used. Pick its kind and click where it goes.' },
@@ -27,8 +27,9 @@ const TIPOS_GATILHO = [
   { id: 'item_pool', nome: 'Change the item pool', expl: 'Adds an item to (or removes one from) the item pool of the map, the one “Give an item” draws its random items and materials from, for the rest of the map.' },
   { id: 'reserve', nome: 'Change the spawn pool', expl: 'Adds a monster to (or removes one from) the pool the game draws from, for the rest of the map.' },
   { id: 'end_map', nome: 'End the map', expl: 'The map ends here, in victory or in defeat (a villain escaped, the time ran out…).' },
-  { id: 'escort', nome: 'Escort (a protected one)', expl: 'Someone the heroes protect (a token on the table, with 5 interaction tokens beside it as its health): from now on the monsters may pick it as their target; the activation window shows it by name. The hunters (spawn groups you list) always go for it; the others, with a chance each round. “End” stops it (it fell, or it is safe).' },
-  { id: 'move_object', nome: 'Move an object', oculto: true, expl: 'Moves an object of the map to a space (the generator uses it to take the protected one beside the waystone it woke).' },
+  { id: 'escort', nome: 'Escort (a protected one)', oculto: true, expl: 'Someone the heroes protect (a token on the table, with 5 interaction tokens beside it as its health): from now on the monsters may pick it as their target; the activation window shows it by name. The hunters (spawn groups you list) always go for it; the others, with a chance each round. “End” stops it (it fell, or it is safe).' },
+  { id: 'move_object', nome: 'Move an object', expl: 'Moves an object of the map to the place of its marker: lay a second object of the same kind where it goes, turned as it should end. The marker does not come out in the setup of the room: it only shows the new place. Click the object, then its marker.' },
+  { id: 'move_tile', nome: 'Move a tile', expl: 'Moves a tile to the place of its marker: the same tile laid a second time, where it goes. The marker does not come out in the setup of the room. What stands on the tile (objects, pillars) goes with it; the table moves the figures. Click the tile, then its marker.' },
   { id: 'objective', nome: 'Room objective', oculto: true, expl: 'Using this object counts as an objective of the room (listed and ticked). Older maps only: use “Add a mission → An object is used”.' },
 ];
 const GATILHO = Object.fromEntries(TIPOS_GATILHO.map(t => [t.id, t]));
@@ -41,12 +42,14 @@ function ligarExtras(el, o) { if (!el || !o) return; el.querySelectorAll('input[
   i.onchange = () => { o.acaoExtra = o.acaoExtra || {}; if (i.checked) o.acaoExtra[i.dataset.extra] = true; else delete o.acaoExtra[i.dataset.extra]; if (!Object.keys(o.acaoExtra).length) delete o.acaoExtra; renderConferencia(); }; }); }
 /* triggers shown together in the catalog: one entry, then the kind */
 const GRUPOS_GATILHO = [
-  { id: 'grp:addremove', nome: 'Add / Remove…', expl: 'Puts something on the board, or takes it off, during play: tiles, objects, monsters, rooms.', pergunta: 'Add or remove?',
+  { id: 'grp:addremove', nome: 'Add / Remove…', expl: 'Puts something on the board, takes it off or moves it, during play: tiles, objects, monsters, rooms.', pergunta: 'Add, remove or move?',
     ramos: [
       { id: 'ramo:add', nome: 'Add…', expl: 'Something appears on the board: a tile, an object or monsters.', pergunta: 'Add what?',
         membros: [['add_tile', 'A tile'], ['add_object', 'An object'], ['spawn', 'Spawn monsters']] },
       { id: 'ramo:remove', nome: 'Remove…', expl: 'Takes something off the board: a tile, a room, an object or monsters.', pergunta: 'Remove what?',
         membros: [['remove_tile', 'A tile'], ['remove_room', 'A room'], ['remove_object', 'An object'], ['remove_enemy', 'A monster (or a group, the room’s, all)']] },
+      { id: 'ramo:move', nome: 'Move…', expl: 'Something changes place on the board: an object or a tile, to the place of its marker (a second one laid where it goes).', pergunta: 'Move what?',
+        membros: [['move_object', 'An object'], ['move_tile', 'A tile']] },
     ] },
   { id: 'grp:media', nome: 'Play a scene, video or sound', expl: 'A scene of dialogue boxes (like the story flow), your own film full screen, a sound effect of the game or your own sound file.', pergunta: 'Play what?',
     membros: [['scene', 'A scene (dialogue boxes)'], ['cutscene', 'A video (your own film)'], ['sound', 'A sound (game effect or your own file)']] },
@@ -66,7 +69,7 @@ const grupoDoGatilho = id => GRUPOS_GATILHO.find(gr => membrosDoGrupo(gr).some((
 /* tiles that enter the board by an "Add a tile" trigger: 'room:tile' -> reveal group of that tile */
 function pecasAdicionadas(p = projeto) {
   const m = new Map(), olha = o => todosGatilhos(o).forEach(g => { if (g.tipo === 'add_tile' && p.salas[g.sala]?.pecas[g.peca]) m.set(g.sala + ':' + g.peca, 'tile-' + (g.sala + 1) + '-' + (g.peca + 1)); });
-  p.salas.forEach(ss => donosDaSala(ss).forEach(({ o }) => olha(o))); (p.contadores || []).forEach(olha);
+  p.salas.forEach(ss => donosDaSala(ss).forEach(({ o }) => olha(o))); (p.contadores || []).forEach(olha); (p.eventos || []).forEach(olha);   // (an event of rounds may add one too)
   return m;
 }
 /* the explanation of a trigger kind, worded for its holder (object or monster) */
@@ -91,7 +94,7 @@ function poolSemO(materiais) {
   const mat = pool.some(id => ITENS_B().find(i => i.id === id)?.cls === 'CraftingMaterialModel'), item = pool.some(id => { const i = ITENS_B().find(x => x.id === id); return i && i.cls !== 'CraftingMaterialModel'; });
   return materiais ? (mat ? null : 'The item pool has no materials: add crafting materials to it (Workshop → Items, or Map setup).') : (item ? null : 'The item pool has no items: add items to it (Workshop → Items, or Map setup).');
 }
-const SO_CONSEQUENCIA = new Set(['end_map', 'escort', 'move_object', 'unlock_map', 'text', 'counter', 'sound', 'skill_test', 'choice', 'spawn', 'enemy_condition', 'highlight', 'give_item', 'remove_enemy', 'move_heroes', 'add_object', 'add_tile', 'remove_object', 'cutscene', 'scene', 'rounds']);
+const SO_CONSEQUENCIA = new Set(['end_map', 'escort', 'move_object', 'move_tile', 'unlock_map', 'text', 'counter', 'sound', 'skill_test', 'choice', 'spawn', 'enemy_condition', 'highlight', 'give_item', 'remove_enemy', 'move_heroes', 'add_object', 'add_tile', 'remove_object', 'cutscene', 'scene', 'rounds']);
 const TIPOS_REQUISITO = [
   { id: 'item', nome: 'The party has an item', expl: 'An item of the workshop must be in the party’s possession.' },
   { id: 'mission', nome: 'An objective was completed', expl: 'An objective added by an “Add an objective” trigger must already be completed.' },
@@ -152,7 +155,8 @@ function removerObjeto(si, oi, semPergunta, semRender) {
   s.objetivos.forEach(ob => { if (ob.objeto === oi) ob.objeto = -1; else if (ob.objeto > oi) ob.objeto--; });
   const fm = projeto.meta.finalMission; if (fm && fm.tipo === 'use_object' && fm.sala === si) { if (fm.objeto === oi) fm.objeto = -1; else if (fm.objeto > oi) fm.objeto--; }
   // every holder, the counters' consequences too
-  projeto.salas.flatMap(ss => donosDaSala(ss)).concat(donosContadores()).forEach(({ o: x }) => { todosGatilhos(x).forEach(g => { if (g.objSala === si && g.objIndex !== undefined) { if (g.objIndex === oi) delete g.objIndex; else if (g.objIndex > oi) g.objIndex--; } });
+  projeto.salas.flatMap(ss => donosDaSala(ss)).concat(donosContadores()).forEach(({ o: x }) => { todosGatilhos(x).forEach(g => { if (g.objSala === si && g.objIndex !== undefined) { if (g.objIndex === oi) delete g.objIndex; else if (g.objIndex > oi) g.objIndex--; }
+      if (g.tipo === 'move_object' && g.marcaSala === si && g.marcaIndex !== undefined) { if (g.marcaIndex === oi) delete g.marcaIndex; else if (g.marcaIndex > oi) g.marcaIndex--; } });
     [x, ...todosGatilhos(x)].flatMap(z => z.requisitos || []).forEach(r => { if (r.tipo === 'object_used' && r.sala === si) { if (r.objeto === oi) delete r.objeto; else if (r.objeto > oi) r.objeto--; } }); });
   limparAbridores();
   if (!semRender) { sel = null; tudo(); }
@@ -183,16 +187,19 @@ function resumoGatilho(g) {
     case 'skill_test': return (g.secret ? 'secret' : 'open') + ' test, ' + (g.successes || 2) + ' success(es)'; // outcome counts are added by renderGatilhos
     case 'spawn': return g.fonte === 'pool' ? (g.cells || []).length + ' balanced space(s) from the pool' : (g.inimigos || []).length ? nomeIni(g.inimigos[0].enemy) + ((g.inimigos || []).length > 1 ? ' +' + (g.inimigos.length - 1) : '') : 'no monster yet';
     case 'remove_enemy': return 'removes ' + (g.alvo === 'all' ? 'all monsters' : g.alvo === 'group' ? 'a spawn group' : g.alvo === 'one' ? (inimigoRef(g.inimigo) ? nomeIni(inimigoRef(g.inimigo).enemy) + ' at ' + inimigoRef(g.inimigo).pos.join(',') : 'one monster (none picked yet)') : 'the monsters of this room');
-    case 'enemy_condition': return ({ heal: 'heals', damage: 'damages', apply: 'applies ' + (g.condition || '?') + ' to', remove: 'removes ' + (g.condition || '?') + ' from', bonus: 'changes attack/defence of' })[g.acao || 'apply'] + ' ' + (g.alvo === 'all' ? 'all' : g.alvo === 'group' ? 'a spawn group' : 'the monsters of this room');
+    case 'enemy_condition': if (g.acao === 'mirar') return (g.alvo === 'all' ? 'all monsters' : g.alvo === 'group' ? 'a spawn group' : 'the monsters of this room') + ' may target ' + (g.nome || 'the protected one') + ' (' + ((g.chance ?? 25) >= 100 ? 'always' : (g.chance ?? 25) + '% each round') + ')';
+      if (g.acao === 'desmirar') return 'the monsters stop targeting ' + (g.nome || 'the protected one');
+      return ({ heal: 'heals', damage: 'damages', apply: 'applies ' + (g.condition || '?') + ' to', remove: 'removes ' + (g.condition || '?') + ' from', bonus: 'changes attack/defence of' })[g.acao || 'apply'] + ' ' + (g.alvo === 'all' ? 'all' : g.alvo === 'group' ? 'a spawn group' : 'the monsters of this room');
     case 'end_map': return 'ends the map in ' + (g.resultado === 'vitoria' ? 'victory' : 'defeat');
     case 'escort': return g.acao === 'fim' ? 'ends the escort' : 'starts the escort of ' + (g.nome || 'the protected one') + ' (' + (g.chance ?? 25) + '% of the other monsters, ' + (g.cacadores || []).length + ' hunter group(s))';
-    case 'move_object': return 'moves ' + (g.objIndex !== undefined ? rotulo(projeto.salas[g.objSala]?.objetos[g.objIndex] || {}) : '(no object)') + (g.cell ? ' to ' + g.cell.join(',') : '');
+    case 'move_object': return 'moves ' + (g.objIndex !== undefined ? rotulo(projeto.salas[g.objSala]?.objetos[g.objIndex] || {}) : '(no object)') + (projeto.salas[g.marcaSala]?.objetos[g.marcaIndex] ? ' to its marker' : g.cell ? ' to ' + g.cell.join(',') : ' (no marker yet)');
+    case 'move_tile': { const p = projeto.salas[g.sala]?.pecas[g.peca]; return 'moves tile ' + (p ? nomePeca(p.tile) : '(none yet)') + (projeto.salas[g.marcaSala]?.pecas[g.marcaPeca] ? ' to its marker' : ' (no marker yet)'); }
     case 'move_heroes': return 'moves the heroes' + ((g.cells || []).length ? ' to ' + g.cells.map(c => c.join(',')).join('; ') : ' (no destination yet)');
     case 'add_object': return 'adds ' + nomeObj(g.objType || 'Chest') + (g.objIndex !== undefined ? '' : ' (no place yet)');
     case 'remove_object': return 'removes ' + (g.proprio ? 'itself' : g.objIndex !== undefined ? rotulo(projeto.salas[g.objSala]?.objetos[g.objIndex] || {}) : '(no target yet)');
     case 'remove_room': return 'removes ' + (projeto.salas[g.sala]?.nome || '(no room yet)');
     case 'add_tile': { const p = projeto.salas[g.sala]?.pecas[g.peca]; return 'adds tile ' + (p ? nomePeca(p.tile) + ' of room ' + (g.sala + 1) : '(none yet)'); }
-    case 'remove_tile': { const p = projeto.salas[g.sala]?.pecas[g.peca]; return 'removes tile ' + (p ? nomePeca(p.tile) + ' of room ' + (g.sala + 1) : '(none yet)'); }
+    case 'remove_tile': { const p = projeto.salas[g.sala]?.pecas[g.peca]; return 'removes tile ' + (p ? nomePeca(p.tile) + ' of room ' + (g.sala + 1) : '(none yet)') + (g.manter ? ' (keeps what stands on it)' : ''); }
     case 'highlight': return 'highlights ' + (g.objIndex !== undefined ? rotulo(projeto.salas[g.objSala]?.objetos[g.objIndex] || {}) : g.cell ? 'space ' + g.cell.join(',') : '(no target yet)');
     case 'choice': return 'choice: ' + (g.text || '').slice(0, 30) + ' (' + (g.options || []).length + ' answers)';
     case 'scene': { const cx = g.caixas || []; const c0 = cx.find(c => c.id === g.inicio) || cx[0]; return 'scene: ' + cx.length + ' box(es)' + (c0 ? ' · ' + (c0.speaker ? nomePersonagem(c0.speaker) + ': ' : '') + '“' + (c0.text || '').slice(0, 30) + ((c0.text || '').length > 30 ? '…' : '') + '”' : ''); }
@@ -299,8 +306,11 @@ function camposGatilho(el, s, oi, g, lista) {
     case 'remove_enemy': html = campo('Target', `<select data-k="alvo"><option value="room" ${g.alvo === 'room' || !g.alvo ? 'selected' : ''}>Monsters of this room</option><option value="one" ${g.alvo === 'one' ? 'selected' : ''}>One specific monster…</option><option value="all" ${g.alvo === 'all' ? 'selected' : ''}>All monsters</option><option value="group" ${g.alvo === 'group' ? 'selected' : ''}>A spawn group…</option></select>` +
       (g.alvo === 'group' ? `<select data-k="grupo">${gruposDaMissao().map(x => `<option value="${x.id}" ${g.grupo === x.id ? 'selected' : ''}>${esc(x.nome)}</option>`).join('') || '<option value="">(no spawn groups yet)</option>'}</select>` : '')) +
       (g.alvo === 'one' ? `<p>Monster: <b>${inimigoRef(g.inimigo) ? esc(nomeIni(inimigoRef(g.inimigo).enemy)) + ' at ' + inimigoRef(g.inimigo).pos.join(',') : 'none yet'}</b> <button class="sm" id="g_alvo">Click it on the board</button></p><p class="ajuda">If it is not on the board when the trigger fires, nothing happens.</p>` : ''); break;
-    case 'enemy_condition': html = campo('Action', `<select data-k="acao"><option value="heal" ${g.acao === 'heal' ? 'selected' : ''}>Heal</option><option value="damage" ${g.acao === 'damage' ? 'selected' : ''}>Damage</option><option value="apply" ${g.acao === 'apply' || !g.acao ? 'selected' : ''}>Apply a condition</option><option value="remove" ${g.acao === 'remove' ? 'selected' : ''}>Remove conditions</option></select>`) +
-      ((g.acao === 'heal' || g.acao === 'damage') ? campo('Amount', `<input data-k="amount" type="number" min="1" value="${g.amount || 2}" style="width:70px">`) : '') + (g.acao === 'apply' ? campo('Condition', `<select data-k="condition">${CONDICOES.map(c => `<option ${g.condition === c ? 'selected' : ''}>${c}</option>`).join('')}</select>`) : '') + campo('Target', alvos()); break;
+    case 'enemy_condition': html = campo('Action', `<select data-k="acao"><option value="heal" ${g.acao === 'heal' ? 'selected' : ''}>Heal</option><option value="damage" ${g.acao === 'damage' ? 'selected' : ''}>Damage</option><option value="apply" ${g.acao === 'apply' || !g.acao ? 'selected' : ''}>Apply a condition</option><option value="remove" ${g.acao === 'remove' ? 'selected' : ''}>Remove conditions</option><option value="mirar" ${g.acao === 'mirar' ? 'selected' : ''}>Target a protected one</option><option value="desmirar" ${g.acao === 'desmirar' ? 'selected' : ''}>Stop targeting a protected one</option></select>`) +
+      (g.acao === 'mirar' || g.acao === 'desmirar' ? campo('Protected one (its name, as the token is called)', `<input data-k="nome" value="${esc(g.nome || '')}" placeholder="the protected one">`) : '') +
+      (g.acao === 'mirar' ? campo('Chance each round', `<input data-k="chance" type="number" min="1" max="100" value="${g.chance ?? 25}" style="width:70px"> %`) + `<p class="ajuda">Each round, each of these monsters picks the protected one as its target with this chance (100: always, as hunters drawn to it): the activation window shows its name in place of the hero, and the monster attacks it. The protected one is a token on the table; the table keeps its health and says when it falls. A spawn group listed here wins over a rule for all.</p>` : '') +
+      (g.acao === 'desmirar' ? '<p class="ajuda">Every monster goes back to the heroes the game picks (use it when the protected one falls or leaves).</p>' : '') +
+      ((g.acao === 'heal' || g.acao === 'damage') ? campo('Amount', `<input data-k="amount" type="number" min="1" value="${g.amount || 2}" style="width:70px">`) : '') + (g.acao === 'apply' ? campo('Condition', `<select data-k="condition">${CONDICOES.map(c => `<option ${g.condition === c ? 'selected' : ''}>${c}</option>`).join('')}</select>`) : '') + (g.acao === 'desmirar' ? '' : campo('Target', alvos())); break;
     case 'move_heroes': html = `<p>Destination: <b>${(g.cells || []).length ? (g.cells.length === 1 ? 'space ' : g.cells.length + ' spaces: ') + g.cells.map(c => c.join(',')).join('; ') : 'none yet'}</b></p><button class="sm" id="g_alvo">Click the spaces where the heroes appear</button>${(g.cells || []).length ? ' <button class="sm" id="g_limpa">Clear</button>' : ''}` +
       campo('Text for the table (optional)', `<input data-k="text" value="${esc(g.text || '')}" placeholder="Move the heroes to the highlighted spaces.">`) +
       `<p class="ajuda">In the game these spaces light up and the table is told to move the heroes there (one hero per space), every time the trigger fires. The light goes out at the next round or the next move. For an object used many times, set “Can be used” above.</p>`; break;
@@ -313,7 +323,17 @@ function camposGatilho(el, s, oi, g, lista) {
       (g.modo !== 'uma' ? campo('How many times', `<select data-k="vezes">${[0, 1, 2, 3, 4, 5, 6, 8, 10].map(v => `<option value="${v}" ${(+g.vezes || 0) === v ? 'selected' : ''}>${v ? v + ' time(s)' : 'To the end of the map'}</option>`).join('')}</select>`) : '') +
       `<p class="ajuda">${g.modo === 'uma' ? 'Counts from the round the object is used in: ' + Math.max(1, +g.n || 2) + ' round(s) later, at the start of that round, the triggers below run once.' : 'Counts from the round the object is used in: every ' + Math.max(1, +g.n || 2) + ' round(s) after it, at the start of the round, the triggers below run' + (+g.vezes ? ' (' + g.vezes + ' time(s) in all).' : ', until the map ends.')} Used again, the object starts the count over.</p>` +
       `<div class="resultado rodada"><div class="sub">When the rounds come <button class="sm" data-res="rodada">+ Add</button></div><div data-lres="rodada"></div></div>`; break;
-    case 'remove_tile': { const p = projeto.salas[g.sala]?.pecas[g.peca]; html = `<p>Tile: <b>${p ? nomePeca(p.tile) + ' of room ' + (g.sala + 1) : 'none yet'}</b> <button class="sm" id="g_alvo">Click the tile on the board</button></p><p class="ajuda">Everything on that tile goes with it.</p>`; break; }
+    case 'remove_tile': { const p = projeto.salas[g.sala]?.pecas[g.peca]; html = `<p>Tile: <b>${p ? nomePeca(p.tile) + ' of room ' + (g.sala + 1) : 'none yet'}</b> <button class="sm" id="g_alvo">Click the tile on the board</button></p>
+      <label class="chk"><input type="checkbox" data-k="manter" ${g.manter ? 'checked' : ''}> Keep what stands on it (objects, monsters)</label>
+      <p class="ajuda">${g.manter ? 'Only the tile leaves: what stood on it stays where it is, on whatever lies below (an underlay: water, fetid water, embers, spikes, with the game’s own rules for that ground). Lay the tile wholly over an underlay.' : 'Everything on that tile goes with it.'}</p>`; break; }
+    case 'move_object': { const ob = projeto.salas[g.objSala]?.objetos[g.objIndex], mk = projeto.salas[g.marcaSala]?.objetos[g.marcaIndex];
+      html = `<p>Object: <b>${ob ? esc(rotulo(ob)) + ' (room ' + (g.objSala + 1) + ')' : 'none yet'}</b> <button class="sm" id="g_alvo">Click the object</button></p>
+      <p>Marker (where it goes): <b>${mk ? nomeObj(mk.type) + ' at ' + mk.pos.join(',') + (mk.level ? ', level ' + mk.level : '') : g.cell ? 'space ' + g.cell.join(',') : 'none yet'}</b> <button class="sm" id="g_marca">Click the marker</button></p>
+      <p class="ajuda">The marker is a second ${ob ? esc(nomeObj(ob.type)) : 'object of the same kind'}, laid where the object goes and turned as it should end. It does not come out in the setup of the room.</p>`; break; }
+    case 'move_tile': { const p = projeto.salas[g.sala]?.pecas[g.peca], mk = projeto.salas[g.marcaSala]?.pecas[g.marcaPeca];
+      html = `<p>Tile: <b>${p ? nomePeca(p.tile) + ' of room ' + (g.sala + 1) : 'none yet'}</b> <button class="sm" id="g_alvo">Click the tile on the board</button></p>
+      <p>Marker (where it goes): <b>${mk ? nomePeca(mk.tile) + ' at ' + mk.pos.join(',') + (mk.level ? ', level ' + mk.level : '') : 'none yet'}</b> <button class="sm" id="g_marca">Click the marker</button></p>
+      <p class="ajuda">The marker is the same tile laid a second time where it goes (the warning of a tile already in the room offers “Move the tile”). It does not come out in the setup of the room. What stands on the tile goes with it: objects and pillars; the table moves the figures.</p>`; break; }
     case 'end_map': html = campo('Result', `<select data-k="resultado"><option value="derrota" ${g.resultado !== 'vitoria' ? 'selected' : ''}>Defeat</option><option value="vitoria" ${g.resultado === 'vitoria' ? 'selected' : ''}>Victory</option></select>`); break;
     case 'escort': html = campo('Action', `<select data-k="acao"><option value="inicio" ${g.acao !== 'fim' ? 'selected' : ''}>Start</option><option value="fim" ${g.acao === 'fim' ? 'selected' : ''}>End</option></select>`) + (g.acao === 'fim' ? '' : campo('Name', `<input data-k="nome" value="${esc(g.nome || '')}">`) + campo('Chance (%)', `<input type="number" min="0" max="100" data-k="chance" value="${g.chance ?? 25}">`) + `<p class="ajuda">${(g.cacadores || []).length} hunter group(s).</p>`); break;
     case 'highlight': html = campo('Mode', `<select data-k="modo"><option value="object" ${g.modo !== 'space' ? 'selected' : ''}>Outline an object</option><option value="space" ${g.modo === 'space' ? 'selected' : ''}>Highlight a space</option></select>`) + `<p>Target: <b>${g.objIndex !== undefined ? esc(rotulo(projeto.salas[g.objSala]?.objetos[g.objIndex] || {})) : g.cell ? 'space ' + g.cell.join(',') : 'none yet'}</b> <button class="sm" id="g_alvo">Click the ${g.modo === 'space' ? 'space' : 'object'}</button></p>`; break;
@@ -345,7 +365,7 @@ function camposGatilho(el, s, oi, g, lista) {
       if (g.tipo === 'skill_test' && k === 'cumulativo') { const dono = donoDe(s, oi); if (dono && !dono.enemy && g.cumulativo && !dono.usos) { dono.usos = 'always'; aviso('“' + rotulo(dono) + '” can now be used every time (change it in “Can be used”).'); } renderPropriedades(); return; }
       if (g.tipo === 'choice' && k === 'umaVez') { const dono = donosDaSala(s).map(x => x.o).find(x => !x.enemy && todosGatilhos(x).includes(g)); const n = String((g.options || []).filter(x => x.text).length || 3);
         if (dono && g.umaVez && dono.usos !== 'always') { dono.usos = n; aviso('“' + rotulo(dono) + '” can now be used ' + n + ' times, one per answer.'); } renderPropriedades(); return; }
-      if (['modo', 'alvo', 'acao', 'como', 'secret', 'fonte', 'desde'].includes(k) || (g.tipo === 'counter' && g.acao === 'use' && k === 'n') || (inp.tagName === 'SELECT' && !inp.dataset.semRender)) renderPropriedades(); else renderGatilhosSoResumo(); renderConferencia();
+      if (['modo', 'alvo', 'acao', 'como', 'secret', 'fonte', 'desde', 'manter'].includes(k) || (g.tipo === 'counter' && g.acao === 'use' && k === 'n') || (inp.tagName === 'SELECT' && !inp.dataset.semRender)) renderPropriedades(); else renderGatilhosSoResumo(); renderConferencia();
     };
     if (inp.tagName === 'TEXTAREA' || (inp.tagName === 'INPUT' && inp.type !== 'checkbox' && inp.type !== 'number')) inp.oninput = h; else inp.onchange = h;
   });
@@ -375,6 +395,16 @@ function camposGatilho(el, s, oi, g, lista) {
   }
   if (g.tipo === 'move_heroes') { const lp = el.querySelector('#g_limpa'); if (lp) lp.onclick = () => { g.cells = []; delete g.cell; renderPropriedades(); desenhar(); }; }
   const bc = el.querySelector('#g_cena'); if (bc) bc.onclick = () => abrirCenaDoGatilho(g, () => tudo());
+  // the marker of a move: a second object of the same kind, or the same tile laid again
+  const bm = el.querySelector('#g_marca'); if (bm) bm.onclick = () => {
+    if (g.tipo === 'move_object') { const ob = projeto.salas[g.objSala]?.objetos[g.objIndex]; if (!ob) return aviso('Click the object first.');
+      pedirClique({ modo: 'object', g, si, texto: 'Click the marker: a second ' + nomeObj(ob.type) + ', where the object goes.', cb: (x, y, q) => { if (!q || q.tipo !== 'objeto') return aviso('Click an object.'), false;
+        const mk = projeto.salas[q.sala].objetos[q.i]; if (mk === ob) return aviso('Click a second object, not the one that moves.'), false; if (baseObj(mk.type) !== baseObj(ob.type)) return aviso('The marker must be a ' + nomeObj(ob.type) + ' too.'), false;
+        g.marcaSala = q.sala; g.marcaIndex = q.i; delete g.cell; return true; } }); }
+    else if (g.tipo === 'move_tile') { const p = projeto.salas[g.sala]?.pecas[g.peca]; if (!p) return aviso('Click the tile first.');
+      pedirClique({ modo: 'object', g, si, texto: 'Click the marker: the same tile laid again, where it goes.', cb: (x, y, q) => { const c = candidatosEm(x, y, true).find(z => z.tipo === 'peca' && !(z.sala === g.sala && z.i === g.peca)); if (!c) return aviso('Click the marker tile.'), false;
+        const mk = projeto.salas[c.sala].pecas[c.i]; if (numeroDaPeca(mk.tile) !== numeroDaPeca(p.tile)) return aviso('The marker must be tile ' + numeroDaPeca(p.tile) + ' too.'), false; g.marcaSala = c.sala; g.marcaPeca = c.i; return true; } }); }
+  };
   const alvo = el.querySelector('#g_alvo'); if (alvo) alvo.onclick = () => {
     if (g.tipo === 'move_heroes') pedirClique({ modo: 'space', g, si, repetir: true, texto: 'Click each space where a hero appears (Esc to stop).', cb: (x, y) => { g.cells = g.cells || []; delete g.cell; if (!g.cells.some(c => c[0] === x && c[1] === y)) g.cells.push([x, y]); return true; } });
     else if (g.tipo === 'add_object') pedirClique({ modo: 'space', g, si, texto: 'Click where the new ' + nomeObj(g.objType || 'Chest') + ' appears.', cb: (x, y) => {
@@ -385,6 +415,8 @@ function camposGatilho(el, s, oi, g, lista) {
     else if (g.tipo === 'remove_object' || g.tipo === 'mission') pedirClique({ modo: 'object', g, si, texto: g.tipo === 'mission' ? 'Click the object that completes the objective.' : 'Click the object to remove.', cb: (x, y, q) => { if (!q || q.tipo !== 'objeto') return aviso('Click an object.'), false; g.objSala = q.sala; g.objIndex = q.i; delete g.proprio; return true; } });
     else if (g.tipo === 'add_tile') pedirClique({ modo: 'object', g, si, texto: 'Click the tile that appears (any room).', cb: (x, y, q) => { const c = candidatosEm(x, y, true).find(z => z.tipo === 'peca'); if (!c) return aviso('Click a tile.'), false; if (c.sala === 0 && projeto.salas[0].pecas.length === 1) return aviso('That is the only tile of the starting room.'), false; g.sala = c.sala; g.peca = c.i; return true; } });
     else if (g.tipo === 'remove_tile') pedirClique({ modo: 'object', g, si, texto: 'Click the tile to remove (any room).', cb: (x, y, q) => { const c = candidatosEm(x, y, true).find(z => z.tipo === 'peca'); if (!c) return aviso('Click a tile.'), false; g.sala = c.sala; g.peca = c.i; return true; } });
+    else if (g.tipo === 'move_object') pedirClique({ modo: 'object', g, si, texto: 'Click the object to move.', cb: (x, y, q) => { if (!q || q.tipo !== 'objeto') return aviso('Click an object.'), false; if (ehMarca('objeto', q.sala, q.i)) return aviso('That one is a marker: click the object itself.'), false; g.objSala = q.sala; g.objIndex = q.i; return true; } });
+    else if (g.tipo === 'move_tile') pedirClique({ modo: 'object', g, si, texto: 'Click the tile to move (any room).', cb: (x, y, q) => { const c = candidatosEm(x, y, true).find(z => z.tipo === 'peca' && !ehMarca('peca', z.sala, z.i)); if (!c) return aviso('Click a tile (not its marker).'), false; g.sala = c.sala; g.peca = c.i; return true; } });
     else if (g.tipo === 'highlight') { if (g.modo === 'space') pedirClique({ modo: 'space', g, si, texto: 'Click the space to highlight.', cb: (x, y) => { g.cell = [x, y]; delete g.objIndex; return true; } }); else pedirClique({ modo: 'object', g, si, texto: 'Click the object to outline.', cb: (x, y, q) => { if (!q || q.tipo !== 'objeto') return aviso('Click an object.'), false; g.objSala = q.sala; g.objIndex = q.i; delete g.cell; return true; } }); }
   };
   if (g.tipo === 'choice') {
@@ -511,8 +543,9 @@ function adicionarGatilho(s, oi, tipo, modo, lista) {
 /* a tile already on the table while room si is open, with no copy of it left in the boxes (two boxes: two of each) */
 function pecaReutilizada(num, si) {
   let fora = new Set(); try { limparAbridores(); fora = removidosAntes(si).salas; } catch { }
-  const usos = []; projeto.salas.forEach((s, ri) => { if (ri === si || fora.has(ri) || s._previa) return; s.pecas.forEach((q, pi) => { if (!ehAlfombra(q.tile) && numeroDaPeca(q.tile) === num) usos.push({ sala: ri, peca: pi }); }); });
-  const nesta = (projeto.salas[si]?.pecas || []).filter(q => !ehAlfombra(q.tile) && numeroDaPeca(q.tile) === num).length;
+  const mk = marcasDoMapa(); const marca = (ri, pi) => mk.pecas.has(ri + ':' + pi);   // (a marker is the same physical tile: it does not count)
+  const usos = []; projeto.salas.forEach((s, ri) => { if (ri === si || fora.has(ri) || s._previa) return; s.pecas.forEach((q, pi) => { if (!ehAlfombra(q.tile) && numeroDaPeca(q.tile) === num && !marca(ri, pi)) usos.push({ sala: ri, peca: pi }); }); });
+  const nesta = (projeto.salas[si]?.pecas || []).filter((q, pi) => !ehAlfombra(q.tile) && numeroDaPeca(q.tile) === num && !marca(si, pi)).length;
   return usos.length && usos.length + nesta >= caixaDaPeca(num) ? usos[0] : null;
 }
 function avisarReuso(reuso, si, por) {
@@ -525,12 +558,33 @@ function avisarReuso(reuso, si, por) {
   if (!abre.length) { avisoLongo('Tile ' + nomePeca(p.tile) + ' is already in room ' + (reuso.sala + 1) + '. To reuse it here, this room needs an opener object first (an “Open a room” trigger): the removal of the earlier tile hangs on that object.'); return; }
   const alvo = abre[0].o;
   const fundo = modal('Tile ' + nomePeca(p.tile) + ' is already in room ' + (reuso.sala + 1), `<p class="ajuda">Each physical tile exists once. To use it here, the game must take it off the board when this room opens (the players cannot go back there). A trigger is added to “${esc(rotulo(alvo))}”, the object that opens this room.</p>
-    <button class="op" data-o="tile"><b>Remove only that tile</b><small>“Remove a tile” trigger: tile ${nomePeca(p.tile)} of room ${reuso.sala + 1} and everything on it.</small></button>${nota('Remove only that tile: the earlier room stays on the table, without this tile. When a hero opens this room, the game takes the tile off the board (with whatever stands on it) and it can be laid here. Good when the party may still walk through the earlier room.')}
+    <button class="op" data-o="tile"><b>Remove only that tile</b><small>“Remove a tile” trigger: tile ${nomePeca(p.tile)} of room ${reuso.sala + 1} and everything on it.</small></button>
+    <button class="op" data-o="tileSo"><b>Remove only that tile, keeping objects and monsters</b><small>“Remove a tile” trigger (keeping what stands on it): tile ${nomePeca(p.tile)} of room ${reuso.sala + 1} leaves; what stood on it stays, on whatever lies below (an underlay).</small></button>${nota('Remove only that tile: the earlier room stays on the table, without this tile. When a hero opens this room, the game takes the tile off the board (with whatever stands on it) and it can be laid here. Good when the party may still walk through the earlier room.')}
     <div class="op estatico"><b>Remove whole rooms</b><small>“Remove a room” trigger for each room ticked:</small><div id="ru_salas">${projeto.salas.map((s, i) => i !== si ? `<label class="chk"><input type="checkbox" data-s="${i}" ${i === reuso.sala ? 'checked' : ''}> ${i + 1} · ${esc(s.nome)}</label>` : '').join('')}</div><button class="sm" data-o="rooms">Remove the ticked rooms</button>${nota('Remove whole rooms: when a hero opens this room, the game clears each ticked room off the board, with its tiles, objects and monsters, and all their tiles go back to the box for the rooms ahead. Good when the party leaves those rooms behind for good.')}</div>
     ${nota('Cancel leaves everything as it was: pick another tile in the palette.')}<div class="rodape"><button data-o="cancel">Cancel</button></div>`, (el, fechar) => {
     el.querySelector('[data-o="cancel"]').onclick = fechar;
     el.querySelector('[data-o="tile"]').onclick = () => { alvo.gatilhos.unshift({ uid: uid(), tipo: 'remove_tile', sala: reuso.sala, peca: reuso.peca }); fechar(); por(); aviso('Trigger added to “' + rotulo(alvo) + '”: removes tile ' + nomePeca(p.tile) + ' when this room opens.'); };
+    el.querySelector('[data-o="tileSo"]').onclick = () => { alvo.gatilhos.unshift({ uid: uid(), tipo: 'remove_tile', sala: reuso.sala, peca: reuso.peca, manter: true }); fechar(); por(); aviso('Trigger added to “' + rotulo(alvo) + '”: removes only tile ' + nomePeca(p.tile) + ' (what stands on it stays) when this room opens.'); };
     el.querySelector('[data-o="rooms"]').onclick = () => { const salas = [...el.querySelectorAll('[data-s]:checked')].map(c => +c.dataset.s); if (!salas.length) return aviso('Tick at least one room.'); salas.forEach(ri => alvo.gatilhos.unshift({ uid: uid(), tipo: 'remove_room', sala: ri })); fechar(); por(); aviso('Trigger(s) added to “' + rotulo(alvo) + '”: removes room ' + salas.map(x => x + 1).join(', ') + ' when this room opens.'); };
+  });
+}
+/* the same tile laid again in its own room: it can only be the marker of where that tile moves to. "Move the tile" lays it
+   as the marker and asks for the object whose use moves it ("Move a tile" trigger, added at once) */
+function avisarMovimento(si, original, p) {
+  const s = projeto.salas[si]; const q = s.pecas[original];
+  modal('Tile ' + nomePeca(q.tile) + ' is already in this room', `<p class="ajuda">Each physical tile exists once. Laid again here, it can mark where that tile moves to during play: a “Move a tile” trigger takes the tile (with what stands on it) to this place. The marker does not come out in the setup of the room.</p>
+    <button class="op" data-o="mover"><b>Move the tile</b><small>Lays this one as the marker; then click the object whose use moves the tile.</small></button>
+    <div class="rodape"><button data-o="cancel">Cancel</button></div>`, (el, fechar) => {
+    el.querySelector('[data-o="cancel"]').onclick = fechar;
+    el.querySelector('[data-o="mover"]').onclick = () => { fechar();
+      s.pecas.push(p); const mi = s.pecas.length - 1; tudo();
+      pedirClique({ modo: 'object', si, texto: 'Click the object whose use moves tile ' + nomePeca(q.tile) + ' (Esc cancels: the marker goes away).', cb: (x, y, c) => {
+        if (!c || c.tipo !== 'objeto') return aviso('Click an object.'), false;
+        const o = projeto.salas[c.sala].objetos[c.i]; o.gatilhos = o.gatilhos || [];
+        o.gatilhos.push({ uid: uid(), tipo: 'move_tile', sala: si, peca: original, marcaSala: si, marcaPeca: mi, requisitos: [] });
+        ferramenta = null; aviso('Trigger added to “' + rotulo(o) + '”: moves tile ' + nomePeca(q.tile) + ' to its marker.'); tudo(); return true; },
+        aoTerminar: () => { if (s.pecas[mi] === p && !ehMarca('peca', si, mi)) { s.pecas.splice(mi, 1); tudo(); } } });
+    };
   });
 }
 /* the box has a fixed number of each pillar: a room may not exceed it; across rooms, earlier rooms can be removed */
@@ -580,7 +634,7 @@ function irParaDono(si, chave) {
   tudo();
 }
 /* consequences of a counter: what can happen when the count is complete (nothing tied to an object being used) */
-const CONSEQ_CONTADOR = new Set(['end_map', 'escort', 'move_object', 'give_item', 'text', 'counter', 'mission', 'unlock_map', 'remove_room', 'remove_tile', 'add_tile', 'remove_enemy', 'remove_object', 'enemy_condition', 'move_heroes', 'add_object', 'highlight', 'cutscene', 'scene', 'sound', 'reserve', 'item_pool']);
+const CONSEQ_CONTADOR = new Set(['end_map', 'escort', 'move_object', 'move_tile', 'give_item', 'text', 'counter', 'mission', 'unlock_map', 'remove_room', 'remove_tile', 'add_tile', 'remove_enemy', 'remove_object', 'enemy_condition', 'move_heroes', 'add_object', 'highlight', 'cutscene', 'scene', 'sound', 'reserve', 'item_pool']);
 const metaDoContador = c => Math.max(1, totalDoContador(c.nome));
 const textoMissaoContador = c => c.conta === 'rodadas' ? 'Hold out for ' + metaDoContador(c) + ' rounds.' : c.conta === 'monstros' ? 'Defeat ' + metaDoContador(c) + ' monsters' + (c.monstro ? ' (' + nomeIni(c.monstro) + ')' : '') + '.' : 'Find the ' + metaDoContador(c) + ' ' + c.nome + '.';
 /* a counter counts by the triggers (Add / subtract / use a count), or by itself: monsters defeated (any, or one kind) or rounds passed */

@@ -120,6 +120,7 @@ $('#fAjuda').onclick = () => { const e = explicacaoDaAba(abaF); if (!e) return; 
 function renderFichas() {
   explicarAba();
   $$('#abasF button').forEach(b => b.classList.toggle('ativo', b.dataset.aba === abaF));
+  const lote = $('#fLote'); if (lote) { lote.hidden = abaF === 'historias'; lote.onclick = apagarVarios; }
   if (abaF === 'herois') { renderHerois(); return; }
   if (abaF === 'armas') { renderArmas(); return; }
   if (abaF === 'receitas') { renderReceitas(); return; }
@@ -135,7 +136,11 @@ function renderFichas() {
     esq.innerHTML = `<div class="bloco"><h2>Items</h2><div class="botoes"><button class="sm" id="f_importar">Import…</button></div><p class="ajuda">Import the game’s items (all kinds together, with filters), or pick a kind to see its entries and create your own. Weapon parts are made in the Weapons tab, recipes in the Recipes tab.</p>${escolhaTipo}</div>`;
     esq.querySelectorAll('[data-tipoitem]').forEach(b => b.onclick = () => { tipoItem = b.dataset.tipoitem; fichaSel = null; renderFichas(); });
     $('#f_importar').onclick = importar;
-    $('#centroF').innerHTML = `<div class="vazio"><h2>Items</h2>${TIPOS_ITEM.map(([k, n, ex]) => `<p><b>${n}</b>: ${ex}</p>`).join('')}<p>Pick a kind on the left.</p></div>`; return;
+    // (weapon parts are items too, but each belongs to a weapon: they live in the Weapons tab, under their weapon)
+    const nPartes = oficina().itens.filter(i => i.cls === 'WeaponPartsModel').length;
+    const ir = document.createElement('div'); ir.className = 'tiposItem'; ir.innerHTML = `<button class="sm" id="f_irArmas">${tr('Weapon parts')} → <small>${nPartes}</small></button>`; esq.querySelector('.bloco').appendChild(ir);
+    $('#f_irArmas').onclick = () => { abaF = 'armas'; fichaSel = null; renderFichas(); };
+    $('#centroF').innerHTML = `<div class="vazio"><h2>Items</h2>${TIPOS_ITEM.map(([k, n, ex]) => `<p><b>${n}</b>: <span>${ex}</span></p>`).join('')}<p><b>${tr('Weapon parts')}</b>: <span>${tr('Heads, hafts and grips of the weapons, imported in a package or made here: they are in the Weapons tab, under the weapon they belong to.')}</span>${nPartes ? ' <span>(' + nPartes + ')</span>' : ''}</p><p>Pick a kind on the left.</p></div>`; return;
   }
   esq.innerHTML = `<div class="bloco"><h2>${abaF === 'itens' ? TIPOS_ITEM.find(t => t[0] === tipoItem)[1] : titulo} <span class="etq">${lista.length}</span></h2>${escolhaTipo}
     <div class="botoes">${variante ? `<button class="sm primario" id="f_novo">+ New ${abaF === 'pecas' ? 'tile' : 'object'}</button>` : `<button class="sm" id="f_importar">Import…</button><button class="sm primario" id="f_novo">+ Create</button>`}</div>
@@ -164,15 +169,16 @@ function renderFichas() {
 }
 /* importing from the game: click entries to tick them (several at once), or tick every entry shown, then import them together.
    filtros: [{ nome, opcoes: [[valor, rótulo]], de: entrada -> valor or [valores] }]; chips of one row add up (or), rows narrow each other (and) */
-function modalImportacao(titulo, entradas, aoImportar, filtros = []) {
+function modalImportacao(titulo, entradas, aoImportar, filtros = [], opcoes = {}) {
+  const acao = opcoes.acao || 'Import';
   const marcadas = new Set();
   const escolhidos = filtros.map(() => new Set());
   const valores = (fl, x) => { const v = fl.de(x); return (Array.isArray(v) ? v : [v]).map(String); };
   filtros.forEach(fl => { fl.opcoes = fl.opcoes.filter(([v]) => entradas.some(x => valores(fl, x).includes(String(v)))); });
   const linhas = filtros.map((fl, fi) => fl.opcoes.length > 1 ? `<div class="impFiltro"><b>${esc(fl.nome)}</b>${fl.opcoes.map(([v, r]) => `<button class="sm chipF" data-f="${fi}" data-v="${esc(String(v))}">${esc(r)} <small>${entradas.filter(x => valores(fl, x).includes(String(v))).length}</small></button>`).join('')}</div>` : '').join('');
-  const { fundo } = modal(titulo, `<div class="linha impBarra"><input id="imp_filtro" placeholder="filter by name…"><button class="sm" id="imp_todos">Tick all shown</button><button class="sm" id="imp_nenhum">Untick all</button><button class="sm primario" id="imp_ok" disabled>Import</button></div>${linhas ? `<div class="impFiltros">${linhas}<button class="sm" id="imp_limpa" hidden>Clear filters</button></div>` : ''}<p class="ajuda" id="imp_conta"></p><div class="grade importar" id="imp_lista"></div>`, el => {
+  const { fundo } = modal(titulo, `<div class="linha impBarra"><input id="imp_filtro" placeholder="filter by name…"><button class="sm" id="imp_todos">Tick all shown</button><button class="sm" id="imp_nenhum">Untick all</button><button class="sm ${opcoes.acao ? 'perigo' : 'primario'}" id="imp_ok" disabled>${acao}</button></div>${linhas ? `<div class="impFiltros">${linhas}<button class="sm" id="imp_limpa" hidden>Clear filters</button></div>` : ''}<p class="ajuda" id="imp_conta"></p><div class="grade importar" id="imp_lista"></div>`, el => {
     const ok = el.querySelector('#imp_ok');
-    const conta = () => { ok.textContent = marcadas.size ? 'Import ' + marcadas.size : 'Import'; ok.disabled = !marcadas.size; };
+    const conta = () => { ok.textContent = marcadas.size ? acao + ' ' + marcadas.size : acao; ok.disabled = !marcadas.size; };
     let visiveis = [];
     const passa = x => filtros.every((fl, fi) => !escolhidos[fi].size || valores(fl, x).some(v => escolhidos[fi].has(v)));
     const pinta = f => { const g = el.querySelector('#imp_lista'); g.innerHTML = ''; visiveis = entradas.filter(x => (!f || x.nome.toLowerCase().includes(f)) && passa(x));
@@ -256,6 +262,60 @@ function apagarFicha(x) {
   // in a campaign the workshop is shared: every map counts
   if (abaF === 'monstros') { const usado = (campanha ? campanha.missoes : [projeto]).some(p => p.salas.some(s => inimigosDaSala(s).some(({ e }) => e.enemy === x.id) || (s.reserva?.add || []).includes(x.id)) || (p.reserva || []).includes(x.id)); if (usado && !confirm(x.nome + ' is placed on the board or in the pool. Remove it anyway (those monsters become invalid)?')) return; }
   lista.splice(lista.indexOf(x), 1); esquecerFicha(abaF, x.id); fichaSel = null; renderFichas();
+}
+/* 🗑 Delete several…: the entries of the tab on screen (filtered by name and kind), ticked and deleted at once. What a
+   single Delete does for each is done here too: placements taken off the board, ids forgotten in pools, loot and rewards */
+function entradasParaApagar() {
+  const b = oficina(); const proprio = x => (x.custom || !x.base) ? 'own' : 'jogo';
+  const nomeTipo = cls => (TIPOS_ITEM.find(([k]) => doTipoItem({ cls }, k)) || [, cls.replace('Model', '')])[1];
+  switch (abaF) {
+    case 'monstros': return b.monstros.map(x => ({ x, nome: x.nome || '(no name)', img: retratoDoMonstro(x), sub: '', origem: proprio(x) }));
+    case 'personagens': return b.personagens.map(x => ({ x, nome: x.nome || '(no name)', img: retratoDoPersonagem(x), sub: '', origem: proprio(x) }));
+    case 'itens': return b.itens.filter(i => i.cls !== 'WeaponPartsModel').map(x => ({ x, nome: x.nome || '(no name)', img: retratoDoItem(x), sub: nomeTipo(x.cls), tipo: TIPO_DO_ITEM(x.cls), origem: proprio(x) }));
+    case 'armas': return b.itens.filter(i => i.cls === 'WeaponPartsModel').map(x => { const k = CLASSES_ARMA.indexOf(x.classe); return { x, nome: x.nome || '(no name)', img: retratoDoItem(x), sub: (NOME_CLASSE[k] || x.classe || '') + ' · ' + (x.slot || 'A'), arma: x.classe || '' }; });
+    case 'receitas': return (b.receitas || []).map(x => ({ x, nome: nomeReceita(x), img: '', sub: '' }));
+    case 'facanhas': return (b.facanhas || []).map(x => ({ x, nome: nomeFacanha(x), img: '', sub: x.heroi ? nomeDoHeroi(x.heroi) : '' }));
+    case 'pericias': return (b.pericias || []).map(x => ({ x, nome: nomePericia(x), img: (x.cartas || [])[0]?.img || '', sub: x.heroi ? nomeDoHeroi(x.heroi) : '' }));
+    case 'pecas': return (b.pecas || []).map(x => ({ x, nome: x.nome || x.id, img: defPeca(x.id) ? miniatura(defPeca(x.id)) : '', sub: '' }));
+    case 'objetos': return (b.objetos || []).map(x => ({ x, nome: x.nome || x.id, img: '', sub: '' }));
+    case 'herois': return heroisNovos().map(x => ({ x, nome: x.nome || tr('New hero'), img: x.retrato || '', sub: x.perfil ? tr('plays the profile of') + ' ' + nomeDoHeroiJogo(x.perfil) : tr('in the roster') }));
+  }
+  return null;
+}
+function apagarVarios() {
+  const ents = entradasParaApagar(); if (!ents) return aviso(tr('This tab has nothing to delete in a batch.')); if (!ents.length) return aviso(tr('Nothing to delete in this tab.'));
+  const filtros = [];
+  if (abaF === 'itens') filtros.push({ nome: 'Kind', opcoes: TIPOS_ITEM.map(([k, n]) => [k, n]), de: e => e.tipo });
+  if (abaF === 'armas') filtros.push({ nome: 'Weapon', opcoes: CLASSES_ARMA.map((c, k) => [c, NOME_CLASSE[k]]), de: e => e.arma });
+  if (['monstros', 'personagens', 'itens'].includes(abaF)) filtros.push({ nome: 'Origin', opcoes: [['own', 'Made here or in a package'], ['jogo', 'Imported from the game']], de: e => e.origem });
+  modalImportacao(tr('Delete several'), ents, escolhidas => apagarEstas(escolhidas.map(e => e.x)), filtros, { acao: 'Delete' });
+}
+function apagarEstas(xs) {
+  if (!xs.length) return; const b = oficina(); const ids = new Set(xs.map(x => x.id)); const mapas = campanha ? campanha.missoes : [projeto];
+  // (what is on the board: counted first, asked once)
+  let noTabuleiro = 0;
+  if (abaF === 'pecas' || abaF === 'objetos') mapas.forEach(m => m.salas.forEach(s => { noTabuleiro += abaF === 'pecas' ? s.pecas.filter(p => ids.has(p.tile)).length : s.objetos.filter(o => ids.has(o.type)).length; }));
+  if (abaF === 'monstros') mapas.forEach(m => m.salas.forEach(s => { noTabuleiro += inimigosDaSala(s).filter(({ e }) => ids.has(e.enemy)).length; }));
+  const pergunta = tr('Delete') + ' ' + xs.length + ' ' + tr(xs.length > 1 ? 'entries' : 'entry') + '?' + (noTabuleiro ? ' ' + noTabuleiro + ' ' + tr(abaF === 'monstros' ? 'of them are placed on the board (those monsters become invalid).' : 'placements on the board go too.') : '') + ' ' + tr('It cannot be undone.');
+  if (!confirm(pergunta)) return;
+  if (abaF === 'pecas' || abaF === 'objetos') {
+    mapas.forEach(m => m.salas.forEach((s, si) => {
+      if (abaF === 'pecas') { for (let pi = s.pecas.length - 1; pi >= 0; pi--) if (ids.has(s.pecas[pi].tile)) { if (m === projeto) removerPecaComAnexos(si, pi); else s.pecas.splice(pi, 1); } }
+      else { for (let oi = s.objetos.length - 1; oi >= 0; oi--) if (ids.has(s.objetos[oi].type)) { if (m === projeto) removerObjeto(si, oi, true, true); else s.objetos.splice(oi, 1); } }
+    }));
+    sel = null; if (ids.has(pecaEscolhida)) pecaEscolhida = PECAS[0].id; if (ids.has(objetoEscolhido)) objetoEscolhido = 'Door';
+  }
+  const fora = (k, tipo) => { b[k] = (b[k] || []).filter(x => !ids.has(x.id)); if (tipo) ids.forEach(id => esquecerFicha(tipo, id)); };
+  if (abaF === 'monstros') fora('monstros', 'monstros');
+  else if (abaF === 'personagens') fora('personagens', 'personagens');
+  else if (abaF === 'itens' || abaF === 'armas') fora('itens', 'itens');
+  else if (abaF === 'pecas' || abaF === 'objetos') fora(abaF, null);
+  else if (abaF === 'receitas') { fora('receitas', null); ids.forEach(id => esquecerFicha('itens', 'RECEITA:' + id)); }
+  else if (abaF === 'facanhas') { fora('facanhas', null); b.poolFacanhas = (b.poolFacanhas || []).filter(id => !ids.has(id)); }
+  else if (abaF === 'pericias') fora('pericias', null);
+  else if (abaF === 'herois') b.herois = b.herois.filter(x => !(ehHeroiNovo(x) && ids.has(x.id)));
+  fichaSel = null; if (abaF === 'herois') heroiSel = null; if (abaF === 'armas') pecaAberta = null;
+  renderFichas(); aviso(xs.length + ' ' + tr(xs.length > 1 ? 'entries deleted.' : 'entry deleted.'));
 }
 /* a deleted entry leaves no stale id in the lists that only name it: item pools, loot, rewards and feat rewards (items,
    recipes as RECEITA:id, runes as RUNA:id), spawn pools (monsters), speakers and casts of the boxes (NPCs) */
@@ -389,7 +449,7 @@ function fichaMonstro(c, m) {
       <p class="ajuda">What the monster does on its turn, in order; “next” chains them. Speed, damage, aim, attack, range, healing, shield, initiative and range type are the numbers the app uses; the text is what the players read.</p>
       <div id="fm_ativs"></div>
       <div class="sub">Tactics (manual activations) <button class="sm" id="fm_tat">+ Tactic</button></div>
-      <p class="ajuda">Special activations the app may pick through the type’s behaviour.</p>
+      <p class="ajuda">Special activations the app may pick through the type’s behaviour. A tactic made here (+ Tactic) is picked by Bigorna instead: each round the app draws among the tactics whose condition holds, or none, never the same one twice in a row; the hint is shown when it is revealed, the text when the monster activates. With at least one of them, the game’s tactics of this monster stop coming.</p>
       <div id="fm_tats"></div>
       <div class="sub">Defense (when a hero attacks it)</div>
       <p class="ajuda">The monster’s own rule shown in the attack window, like the bandit’s “Smokebomb”. Leave empty to keep the one of the behaviour monster.</p>
@@ -439,9 +499,14 @@ function fichaMonstro(c, m) {
   tiers(); $('#fm_tier').onclick = () => { const u = (m.tiers || []).reduce((a, t) => !a || t.tier > a.tier ? t : a, null); m.tiers.push(u ? tierPelaCurva(u, u.tier + 1) : { tier: 1, hp: 20, def: 1, atk: 1 }); marcar(m, c); tiers(); };
   const ativs = (chave, el) => { const lista = m[chave] || (m[chave] = []); el.innerHTML = lista.map((a, i) => `<div class="ativ ${chave === 'taticas' ? 'tatica' : ''}"><div class="cabAtiv"><span class="numAtiv">${chave === 'taticas' ? 'Tactic' : 'Activation'} ${i + 1}</span><input data-a="nome" data-i="${i}" value="${esc(a.nome || '')}" placeholder="Name"><button class="sm" data-ax="${i}" title="Delete this ${chave === 'taticas' ? 'tactic' : 'activation'}">✕</button></div>
       <div class="nums">${['speed', 'damage', 'aim', 'attack', 'range', 'healing', 'shield', 'initiative'].map(k => `<label>${k}<input type="number" data-a="${k}" data-i="${i}" value="${a[k] || 0}"></label>`).join('')}<label>range type<select data-a="rangeType" data-i="${i}">${ALCANCES.map(r => `<option ${a.rangeType === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label><label>next<select data-a="next" data-i="${i}"><option value="">—</option>${lista.map((z, j) => j !== i ? `<option value="${esc(z.id || z.nome)}" ${a.next === (z.id || z.nome) ? 'selected' : ''}>${esc(z.nome)}</option>` : '').join('')}</select></label></div>
+      ${chave === 'taticas' && taticaPropria(a) ? `<div class="linha quandoTat"><label class="campo">When it can come <select data-a="quando" data-i="${i}">${QUANDO_TATICA.map(([k, n]) => `<option value="${k}" ${(a.quando || 'sempre') === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+        <div class="efeitosTat"><small>When revealed, the app applies:</small> ${(a.efeitos || []).map((f, j) => `<span class="tag"><select data-tef="tipo" data-i="${i}" data-j="${j}">${EFEITOS_DEFESA.map(([k, n]) => `<option value="${k}" ${f.tipo === k ? 'selected' : ''}>${n}</option>`).join('')}</select> N <select data-tef="n" data-i="${i}" data-j="${j}">${[1, 2, 3, 4, 5].map(v => `<option ${f.n === v ? 'selected' : ''}>${v}</option>`).join('')}</select> <a href="#" data-tefx="${i}:${j}">✕</a></span>`).join('')} <button class="sm" data-tefadd="${i}">+ effect</button></div></div>` : ''}
       <div class="txAtiv" data-i="${i}"></div></div>`).join('') || '<p class="ajuda">None.</p>';
     el.querySelectorAll('[data-a]').forEach(inp => { const h = () => { const a = lista[+inp.dataset.i]; a[inp.dataset.a] = inp.type === 'number' ? +inp.value || 0 : inp.value; marcar(m, c); }; if (inp.tagName === 'SELECT' || inp.type === 'number') inp.onchange = h; else inp.oninput = h; });
     el.querySelectorAll('.txAtiv').forEach(d => editorDeTexto(d, lista[+d.dataset.i], () => marcar(m, c)));
+    el.querySelectorAll('[data-tef]').forEach(sl => sl.onchange = () => { const f = lista[+sl.dataset.i].efeitos[+sl.dataset.j]; f[sl.dataset.tef] = sl.dataset.tef === 'n' ? +sl.value : sl.value; marcar(m, c); });
+    el.querySelectorAll('[data-tefx]').forEach(x => x.onclick = ev => { ev.preventDefault(); const [i, j] = x.dataset.tefx.split(':').map(Number); lista[i].efeitos.splice(j, 1); marcar(m, c); ativs(chave, el); });
+    el.querySelectorAll('[data-tefadd]').forEach(x => x.onclick = () => { const a = lista[+x.dataset.tefadd]; (a.efeitos = a.efeitos || []).push({ tipo: 'roundDefense', n: 1 }); marcar(m, c); ativs(chave, el); });
     el.querySelectorAll('[data-ax]').forEach(b => b.onclick = () => { const [z] = lista.splice(+b.dataset.ax, 1); const ref = z && (z.id || z.nome); if (ref) lista.forEach(a => { if (a.next === ref) a.next = ''; }); marcar(m, c); ativs(chave, el); }); };
   ativs('ativacoes', $('#fm_ativs')); ativs('taticas', $('#fm_tats'));
   const dfs = { text: m.defesa || '', hint: '' }; const dEl = $('#fm_def');
@@ -640,6 +705,9 @@ const ALTURAS_MODELO = [[0.3, 'Very low (like a coin or a trap)'], [0.6, 'Low (l
 const ESCALAS_STANDEE = [[0.75, 'Smaller than the figure (×0.75)'], [1, 'As tall as the figure'], [1.25, 'Taller (×1.25)'], [1.5, 'Much taller (×1.5)'], [2, 'Double (×2)']];
 /* what the app applies by itself, per monster type, when a hero attacks (the rest of each defense is applied at the table) */
 const DEFESA_AUTOMATICA = { Berserker: 'damage +1, permanently (Anger)', Golem: 'raises its defense', Vampire: 'raises its defense', Zealot: 'strengthens another enemy', Doomcaller: 'changes its own numbers' };
+/* the tactics made in the Workshop (not the game's): the app picks among them itself, each one only "when" its condition holds */
+const taticaPropria = a => !!a && /^(TAC|ACT)_/.test(a.id || '');
+const QUANDO_TATICA = [['sempre', 'Any time'], ['ferido', 'When below half health'], ['ileso', 'When unhurt'], ['atingido', 'When hurt since its last tactic'], ['sozinho', 'When it is the last enemy'], ['bando', 'When two or more other enemies are in play']];
 const EFEITOS_DEFESA = [['damage', 'Damage +N, permanently'], ['nextDamage', 'Damage +N on its next activation'], ['defense', 'Defense +N, permanently'], ['roundDefense', 'Defense +N until the end of the round'], ['heal', 'Recovers N health']];
 /* the defenses of the game's monsters (one entry per distinct text), for copying into another monster */
 let _defesas = null;

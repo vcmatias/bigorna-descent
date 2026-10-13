@@ -25,6 +25,33 @@ namespace Bigorna.Menu
         /// <summary>O progresso de cada campanha da lista, lido junto com ela (o OnGUI corre varias vezes por quadro e lia o
         /// arquivo de progresso de todas as campanhas a cada vez).</summary>
         static readonly Dictionary<Dcamp, Campanha.Progresso> _progressos = new Dictionary<Dcamp, Campanha.Progresso>();
+        /// <summary>A data da ultima alteracao de cada arquivo da lista, lida no Reler (de uma campanha: o mais novo entre o
+        /// .dcamp e os .dmap dela).</summary>
+        static readonly Dictionary<object, DateTime> _alterados = new Dictionary<object, DateTime>();
+
+        static DateTime Alterado(string caminho) { try { return File.Exists(caminho) ? File.GetLastWriteTime(caminho) : DateTime.MinValue; } catch { return DateTime.MinValue; } }
+        static DateTime AlteradoDaCampanha(Dcamp c)
+        {
+            var d = Alterado(c.Caminho);
+            foreach (var n in c.Nos) { var m = c.CaminhoDoMapa(n); if (m != null) { var dm = Alterado(m); if (dm > d) d = dm; } }
+            return d;
+        }
+        /// <summary>"alterado em 07/10/2026 21:40" (em ingles, 2026-10-07 21:40).</summary>
+        static string TextoAlterado(object chave)
+        {
+            if (!_alterados.TryGetValue(chave, out var d) || d == DateTime.MinValue) return "";
+            return T("alterado em " + d.ToString("dd/MM/yyyy HH:mm"), "last changed " + d.ToString("yyyy-MM-dd HH:mm"));
+        }
+
+        public static bool Aberto => _aberto;
+        // (para a tela no estilo do jogo: TelaDeMapas)
+        public static IReadOnlyList<Dcamp> Campanhas => _campanhas;
+        public static IReadOnlyList<Dmap> Mapas => _mapas;
+        public static Campanha.Progresso ProgressoDe(Dcamp c) { if (!_progressos.TryGetValue(c, out var p)) _progressos[c] = p = Campanha.Progresso.Carregar(c); return p; }
+        public static DateTime AlteradoEm(object chave) => _alterados.TryGetValue(chave, out var d) ? d : DateTime.MinValue;
+        public static void AbrirNaAba(int aba) { _aba = aba; if (!_aberto) Alternar(); }
+        public static void AbrirAPasta() => AbrirPasta();
+        public static void MostrarErro(string erro, int aba) { _erro = erro; _aba = aba; if (!_aberto) Alternar(); _erro = erro; }
 
         public static void Alternar()
         {
@@ -45,6 +72,9 @@ namespace Bigorna.Menu
                 _mapas = Dmap.CarregarTodos(Bootstrap.PastaMapas);
                 foreach (var sub in Directory.GetDirectories(Bootstrap.PastaMapas))
                     if (!pastasDeCampanha.Contains(sub)) _mapas.AddRange(Dmap.CarregarTodos(sub)); // os mapas de campanha jogam-se pela campanha
+                _alterados.Clear();
+                foreach (var c in _campanhas) _alterados[c] = AlteradoDaCampanha(c);
+                foreach (var m in _mapas) _alterados[m] = Alterado(m.Caminho);
                 _erro = null;
             }
             catch (Exception ex) { _erro = ex.Message; }
@@ -69,8 +99,12 @@ namespace Bigorna.Menu
         {
             if (Jogo.CenaAtual() != Scene.Titlescene) { _aberto = false; return; }
             Estilos();
-            var botao = new Rect(Screen.width / 2f - 130f, Screen.height - 64f, 260f, 40f);
-            if (GUI.Button(botao, _aberto ? T("Fechar mapas", "Close maps") : T("Mapas da comunidade", "Community maps"), _botao)) Alternar();
+            // (o botao fica no menu do jogo, entre "Colecao" e "Sair": BotaoDoMenu; este, embaixo da tela, so se o menu nao o aceitou)
+            // (por enquanto os dois: o do menu ainda em teste)
+            {
+                var botao = new Rect(Screen.width / 2f - 130f, Screen.height - 64f, 260f, 40f);
+                if (GUI.Button(botao, _aberto ? T("Fechar mapas", "Close maps") : T("Mapas da comunidade", "Community maps"), _botao)) Alternar();
+            }
             if (!_aberto) return;
             if (Time.unscaledTime > _proximaLeitura) Reler();
             float largura = Mathf.Min(760f, Screen.width - 40f), altura = Mathf.Min(Screen.height - 140f, 620f);
@@ -82,6 +116,7 @@ namespace Bigorna.Menu
             GUILayout.Label(T("Mapas da comunidade", "Community maps") + " · Bigorna " + Bootstrap.Versao, _titulo);
             GUILayout.FlexibleSpace();
             if (GUILayout.Button(Pt ? "English" : "Português", _botao, GUILayout.Width(100f))) Definir(!Pt);
+            if (GUILayout.Button(T("Fechar", "Close"), _botao, GUILayout.Width(80f))) _aberto = false;   // (fecha no quadro seguinte: os grupos do layout fecham neste)
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             if (GUILayout.Button(T("Reler", "Reload"), _botao, GUILayout.Width(80f))) Reler();
@@ -118,7 +153,7 @@ namespace Bigorna.Menu
                 GUILayout.BeginHorizontal(GUI.skin.box);
                 GUILayout.BeginVertical();
                 GUILayout.Label(c.NomeVisivel, _texto);
-                GUILayout.Label(c.Nos.Count(n => n.EhMapa) + T(" mapa(s), ", " map(s), ") + c.Nos.Count(n => !n.EhMapa) + T(" parada(s) narrativa(s)", " narrative stop(s)") + (prog.Completados.Count > 0 ? " · " + prog.Completados.Count + T(" nó(s) completado(s)", " node(s) completed") : "") + (string.IsNullOrEmpty(c.Metadados.Descricao) ? "" : "\n" + c.Metadados.Descricao), _pequeno);
+                GUILayout.Label(c.Nos.Count(n => n.EhMapa) + T(" mapa(s), ", " map(s), ") + c.Nos.Count(n => !n.EhMapa) + T(" parada(s) narrativa(s)", " narrative stop(s)") + (prog.Completados.Count > 0 ? " · " + prog.Completados.Count + T(" nó(s) completado(s)", " node(s) completed") : "") + (TextoAlterado(c) == "" ? "" : " · " + TextoAlterado(c)) + (string.IsNullOrEmpty(c.Metadados.Descricao) ? "" : "\n" + c.Metadados.Descricao), _pequeno);
                 GUILayout.EndVertical();
                 if (GUILayout.Button(prog.Completados.Count > 0 ? T("Continuar", "Continue") : T("Jogar", "Play"), _botao, GUILayout.Width(100f), GUILayout.Height(40f)))
                 {
@@ -140,7 +175,7 @@ namespace Bigorna.Menu
                 GUILayout.BeginHorizontal(GUI.skin.box);
                 GUILayout.BeginVertical();
                 GUILayout.Label(m.NomeVisivel, _texto);
-                GUILayout.Label(m.Resumo(Pt) + (string.IsNullOrEmpty(m.Metadados.Descricao) ? "" : "\n" + m.Metadados.Descricao), _pequeno);
+                GUILayout.Label(m.Resumo(Pt) + (TextoAlterado(m) == "" ? "" : " · " + TextoAlterado(m)) + (string.IsNullOrEmpty(m.Metadados.Descricao) ? "" : "\n" + m.Metadados.Descricao), _pequeno);
                 GUILayout.EndVertical();
                 if (GUILayout.Button(T("Jogar", "Play"), _botao, GUILayout.Width(90f), GUILayout.Height(40f)))
                 {

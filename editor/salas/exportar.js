@@ -55,6 +55,19 @@ function conteudoCustom() {
    when an old mod would read a new map wrong. tools/compat.py checks it (rules in compat/LEIAME.md) */
 const VERSAO_DMAP = 3, VERSAO_DCAMP = 2;
 function montarDmap(p = projeto) { return comProjeto(p, () => montarDmapDe(p)); }
+/* the box a map needs: 2 when it uses a tile, an object or a monster of the Act II box, or more pieces of a kind than the
+   Act I box holds (the menu of the game shows the box of the act on the map's card) */
+function atoNecessario(p) {
+  const pecas = p.salas.flatMap(s => s.pecas || []); const objs = p.salas.flatMap(s => s.objetos || []);
+  if (pecas.some(q => (PECA[q.tile]?.act || 1) > 1 || (q.pilares || []).some(x => x && x.type === 'PillarTall'))) return 2;
+  if (objs.some(o => (OBJETO[baseObj(o.type)]?.act || 1) > 1)) return 2;
+  const conta = {}; objs.forEach(o => { const g = grupoDoTerreno(o.type); conta[g] = (conta[g] || 0) + 1; });
+  if (Object.entries(conta).some(([g, n]) => { const c = TERRENO_POR_ATO[1][g]; return c !== undefined && n > c; })) return 2;
+  const ids = p.salas.flatMap(s => (s.inimigos || []).map(e => e.enemy).concat(s.objetos.flatMap(o => todosGatilhos(o).filter(g => g.tipo === 'spawn').flatMap(g => (g.inimigos || []).map(e => e.enemy)))))
+    .concat((p.eventos || []).flatMap(ev => Object.keys(ev).filter(k => Array.isArray(ev[k])).flatMap(k => ev[k]).filter(g => g && g.tipo === 'spawn').flatMap(g => (g.inimigos || []).map(e => e.enemy))), p.reserva || []);
+  if (ids.some(id => { const m = monstro(id); return m && (m.act || 1) > 1; })) return 2;
+  return 1;
+}
 function montarDmapDe(p) {
   const grupo = i => 'room-' + (i + 1);
   const tiles = [], enemies = [], interactables = [], triggers = [], optional = [];
@@ -69,12 +82,15 @@ function montarDmapDe(p) {
   const adicionadas = pecasAdicionadas(p), casaAdicionada = new Map();
   adicionadas.forEach((gr, k) => { const [si, qi] = k.split(':').map(Number); const q = p.salas[si].pecas[qi]; if (!ehAlfombra(q.tile)) casasDaPeca(q).forEach(([x, y]) => casaAdicionada.set(x + ',' + y + ',' + (q.level || 0), gr)); });
   const grupoDoObjeto = o => casaAdicionada.get(o.pos[0] + ',' + o.pos[1] + ',' + (o.level || 0)) || null;   // by its anchor space, as the mod does
+  // (the markers of the "Move" triggers: a tile marker is not exported, an object marker goes hidden, with no triggers)
+  const marcasMover = marcasDoMapa(p);
   p.salas.forEach((s, si) => {
-    s.pecas.forEach((q, qi) => { niveis = Math.max(niveis, (q.level || 0) + 1); indicePeca.set(si + ':' + qi, tiles.length); const gAd = adicionadas.get(si + ':' + qi); tiles.push({ tile: q.tile, pos: [q.pos[0], q.pos[1]], rot: q.rot || 0, level: q.level || 0, ...(gAd ? { reveal: gAd } : si > 0 ? { reveal: grupo(si) } : {}), pillars: (q.pilares || []).map(x => ({ pos: [x.pos[0], x.pos[1]], type: x.type })) }); });
-    s.objetos.forEach(o => {
+    s.pecas.forEach((q, qi) => { if (marcasMover.pecas.has(si + ':' + qi)) return; niveis = Math.max(niveis, (q.level || 0) + 1); indicePeca.set(si + ':' + qi, tiles.length); const gAd = adicionadas.get(si + ':' + qi); tiles.push({ tile: q.tile, pos: [q.pos[0], q.pos[1]], rot: q.rot || 0, level: q.level || 0, ...(gAd ? { reveal: gAd } : si > 0 ? { reveal: grupo(si) } : {}), pillars: (q.pilares || []).map(x => ({ pos: [x.pos[0], x.pos[1]], type: x.type })) }); });
+    s.objetos.forEach((o, oi) => {
+      const ehMarcaObj = marcasMover.objetos.has(si + ':' + oi);
       indiceDe.set(o, interactables.length);
       interactables.push({ type: ehTipo(o, 'PillarObj') ? (SUPORTES[o.tamanho] ? o.tamanho : 'Pillar') : ehTipo(o, 'PillarPush') && o.tamanho === 'PillarShort' ? 'PillarPushShort' : ehDaOficina(o.type) ? 'InteractToken' : o.type, ...(ehDaOficina(o.type) ? { custom: o.type, cells: casasDoObjeto(o) } : {}), pos: [o.pos[0], o.pos[1]], rot: o.rot || 0, level: o.level || 0, name: o.name || varObj(o.type)?.nome || '', text: o.textUse || '', preview: o.textClick || '', ...(o.textGasto ? { spent: o.textGasto } : {}),
-        loot: { mode: 'none', items: [], traits: [], points: 0 }, behavior: 'custom', freeAction: false, uses: o.usos || '', ...(o.hidden ? { hidden: true } : {}), ...(grupoDoObjeto(o) ? { reveal: grupoDoObjeto(o) } : si > 0 ? { reveal: grupo(si) } : {}), ...(ehTipo(o, 'PillarObj') || ehTipo(o, 'PillarPush') ? { anchor: 'cell' } : {}) });
+        loot: { mode: 'none', items: [], traits: [], points: 0 }, behavior: 'custom', freeAction: false, uses: o.usos || '', ...(o.hidden || ehMarcaObj ? { hidden: true } : {}), ...(grupoDoObjeto(o) ? { reveal: grupoDoObjeto(o) } : si > 0 ? { reveal: grupo(si) } : {}), ...(ehTipo(o, 'PillarObj') || ehTipo(o, 'PillarPush') ? { anchor: 'cell' } : {}) });
     });
     (s.inimigos || []).forEach(e => enemies.push(inimigoExportado(e, grupo(si), si)));
   });
@@ -151,16 +167,23 @@ function montarDmapDe(p) {
             if (aoCair.length) extras.push({ id: 'group-defeated-' + g.uid, name: 'Group defeated: ' + rotulo(o), once: false, event: { id: 'groupDefeated', params: { group: g.uid } }, conditions: [], actions: aoCair }); } }
           else if ((g.inimigos || []).length) { g.inimigos.forEach(e => enemies.push(inimigoExportado(e, g.uid))); acoes.push({ id: 'spawnGroup', params: { group: g.uid } }); } break;
         case 'remove_enemy': if (g.alvo === 'one') { const r = inimigoRef(g.inimigo); if (r) acoes.push({ id: 'removeEnemy', params: { enemy: idExportado(r.enemy), slot: slotDoInimigo(g.inimigo) } }); } else gruposDe(si, g).forEach(gr => acoes.push(gr ? { id: 'removeGroup', params: { group: gr } } : { id: 'removeAllEnemies', params: {} })); break;
-        case 'enemy_condition': gruposDe(si, g).forEach(gr => { const pr = gr ? { group: gr } : {};
+        case 'enemy_condition': if (g.acao === 'desmirar') { acoes.push({ id: 'targetProtectedEnd', params: { name: g.nome || '' } }); break; }
+          gruposDe(si, g).forEach(gr => { const pr = gr ? { group: gr } : {};
+          if (g.acao === 'mirar') { acoes.push({ id: 'targetProtected', params: { ...pr, name: g.nome || '', chance: Math.max(1, Math.min(100, +(g.chance ?? 25) || 25)) } }); return; }
           if (g.acao === 'heal') acoes.push({ id: 'healEnemy', params: { ...pr, amount: g.amount || 2, all: true } }); else if (g.acao === 'damage') acoes.push({ id: 'damageEnemy', params: { ...pr, amount: g.amount || 2, all: true } });
           else if (g.acao === 'remove') acoes.push({ id: 'clearConditions', params: pr }); else if (g.acao === 'bonus') acoes.push({ id: 'enemyBonus', params: { ...pr, ...(g.enemy ? { enemy: idExportado(g.enemy) } : {}), attack: g.ataque || 0, defense: g.defesa || 0 } }); else acoes.push({ id: 'applyConditionGroup', params: { ...pr, condition: g.condition || CONDICOES[0] } }); }); break;
         case 'escort': acoes.push(g.acao === 'fim' ? { id: 'escortEnd', params: {} } : { id: 'escort', params: { name: g.nome || '', chance: g.chance ?? 25, hunters: (g.cacadores || []).slice() } }); break;
-        case 'move_object': { const alvo = p.salas[g.objSala]?.objetos[g.objIndex]; if (alvo && g.cell) acoes.push({ id: 'moveObject', params: { interactable: indiceDe.get(alvo), cell: [g.cell[0], g.cell[1]], level: g.cell[2] || 0 } }); break; }
+        case 'move_tile': { const k = indicePeca.get(g.sala + ':' + g.peca), mk = p.salas[g.marcaSala]?.pecas[g.marcaPeca]; if (k !== undefined && mk) acoes.push({ id: 'moveTile', params: { tile: k, pos: [mk.pos[0], mk.pos[1]], rot: mk.rot || 0, level: mk.level || 0 } }); break; }
+        case 'move_object': { const alvo = p.salas[g.objSala]?.objetos[g.objIndex], mk = p.salas[g.marcaSala]?.objetos[g.marcaIndex];
+          if (alvo && mk) { acoes.push({ id: 'moveObject', params: { interactable: indiceDe.get(alvo), cell: [mk.pos[0], mk.pos[1]], level: mk.level || 0, rot: mk.rot || 0 } }); break; }
+          if (alvo && g.cell) acoes.push({ id: 'moveObject', params: { interactable: indiceDe.get(alvo), cell: [g.cell[0], g.cell[1]], level: g.cell[2] || 0 } }); break; }
         case 'move_heroes': { const cs = g.cells || (g.cell ? [g.cell] : []); if (cs.length) acoes.push({ id: 'moveHeroes', params: { spots: cs.flat(), area: [cs[0][0], cs[0][1], cs[0][0], cs[0][1]], ...(g.text ? { text: g.text } : {}) } }); break; }
         case 'add_object': { const alvo = p.salas[g.objSala]?.objetos[g.objIndex]; if (alvo) acoes.push({ id: 'showObject', params: { interactable: indiceDe.get(alvo) } }); break; }
         case 'remove_object': { const alvo = g.proprio ? (o.ehContador || o.enemy ? null : o) : p.salas[g.objSala]?.objetos[g.objIndex]; if (alvo) acoes.push({ id: 'hideObject', params: { interactable: indiceDe.get(alvo) } }); break; }
-        case 'remove_room': if (p.salas[g.sala]) acoes.push({ id: 'removeRoom', params: { group: grupo(g.sala) } }); break;
-        case 'remove_tile': { const k = indicePeca.get(g.sala + ':' + g.peca); if (k !== undefined) acoes.push({ id: 'removeTile', params: { tile: k } }); break; }
+        // (a room off the table is no longer open: what waits for "room open" there, an ambush a round later, a nest calling
+        // monsters, stops; before, an ambush came onto a floor already gone)
+        case 'remove_room': if (p.salas[g.sala]) { acoes.push({ id: 'removeRoom', params: { group: grupo(g.sala) } }); if (g.sala > 0) acoes.push({ id: 'setVar', params: { var: 'room-' + (g.sala + 1) + '-open', value: 0 } }); } break;
+        case 'remove_tile': { const k = indicePeca.get(g.sala + ':' + g.peca); if (k !== undefined) acoes.push({ id: 'removeTile', params: { tile: k, ...(g.manter ? { keep: true } : {}) } }); break; }
         case 'add_tile': { const gr = adicionadas.get(g.sala + ':' + g.peca); if (gr) acoes.push({ id: 'revealTiles', params: { group: gr } }); break; }
         case 'highlight': { if (g.cell) acoes.push({ id: 'highlightArea', params: { area: [g.cell[0], g.cell[1], g.cell[0], g.cell[1]], ...(g.ateRodada ? { untilRound: true } : {}) } }); else { const alvo = p.salas[g.objSala]?.objetos[g.objIndex]; if (alvo) acoes.push({ id: 'outlineObject', params: { interactable: indiceDe.get(alvo) } }); } break; }
         case 'choice': {
@@ -211,7 +234,8 @@ function montarDmapDe(p) {
     // a trigger marked "first time" (g.primeiraVez: a key shared by several objects) runs once, the first time any of them
     // is used: a scene before the first seal, whichever seal it is
     (o.gatilhos || []).filter(g => !saiSo.includes(g) && g.primeiraVez).forEach(g => { const v = 'first-' + slug(String(g.primeiraVez));
-      r.push({ cond: [{ id: 'varEquals', params: { var: v, value: 0 } }], gs: [g], senao: null, primeira: v }); });
+      // (and only when its requirement holds: the scene of the boss behind a locked door played at the first try of the lock)
+      r.push({ cond: [{ id: 'varEquals', params: { var: v, value: 0 } }].concat((g.requisitos || []).length ? condicoesDe(g) : []), gs: [g], senao: null, primeira: v }); });
     (o.gatilhos || []).filter(g => !saiSo.includes(g) && !g.primeiraVez).forEach(g => {
       if (!(g.requisitos || []).length) { if (!solto) { solto = { cond: [], gs: [], senao: null }; r.push(solto); } solto.gs.push(g); }
       else {
@@ -236,7 +260,8 @@ function montarDmapDe(p) {
       default: return null;
     }
   }).filter(Boolean);
-  p.salas.forEach((s, si) => s.objetos.forEach(o => {
+  p.salas.forEach((s, si) => s.objetos.forEach((o, oi) => {
+    if (marcasMover.objetos.has(si + ':' + oi)) return;   // (a marker is never used: it only shows where an object goes)
     const idx = indiceDe.get(o); const extras = [];
     const blocos = blocosDe(s, si, o, extras); const ev = { id: 'interacted', params: { interactable: idx } };
     const marca = { id: 'setVar', params: { var: 'used-' + idx, value: 1 } };
@@ -311,7 +336,10 @@ function montarDmapDe(p) {
   if (p.meta.limite > 0) failConditions.push({ id: 'round_limit', params: { rounds: p.meta.limite } });
   // the pressure of the map (generator): fatigue at the start of every round from a round on, or a warning before the limit
   const pr = p.meta.pressao;
-  if (pr && pr.tipo === 'fadiga' && pr.desde > 0) triggers.push({ id: 'pressure-fatigue', name: 'Pressure: fatigue each round', once: false, event: { id: 'roundStart', params: {} }, conditions: [{ id: 'roundAtLeast', params: { round: pr.desde } }], actions: [{ id: 'showMessage', params: { text: pr.texto || 'Every hero suffers 1 fatigue.' } }] });
+  const fad = pr && typeof linhasDaFadiga === 'function' ? linhasDaFadiga(pr) : null;
+  if (fad) { fad.um.forEach(c => triggers.push({ id: 'pressure-fatigue-' + c.rodada, name: 'Pressure: round ' + c.rodada, once: true, event: { id: 'roundStart', params: { round: c.rodada } }, conditions: [], actions: [{ id: 'showMessage', params: { text: c.texto } }] }));
+    triggers.push({ id: 'pressure-fatigue', name: 'Pressure: worse fatigue each round', once: false, event: { id: 'roundStart', params: {} }, conditions: [{ id: 'roundAtLeast', params: { round: fad.desde } }], actions: [{ id: 'showMessage', params: { text: fad.sempre } }] }); }
+  else if (pr && pr.tipo === 'fadiga' && pr.desde > 0) triggers.push({ id: 'pressure-fatigue', name: 'Pressure: fatigue each round', once: false, event: { id: 'roundStart', params: {} }, conditions: [{ id: 'roundAtLeast', params: { round: pr.desde } }], actions: [{ id: 'showMessage', params: { text: pr.texto || 'Every hero suffers 1 fatigue.' } }] });
   // the countdown of a map with a round limit (generator): a line at the start of every round
   const contagem = p.meta.limite > 0 && p.meta.contagem && typeof linhasDaContagem === 'function' ? linhasDaContagem(p.meta.limite) : [];
   contagem.forEach(c => { if (c && c.rodada > 0 && c.texto) triggers.push({ id: 'countdown-' + c.rodada, name: 'Countdown: round ' + c.rodada, once: true, event: { id: 'roundStart', params: { round: c.rodada } }, conditions: [], actions: [{ id: 'showMessage', params: { text: c.texto } }] }); });
@@ -326,7 +354,7 @@ function montarDmapDe(p) {
   return {
     format: 'dmap', version: VERSAO_DMAP,
     meta: { id, name: p.meta.name || 'Map', author: p.meta.author || autorGuardado() || '', description: p.meta.description || '', difficulty: 'normal',
-      heroCount: [2, Math.max(2, Math.min(4, p.salas[0]?.herois.length || 4))], intro: p.meta.intro || '', music: p.meta.musica && p.meta.musica.arquivo ? { file: p.meta.musica.arquivo, title: p.meta.musica.nome || '', when: 'map', loop: p.meta.musica.loop !== false, url: '', event: '' } : { file: '', title: '', when: 'map', loop: true, url: '', event: p.meta.music || '' }, scene: '', background: p.meta.background || '',
+      heroCount: [2, Math.max(2, Math.min(4, p.salas[0]?.herois.length || 4))], intro: p.meta.intro || '', ...(p.meta.regra ? { rules: p.meta.regra } : {}), requiresAct: atoNecessario(p) > 1 ? 'II' : 'I', music: p.meta.musica && p.meta.musica.arquivo ? { file: p.meta.musica.arquivo, title: p.meta.musica.nome || '', when: 'map', loop: p.meta.musica.loop !== false, url: '', event: '' } : { file: '', title: '', when: 'map', loop: true, url: '', event: p.meta.music || '' }, scene: '', background: p.meta.background || '',
       created: new Date().toISOString().slice(0, 10), editor: 'bigorna-rooms' },
     board: { gridSize: [60, 60], levels: niveis, tiles, blocked: [], floor: 'flagstone' },
     spawns: { heroStart: (p.salas[0]?.herois || []).map(h => [h[0], h[1], h[2] || 0]), enemies, interactables, reserve: [...new Set([...(p.reserva || []).filter(x => !(r0.remove || []).includes(x)), ...(r0.add || [])])].map(idExportado), itemPool: (p.itensPool || []).map(idItemExportado), ...(enemies.some(e => e.enemy === POOL_ID) ? { balance: (r => ({ minTier: r.min, maxTier: r.max, progression: r.progresso }))(regraDoBalanceio(p)) } : {}) },
@@ -393,7 +421,7 @@ function montarDcamp() {
   let intro = abertura;
   if (campanha.intro) { dialogues.unshift({ id: 'd-opening', type: 'normal', speaker: '', title: campanha.meta.name || 'Campaign', text: campanha.intro, cast: [], background: FUNDO_PADRAO, options: [], next: abertura || '', actions: [] }); intro = 'd-opening'; }
   const dcamp = { format: 'dcamp', version: VERSAO_DCAMP,
-    meta: { id: cid, name: campanha.meta.name || 'Campaign', author: campanha.meta.author || autorGuardado() || '', description: campanha.meta.description || '', act: 'I', ...(campanha.meta.mapaProprio ? { worldMap: { file: campanha.meta.mapaProprio.arquivo, clouds: campanha.meta.nuvens !== false, mist: !!campanha.meta.nevoa, ...estradasExportadas() } } : {}), ...(campanha.meta.cidade ? { city: { file: campanha.meta.cidade.arquivo } } : {}), heroCount: [2, 4], requiresAct2: false, created: new Date().toISOString().slice(0, 10), editor: 'bigorna-rooms' },
+    meta: { id: cid, name: campanha.meta.name || 'Campaign', author: campanha.meta.author || autorGuardado() || '', description: campanha.meta.description || '', act: 'I', requiresAct: campanha.missoes.some(m => m && atoNecessario(m) > 1) ? 'II' : 'I', ...(campanha.meta.mapaProprio ? { worldMap: { file: campanha.meta.mapaProprio.arquivo, clouds: campanha.meta.nuvens !== false, mist: !!campanha.meta.nevoa, ...estradasExportadas() } } : {}), ...(campanha.meta.cidade ? { city: { file: campanha.meta.cidade.arquivo } } : {}), heroCount: [2, 4], requiresAct2: false, created: new Date().toISOString().slice(0, 10), editor: 'bigorna-rooms' },
     nodes, dialogues, shop: { replace: false, items: [] }, intro, custom: conteudoCustom(), ...(inventarioExportado() ? { start: inventarioExportado() } : {}),
     bigornaSalas: { campanha: clone(campanha) } };
   const mapas = campanha.nos.filter(n => n.tipo === 'map' || n.tipo === 'side').map(n => { const d = montarDmap(campanha.missoes[n.missao]); d.meta.id = ids[n.id]; return { nome: ids[n.id] + '.dmap', doc: d }; });
@@ -481,7 +509,7 @@ async function abrirArquivo() {
   const texto = await escolherArquivo(['.dmap', '.dcamp']); if (!texto) return;
   const que = lerProjetoDe(texto);
   if (que.campanha) { aplicarEstado({ campanha: que.campanha, missaoAtual: 0, salaAtual: 0 }); } else { aplicarEstado({ projeto: que.projeto, salaAtual: 0 }); }
-  carregarAudios(); camposDaMissao(); tudo(); enquadrar(); que.novo ? avisoLongo('This file was made with a newer version of the editor: it opened, but what this version does not know was left out. Update Bigorna before saving it again.') : aviso((que.campanha ? 'Campaign' : 'Map') + ' opened.');
+  carregarAudios(); camposDaMissao(); tudo(); enquadrar(); setTimeout(avisarPacotesNovos, 3200); que.novo ? avisoLongo('This file was made with a newer version of the editor: it opened, but what this version does not know was left out. Update Bigorna before saving it again.') : aviso((que.campanha ? 'Campaign' : 'Map') + ' opened.');
   return 'fechar';
 }
 async function importarSalas() {
@@ -546,7 +574,7 @@ const Auto = (() => {
   }
   function esquecer() { ultimo = null; gravados = new Set(); audiosNaPasta.clear(); estado(''); }
   function marcar() { const r = retrato(); if (r) { ultimo = r.chave; gravados = new Set(r.arquivos.map(a => (a.sub ? a.sub + '/' : '') + a.nome)); estado('saved ' + hora() + ' → ' + Config.nomePasta()); } }
-  Config.carregar().then(() => carregarAudios()).then(() => { passo(false); setInterval(() => passo(false), 2000); });
+  Config.carregar().then(() => carregarAudios()).then(() => { setTimeout(avisarPacotesNovos, 4000); passo(false); setInterval(() => passo(false), 2000); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) passo(false); });
   return { passo, marcar, esquecer };
 })();
@@ -561,6 +589,7 @@ const EXTRAS_CONFIG = [
   { rotulo: '↩ Quick load (F9)', acao: () => carregarRapido() },
   { secao: 'Workshop packages', rotulo: '📦 Export a package…', acao: () => { exportarPacote(); return 'fechar'; }, ajuda: 'A .bigorna file with what you made in the Workshop (monsters, NPCs, items, weapons, recipes, feats, skills with their cards, heroes, tiles, objects): the parts you pick, or everything at once.' },
   { secao: 'Workshop packages', rotulo: '📥 Import a package…', acao: () => { importarPacote(); return 'fechar'; }, ajuda: 'Brings a package into the Workshop of the map or campaign on screen.' },
+  { secao: 'Workshop packages', rotulo: '📚 My packages…', acao: () => { abrirBibliotecaDePacotes(); return 'fechar'; }, ajuda: 'The packages of this browser: add one to the work on screen, update it to a newer edition, or save its file to share.' },
   { secao: 'Other settings', rotulo: '🧱 Pieces in your boxes…', acao: () => abrirTerrenoDasCaixas(), ajuda: 'How many of each piece your boxes hold (3D objects, tokens, pillars, tiles, your own pieces): the generators use only these, and the object buttons show how many are on the table.' },
   { secao: 'Other settings', rotulo: '🎓 Repeat the tutorial', acao: () => { Tutorial.iniciar(); return 'fechar'; }, ajuda: 'The guided tutorial again, on an empty map: the work on screen goes into the quick save first (↩ Quick load brings it back).' },
   { secao: 'Other settings', rotulo: '↺ Show tips and warnings again', acao: () => { limparVistos(); renderConferencia(); aviso('Hints, first-visit explanations and warnings will show again.'); }, ajuda: 'Brings back the hints of Rooms, the explanations shown the first time a tab opens and the warnings you chose not to see again.' },

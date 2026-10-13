@@ -166,7 +166,7 @@ namespace Bigorna.Menu
             sb.AppendLine("Data: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             sb.AppendLine("Bigorna: " + Bootstrap.Versao + " · jogo: " + Application.version + " · Unity " + Application.unityVersion);
             sb.AppendLine("Código anônimo: " + Pessoa());
-            sb.AppendLine("Língua do jogo: " + Dados.DadosDoEditor.LinguaDoJogo() + " · Windows: " + SystemInfo.operatingSystem);
+            sb.AppendLine("Língua do jogo: " + (Idioma.JogoPronto ? Dados.DadosDoEditor.LinguaDoJogo() : "(antes da tela de título)") + " · Windows: " + SystemInfo.operatingSystem);
             sb.AppendLine("Cena: " + Jogo.CenaAtual() + (Encontro.Lancador.Atual != null ? " · mapa em jogo: " + Encontro.Lancador.Atual.NomeVisivel : ""));
             if (!string.IsNullOrEmpty(UltimoMapa)) sb.AppendLine("Mapa: " + Path.GetFileName(UltimoMapa));
             if (!string.IsNullOrEmpty(UltimaCampanha)) sb.AppendLine("Campanha: " + Path.GetFileName(UltimaCampanha));
