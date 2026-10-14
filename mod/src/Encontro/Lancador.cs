@@ -25,6 +25,7 @@ namespace Bigorna.Encontro
 
         public static string Lancar(Dmap m)
         {
+            if (m.PacotesFaltando != null && m.PacotesFaltando.Count > 0) return Loja.Loja.TextoFaltam(m.PacotesFaltando);
             var cena = CenaBase(m);
             if (cena == null) return Idioma.T("Nenhuma missão oficial disponível para servir de cena base.", "No official quest is available to serve as the base scene.");
             SerializedGame partida;

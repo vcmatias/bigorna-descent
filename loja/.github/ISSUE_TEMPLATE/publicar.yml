@@ -1,0 +1,32 @@
+name: Publicar na loja / Publish to the store
+description: Um mapa, campanha ou pacote feito no editor Bigorna. / A map, campaign or package made in the Bigorna editor.
+title: "[tipo] nome"
+labels: ["publicar"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Este formulário vem preenchido pelo editor (**🛒 Loja → Publicar**). Falta só arrastar o arquivo `.zip` que o editor salvou para o campo **Arquivo**. Um bot confere na hora e responde aqui; se estiver tudo certo, entra na loja sozinho (sem curadoria).
+        This form comes filled by the editor (**🛒 Store → Publish**). Just drag the `.zip` file the editor saved into the **File** box. A bot checks it right away and answers here; if all is right, it goes into the store by itself (no curation).
+  - type: textarea
+    id: ficha
+    attributes:
+      label: Ficha / Card
+      description: Preenchida pelo editor; não mude. / Filled by the editor; do not change it.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: arquivo
+    attributes:
+      label: Arquivo / File
+      description: Arraste aqui o .zip que o editor salvou (bigorna-loja-….zip). / Drag here the .zip the editor saved (bigorna-loja-….zip).
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmo
+    attributes:
+      label: Confirmação / Confirmation
+      options:
+        - label: É meu (ou posso compartilhar) e não tem arte nem texto copiados do jogo. / This is mine (or I may share it), and it has no art or text copied from the game.
+          required: true

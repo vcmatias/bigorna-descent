@@ -1,0 +1,51 @@
+# O bot da loja, sem curadoria: cada pedido de publicação (aberto, ou editado depois de uma recusa) é conferido e, se
+# passar, gravado em itens/ na hora, com o índice refeito; o pedido recebe a resposta e fecha. Se não passar, a resposta
+# diz o que corrigir e o pedido fica aberto (editar roda de novo). Um envio por vez (a fila "loja-gravar").
+# Tudo o que vem do pedido entra pelo ambiente (nunca no texto dos comandos).
+name: Publicar
+on:
+  issues:
+    types: [opened, edited, reopened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: loja-gravar
+  cancel-in-progress: false
+jobs:
+  publicar:
+    if: github.event.issue.state == 'open' && contains(github.event.issue.body, '### Ficha') && !contains(github.event.issue.labels.*.name, 'publicado')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: g
+        env:
+          CORPO_DO_PEDIDO: ${{ github.event.issue.body }}
+          AUTOR_DO_PEDIDO: ${{ github.event.issue.user.login }}
+        run: python3 ferramentas/loja.py gravar
+      - if: steps.g.outputs.ok == 'true'
+        env:
+          TITULO: ${{ github.event.issue.title }}
+          N: ${{ github.event.issue.number }}
+        run: |
+          git config user.name "bigorna-loja"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add itens indice.json
+          git commit -m "loja: $TITULO (#$N)"
+          git pull --rebase --quiet && git push
+      - if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          N: ${{ github.event.issue.number }}
+          OK: ${{ steps.g.outputs.ok }}
+        run: |
+          gh label create publicado --color 0e8a16 --description "Entrou na loja" --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+          gh label create com-problema --color d93f0b --description "Não passou na conferência" --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+          [ -f resposta.md ] || echo "⚠️ A publicação falhou; veja o registro em Actions. / Publishing failed; see the log in Actions." > resposta.md
+          gh issue comment "$N" --repo "$GITHUB_REPOSITORY" --body-file resposta.md
+          if [ "$OK" = "true" ]; then
+            gh issue edit "$N" --repo "$GITHUB_REPOSITORY" --add-label publicado --remove-label com-problema || true
+            gh issue close "$N" --repo "$GITHUB_REPOSITORY"
+          else
+            gh issue edit "$N" --repo "$GITHUB_REPOSITORY" --add-label com-problema || true
+          fi

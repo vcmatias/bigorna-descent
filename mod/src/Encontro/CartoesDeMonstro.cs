@@ -39,7 +39,7 @@ namespace Bigorna.Encontro
             if (d.Malha != null || d.Tentou) return d.Malha;
             d.Tentou = true;
             string arq = null;
-            foreach (var pasta in new[] { System.IO.Path.GetDirectoryName((Motor.Roteiro.Mapa ?? Lancador.Atual)?.Caminho ?? "") ?? "", Campanha.Campanha.Aberta?.Pasta ?? "" })
+            foreach (var pasta in Oficina.PastasDeBusca())
             {
                 if (string.IsNullOrEmpty(pasta)) continue;
                 var c = System.IO.Path.Combine(pasta, System.IO.Path.GetFileName(d.Modelo));

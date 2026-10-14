@@ -285,6 +285,10 @@ namespace Bigorna.Formato
         [JsonProperty("triggers")] public List<Gatilho> Gatilhos = new List<Gatilho>();
         /// <summary>Extensao Bigorna v3: monstros, itens e personagens proprios do mapa (fichas completas).</summary>
         [JsonProperty("custom")] public Personalizado Custom = new Personalizado();
+        /// <summary>Os pacotes da loja que o mapa exige ("requires"; ja juntados ao Custom na leitura).</summary>
+        [JsonIgnore] public List<Loja.Requisito> Requer = new List<Loja.Requisito>();
+        /// <summary>Os exigidos que nao estao instalados (o mapa nao joga sem eles).</summary>
+        [JsonIgnore] public List<Loja.Requisito> PacotesFaltando = new List<Loja.Requisito>();
 
         [JsonIgnore] public string Caminho;
 
@@ -314,8 +318,13 @@ namespace Bigorna.Formato
 
         public static Dmap Carregar(string caminho)
         {
-            var d = JsonConvert.DeserializeObject<Dmap>(File.ReadAllText(caminho));
+            // (um mapa da loja diz quais pacotes exige: o conteudo deles entra no "custom" antes da leitura; o do mapa vence)
+            var texto = File.ReadAllText(caminho);
+            var j = Loja.Pacotes.ExigePacotes(texto) ? Loja.Pacotes.LerJson(texto) : null;
+            var faltam = j != null ? Loja.Pacotes.Juntar(j) : new List<Loja.Requisito>();
+            var d = j != null ? j.ToObject<Dmap>(JsonSerializer.CreateDefault()) : JsonConvert.DeserializeObject<Dmap>(texto);
             if (d == null) throw new Exception("arquivo vazio");
+            d.Requer = j != null ? Loja.Requisito.DoMapa(j["requires"]) : new List<Loja.Requisito>(); d.PacotesFaltando = faltam;
             if (d.Formato != "dmap") throw new Exception("não é um .dmap (format=" + d.Formato + ")");
             if (d.Versao > VersaoAtual) Log.Info("«" + Path.GetFileName(caminho) + "» foi feito num editor mais novo (formato v" + d.Versao + "; este mod lê até v" + VersaoAtual + "): o que ele não conhece fica de fora. Atualize o Bigorna.");
             d.Caminho = caminho;

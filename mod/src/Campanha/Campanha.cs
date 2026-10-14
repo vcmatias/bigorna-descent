@@ -33,6 +33,7 @@ namespace Bigorna.Campanha
         /// <summary>Partida nova (ou continuada pelo progresso da pasta) no mapa-mundi do jogo.</summary>
         public static string Comecar(Dcamp c, bool recomecar)
         {
+            if (c.PacotesFaltando != null && c.PacotesFaltando.Count > 0) return Loja.Loja.TextoFaltam(c.PacotesFaltando);
             try
             {
                 Abrir(c);

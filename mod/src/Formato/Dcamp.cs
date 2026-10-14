@@ -19,6 +19,8 @@ namespace Bigorna.Formato
         [JsonProperty("dialogues")] public List<Dialogo> Dialogos = new List<Dialogo>();
         [JsonProperty("intro")] public string Intro;
         [JsonProperty("custom")] public Dmap.Personalizado Custom = new Dmap.Personalizado();
+        [JsonIgnore] public List<Loja.Requisito> Requer = new List<Loja.Requisito>();
+        [JsonIgnore] public List<Loja.Requisito> PacotesFaltando = new List<Loja.Requisito>();
         /// <summary>O inventario de saida do grupo (veteranos de batalhas anteriores): ouro, itens, materiais e pericias.</summary>
         [JsonProperty("start")] public Inicio Comeco;
         public class Inicio
@@ -150,8 +152,12 @@ namespace Bigorna.Formato
 
         public static Dcamp Carregar(string caminho)
         {
-            var d = JsonConvert.DeserializeObject<Dcamp>(File.ReadAllText(caminho));
+            var texto = File.ReadAllText(caminho);
+            var j = Loja.Pacotes.ExigePacotes(texto) ? Loja.Pacotes.LerJson(texto) : null;
+            var faltam = j != null ? Loja.Pacotes.Juntar(j) : new List<Loja.Requisito>();
+            var d = j != null ? j.ToObject<Dcamp>(JsonSerializer.CreateDefault()) : JsonConvert.DeserializeObject<Dcamp>(texto);
             if (d == null) throw new Exception("arquivo vazio");
+            d.Requer = j != null ? Loja.Requisito.DoMapa(j["requires"]) : new List<Loja.Requisito>(); d.PacotesFaltando = faltam;
             if (d.Formato != "dcamp") throw new Exception("não é um .dcamp (format=" + d.Formato + ")");
             if (d.Versao > VersaoAtual) Log.Info("«" + Path.GetFileName(caminho) + "» foi feita num editor mais novo (formato v" + d.Versao + "; este mod lê até v" + VersaoAtual + "): o que ele não conhece fica de fora. Atualize o Bigorna.");
             d.Caminho = caminho;

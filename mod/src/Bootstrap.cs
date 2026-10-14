@@ -11,6 +11,8 @@ namespace Bigorna
         static bool _iniciado;
 
         public static string PastaMapas => Path.Combine(Application.persistentDataPath, "CustomMaps");
+        /// <summary>Os pacotes baixados da loja (conteudo da Oficina que os mapas exigem), ao lado de CustomMaps.</summary>
+        public static string PastaPacotes => Path.Combine(Application.persistentDataPath, "Pacotes");
         public static string CaminhoLog => Path.Combine(Application.persistentDataPath, "bigorna.log");
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -21,6 +23,7 @@ namespace Bigorna
             try
             {
                 Directory.CreateDirectory(PastaMapas);
+                Loja.Pacotes.Raiz = PastaPacotes;
                 Log.Novo();
                 string compilado = ""; try { compilado = " (DLL de " + System.IO.File.GetLastWriteTime(typeof(Bootstrap).Assembly.Location).ToString("dd/MM HH:mm") + ")"; } catch { }
                 Log.Info("Bigorna " + Versao + compilado + " em marcha. Unity " + Application.unityVersion + " · " + Application.productName);

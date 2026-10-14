@@ -174,7 +174,7 @@ namespace Bigorna.Encontro
 
         static string Achar(string arquivo)
         {
-            foreach (var pasta in new[] { Path.GetDirectoryName((Motor.Roteiro.Mapa ?? Lancador.Atual)?.Caminho ?? "") ?? "", Campanha.Campanha.Aberta?.Pasta ?? "" })
+            foreach (var pasta in Oficina.PastasDeBusca())
             {
                 if (string.IsNullOrEmpty(pasta)) continue;
                 var c = Path.Combine(pasta, Path.GetFileName(arquivo));

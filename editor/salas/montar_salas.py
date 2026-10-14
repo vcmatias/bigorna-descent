@@ -18,7 +18,7 @@ DIST = os.path.join(AQUI, "..", "dist")
 
 PARTES = (("IDIOMA", "idioma.js"), ("IDIOMA_PT", "idioma_pt.js"), ("JOGO", "jogo.js"), ("CONFIG", os.path.join("..", "comum", "config.js")), ("BASE", "base.js"), ("DESENHO", "desenho.js"), ("TEXTURAS", "texturas.js"), ("PAPELAO", "papelao.js"), ("TRES", "tres.js"),
           ("INTERFACE", "interface.js"), ("GATILHOS", "gatilhos.js"), ("FICHAS", "fichas.js"), ("HEROIS", "herois.js"), ("ARMAS", "armas.js"),
-          ("RECEITAS", "receitas.js"), ("FACANHAS", "facanhas.js"), ("PERICIAS", "pericias.js"), ("PACOTES", "pacotes.js"), ("CAMPANHA", "campanha.js"), ("HISTORIAS", "historias.js"), ("NARRATIVA", "narrativa.js"), ("OFICINA_HISTORIAS", "oficina_historias.js"), ("GERADOR", "gerador.js"), ("GERADOR_MAPAS", "gerador_mapas.js"), ("SIMULADOR", "simulador.js"), ("EXPORTAR", "exportar.js"), ("TUTORIAL", "tutorial.js"))
+          ("RECEITAS", "receitas.js"), ("FACANHAS", "facanhas.js"), ("PERICIAS", "pericias.js"), ("PACOTES", "pacotes.js"), ("CAMPANHA", "campanha.js"), ("HISTORIAS", "historias.js"), ("NARRATIVA", "narrativa.js"), ("OFICINA_HISTORIAS", "oficina_historias.js"), ("GERADOR", "gerador.js"), ("GERADOR_MAPAS", "gerador_mapas.js"), ("SIMULADOR", "simulador.js"), ("EXPORTAR", "exportar.js"), ("LOJA", "loja.js"), ("TUTORIAL", "tutorial.js"))
 
 # icone proprio: uma bigorna com um martelo, desenhada aqui
 ICONE = ("data:image/svg+xml," + "".join("""<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>
@@ -123,6 +123,10 @@ def montar(saida, fontes):
         if "</script" in codigo.lower():
             sys.exit("«</script» em " + arq + ": o código vai dentro de um <script type=text/plain>")
         html = html.replace("/*@@" + marca + "@@*/", codigo, 1)
+    # a versao do Bigorna (a do mod, mod/VERSAO), para a ficha da loja
+    try: versao = open(os.path.join(AQUI, "..", "..", "mod", "VERSAO"), encoding="utf-8").read().strip()
+    except OSError: versao = ""
+    html = html.replace("@@VERSAO_BIGORNA@@", versao)
     html = html.replace("/*@@CARREGADOR@@*/", open(os.path.join(AQUI, "carregador.js"), encoding="utf-8").read().rstrip("\n"), 1)
     os.makedirs(os.path.dirname(os.path.abspath(saida)), exist_ok=True)
     with open(saida, "w", encoding="utf-8", newline="\n") as f:

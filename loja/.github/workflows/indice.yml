@@ -1,0 +1,23 @@
+# Refaz o indice.json quando itens/ muda por um commit (uma entrada tirada à mão, um pull request) ou a pedido.
+name: Refazer o índice
+on:
+  push:
+    branches: [main]
+    paths: ['itens/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: loja-gravar
+  cancel-in-progress: false
+jobs:
+  indexar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 ferramentas/loja.py indexar
+      - run: |
+          if git diff --quiet -- indice.json; then echo "sem mudanças"; exit 0; fi
+          git config user.name "bigorna-loja"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add indice.json && git commit -m "loja: índice" && git push

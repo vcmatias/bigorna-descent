@@ -64,6 +64,13 @@ maps and campaigns you make (`.dmap`, `.dcamp`); anyone who opens them uses thei
 Put `.dmap` and `.dcamp` files in `%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of the Dark\CustomMaps`
 (the editor can export straight there). On the title screen, "Community maps" lists them.
 
+## The store
+
+In "Community maps", the **Download maps** and **Packages** tabs list what other authors shared in the store
+(https://github.com/vcmatias/bigorna-loja). Download, update, play or remove; a map brings the packages it needs. Downloaded maps go to
+`CustomMaps\<id>\` and packages to `Pacotes\<id>\`, next to it. To publish your own, use **🛒 Store** in the
+editor.
+
 ## Report a problem
 
 In the game, press **F9** (or the "Report a problem" button in the "Community maps" panel). Write what happened:
