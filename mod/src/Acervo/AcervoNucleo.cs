@@ -9,10 +9,10 @@ using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace Bigorna.Loja
+namespace Bigorna.Acervo
 {
-    // A parte da loja que nao depende do jogo (testada fora dele): a ficha, o zip, a verificacao, instalar e remover, o
-    // registro do que a loja instalou e a juncao dos pacotes exigidos ao "custom" de um mapa. Formato em loja/FORMATO.md.
+    // A parte do acervo que nao depende do jogo (testada fora dele): a ficha, o zip, a verificacao, instalar e remover, o
+    // registro do que o acervo instalou e a juncao dos pacotes exigidos ao "custom" de um mapa. Formato em acervo/FORMATO.md.
 
     /// <summary>Um pacote que um mapa exige (na ficha: id, edicao, nome; no .dmap: id, edition, name).</summary>
     public class Requisito
@@ -62,7 +62,7 @@ namespace Bigorna.Loja
         public static List<Ficha> DoIndice(string json)
         {
             var j = Pacotes.LerJson(json);
-            if ((string)j["formato"] != "bigorna-loja-indice") throw new Exception("o índice da loja não é do Bigorna");
+            if ((string)j["formato"] != "bigorna-acervo-indice") throw new Exception("o índice do acervo não é do Bigorna");
             var r = new List<Ficha>();
             foreach (var x in (j["itens"] as JArray ?? new JArray()).OfType<JObject>())
             {
@@ -114,7 +114,7 @@ namespace Bigorna.Loja
         }
     }
 
-    /// <summary>O que a loja instalou: por id, o tipo, a edicao, a pasta e os arquivos (so estes sao trocados ou apagados).</summary>
+    /// <summary>O que o acervo instalou: por id, o tipo, a edicao, a pasta e os arquivos (so estes sao trocados ou apagados).</summary>
     public class Registro
     {
         public class Item
@@ -159,12 +159,12 @@ namespace Bigorna.Loja
         public static List<Zip.Entrada> Conferir(byte[] zip, Ficha esperada)
         {
             if (!string.IsNullOrEmpty(esperada.Sha256) && !string.Equals(Sha256(zip), esperada.Sha256, StringComparison.OrdinalIgnoreCase))
-                throw new Exception("o arquivo baixado não confere com a loja (soma diferente)");
+                throw new Exception("o arquivo baixado não confere com o acervo (soma diferente)");
             var es = Zip.Ler(zip);
-            var fj = es.FirstOrDefault(e => e.Nome == "bigorna-loja.json") ?? throw new Exception("o arquivo não traz a ficha da loja");
+            var fj = es.FirstOrDefault(e => e.Nome == "bigorna-acervo.json") ?? throw new Exception("o arquivo não traz a ficha do acervo");
             var f = JsonConvert.DeserializeObject<Ficha>(Encoding.UTF8.GetString(fj.Dados).TrimStart('﻿'));
-            if (f == null || f.Formato != "bigorna-loja" || f.Id != esperada.Id || f.Tipo != esperada.Tipo) throw new Exception("a ficha de dentro do arquivo não é a desta entrada da loja");
-            if (f.Edicao != esperada.Edicao) throw new Exception("a edição do arquivo (" + f.Edicao + ") não é a da loja (" + esperada.Edicao + ")");
+            if (f == null || f.Formato != "bigorna-acervo" || f.Id != esperada.Id || f.Tipo != esperada.Tipo) throw new Exception("a ficha de dentro do arquivo não é a desta entrada do acervo");
+            if (f.Edicao != esperada.Edicao) throw new Exception("a edição do arquivo (" + f.Edicao + ") não é a do acervo (" + esperada.Edicao + ")");
             var vistos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var e in es)
             {
@@ -180,17 +180,17 @@ namespace Bigorna.Loja
 
         public static string PastaDe(Ficha f, string raizMapas, string raizPacotes) => Path.Combine(f.EhPacote ? raizPacotes : raizMapas, f.Id);
 
-        /// <summary>Instala (ou atualiza) uma entrada da loja: confere o zip, apaga os arquivos da edicao anterior (so os que a loja
-        /// pos), grava os novos e anota no registro. A pasta e a do id; o que nao veio da loja (o progresso de uma campanha) fica.</summary>
+        /// <summary>Instala (ou atualiza) uma entrada do acervo: confere o zip, apaga os arquivos da edicao anterior (so os que o acervo
+        /// pos), grava os novos e anota no registro. A pasta e a do id; o que nao veio do acervo (o progresso de uma campanha) fica.</summary>
         public static void Instalar(byte[] zip, Ficha f, string raizMapas, string raizPacotes, Registro reg)
         {
             var es = Conferir(zip, f);
             var pasta = PastaDe(f, raizMapas, raizPacotes);
-            // um arquivo que nao veio da loja, com o nome de um que vem: a pasta e de outra coisa (um mapa feito a mao com o mesmo nome)
+            // um arquivo que nao veio do acervo, com o nome de um que vem: a pasta e de outra coisa (um mapa feito a mao com o mesmo nome)
             reg.Itens.TryGetValue(f.Id, out var antes);
             var nossos = new HashSet<string>(antes?.Arquivos ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
-            foreach (var e in es) if (!nossos.Contains(e.Nome) && File.Exists(Path.Combine(pasta, e.Nome)) && e.Nome != "bigorna-loja.json")
-                    throw new Exception("a pasta " + Path.GetFileName(pasta) + " já tem um «" + e.Nome + "» que não veio da loja");
+            foreach (var e in es) if (!nossos.Contains(e.Nome) && File.Exists(Path.Combine(pasta, e.Nome)) && e.Nome != "bigorna-acervo.json")
+                    throw new Exception("a pasta " + Path.GetFileName(pasta) + " já tem um «" + e.Nome + "» que não veio do acervo");
             Directory.CreateDirectory(pasta);
             foreach (var velho in nossos) { var c = Path.Combine(pasta, velho); try { if (File.Exists(c)) File.Delete(c); } catch { } }
             foreach (var e in es) File.WriteAllBytes(Path.Combine(pasta, e.Nome), e.Dados);
@@ -199,7 +199,7 @@ namespace Bigorna.Loja
             Pacotes.Esquecer();
         }
 
-        /// <summary>Tira uma entrada instalada pela loja: so os arquivos dela; a pasta sai se ficar vazia.</summary>
+        /// <summary>Tira uma entrada instalada pelo acervo: so os arquivos dela; a pasta sai se ficar vazia.</summary>
         public static bool Remover(string id, Registro reg)
         {
             if (!reg.Itens.TryGetValue(id ?? "", out var it)) return false;

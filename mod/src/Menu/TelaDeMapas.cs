@@ -185,9 +185,9 @@ namespace Bigorna.Menu
             _abas.Add(Botao(cima, T("Campanhas", "Campaigns"), () => { _aba = 0; Preencher(); }));
             _abas.Add(Botao(cima, T("Mapas avulsos", "Standalone maps"), () => { _aba = 1; Preencher(); }));
             _abas.Add(Botao(cima, T("Mapas oficiais", "Official maps"), () => { _aba = 2; MapasOficiais.Reler(); Preencher(); }));
-            // a loja (como no Valkyrie): mapas e campanhas para baixar; pacotes da Oficina que os mapas exigem
-            _abas.Add(Botao(cima, T("Baixar mapas", "Download maps"), () => { _aba = 3; LerLoja(); }));
-            _abas.Add(Botao(cima, T("Pacotes", "Packages"), () => { _aba = 4; LerLoja(); }));
+            // o acervo (como no Valkyrie): mapas e campanhas para baixar; pacotes da Oficina que os mapas exigem
+            _abas.Add(Botao(cima, T("Baixar mapas", "Download maps"), () => { _aba = 3; LerAcervo(); }));
+            _abas.Add(Botao(cima, T("Pacotes", "Packages"), () => { _aba = 4; LerAcervo(); }));
             var baixo = Fileira("Bigorna ferramentas", new Vector2(0.5f, 0f), 60f);
             Botao(baixo, T("Abrir pasta", "Open folder"), PainelMapas.AbrirAPasta);
             if (Dados.DadosDoEditor.EditorInstalado) Botao(baixo, T("Abrir editor", "Open editor"), Dados.DadosDoEditor.AbrirEditor);
@@ -217,7 +217,7 @@ namespace Bigorna.Menu
                 foreach (var m in PainelMapas.Mapas)
                     Ficha(++n, m.NomeVisivel, m.Resumo(Pt), PainelMapas.AlteradoEm(m), m.Metadados?.Autor, AtoExigido.Ato2(m) ? Act.ActII : Act.ActI, T("Jogar", "Play"), () => { var e = Lancador.Lancar(m); Lancou(e); }, null, null);
             else if (_aba == 3 || _aba == 4)
-                n = FichasDaLoja(_aba == 4);
+                n = FichasDoAcervo(_aba == 4);
             else
                 foreach (var q in MapasOficiais.Lista())
                 {
@@ -229,24 +229,24 @@ namespace Bigorna.Menu
             if (_vazio != null)
             {
                 _vazio.SetActive(n == 0);
-                if (n == 0 && _aba >= 3) Texto(_textoVazio, Loja.Loja.Lendo || !Loja.Loja.Leu ? T("Consultando a loja…", "Asking the store…") : Loja.Loja.SemConexao ? T("Sem conexão com a loja. Confira a internet e toque na aba de novo.", "No connection to the store. Check the internet and tap the tab again.")
-                                                     : _aba == 3 ? T("A loja ainda não tem mapas.", "The store has no maps yet.") : T("A loja ainda não tem pacotes.", "The store has no packages yet."));
+                if (n == 0 && _aba >= 3) Texto(_textoVazio, Acervo.Acervo.Lendo || !Acervo.Acervo.Leu ? T("Consultando o acervo…", "Asking the community library…") : Acervo.Acervo.SemConexao ? T("Sem conexão com o acervo. Confira a internet e toque na aba de novo.", "No connection to the community library. Check the internet and tap the tab again.")
+                                                     : _aba == 3 ? T("O acervo ainda não tem mapas.", "The community library has no maps yet.") : T("O acervo ainda não tem pacotes.", "The community library has no packages yet."));
                 else if (n == 0) Texto(_textoVazio, _aba == 2 ? T("Nenhuma missão do jogo encontrada na sua coleção.", "No game quests found in your collection.") : _aba == 0 ? T("Nenhuma campanha na pasta de mapas. No editor, «Create campaign» e depois «Export campaign».", "No campaigns in the maps folder. In the editor, use \"Create campaign\" and then \"Export campaign\".")
                                                      : T("Nenhum mapa avulso na pasta de mapas. Exporte um mapa no editor.", "No standalone maps in the maps folder. Export a map in the editor."));
             }
         }
 
-        // ------------------------------------------------ a loja
-        /// <summary>Le o indice da loja de novo (a cada toque na aba) e refaz as fichas quando chegar.</summary>
-        static void LerLoja()
+        // ------------------------------------------------ o acervo
+        /// <summary>Le o indice do acervo de novo (a cada toque na aba) e refaz as fichas quando chegar.</summary>
+        static void LerAcervo()
         {
             Preencher();
-            Nucleo.Instancia.StartCoroutine(Loja.Loja.LerIndice(() => { if (_tela != null && (_aba == 3 || _aba == 4)) Preencher(); }));
+            Nucleo.Instancia.StartCoroutine(Acervo.Acervo.LerIndice(() => { if (_tela != null && (_aba == 3 || _aba == 4)) Preencher(); }));
         }
 
         static readonly HashSet<string> _confirmarRemocao = new HashSet<string>();
 
-        static DateTime DataDa(Loja.Ficha f)
+        static DateTime DataDa(Acervo.Ficha f)
         {
             DateTime d; var t = f.Publicado ?? f.Data;
             return !string.IsNullOrEmpty(t) && DateTime.TryParseExact(t.Length > 10 ? t.Substring(0, 10) : t, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out d) ? d : DateTime.MinValue;
@@ -254,17 +254,17 @@ namespace Bigorna.Menu
 
         static string Lingua(string l) => string.IsNullOrEmpty(l) ? "" : string.Join("/", l.Split(',').Select(x => x.Trim() == "pt" ? "PT" : x.Trim() == "en" ? "EN" : x.Trim().ToUpperInvariant()).ToArray());
 
-        /// <summary>As fichas da loja: os mapas e campanhas (aba 3) ou os pacotes (aba 4), primeiro os da lingua de quem joga.</summary>
-        static int FichasDaLoja(bool pacotes)
+        /// <summary>As fichas do acervo: os mapas e campanhas (aba 3) ou os pacotes (aba 4), primeiro os da lingua de quem joga.</summary>
+        static int FichasDoAcervo(bool pacotes)
         {
-            var L = Loja.Loja.Itens.Where(f => f.EhPacote == pacotes)
+            var L = Acervo.Acervo.Itens.Where(f => f.EhPacote == pacotes)
                 .OrderByDescending(f => (f.Lingua ?? "").Contains(Pt ? "pt" : "en")).ThenByDescending(DataDa).ToList();
             int n = 0;
             foreach (var f in L)
             {
-                int tem = Loja.Loja.Instalada(f);
-                var faltam = pacotes ? new List<Loja.Requisito>() : Loja.Loja.PacotesParaBaixar(f);
-                Loja.Loja.Situacao.TryGetValue(f.Id, out var sit); bool ocupado = sit != null && sit.EndsWith("…");
+                int tem = Acervo.Acervo.Instalada(f);
+                var faltam = pacotes ? new List<Acervo.Requisito>() : Acervo.Acervo.PacotesParaBaixar(f);
+                Acervo.Acervo.Situacao.TryGetValue(f.Id, out var sit); bool ocupado = sit != null && sit.EndsWith("…");
                 string tipo = f.Tipo == "campanha" ? T("Campanha", "Campaign") + (f.Conteudo?["mapas"] != null ? " · " + (int)f.Conteudo["mapas"] + T(" mapa(s)", " map(s)") : "")
                             : f.Tipo == "mapa" ? T("Mapa", "Map") : T("Pacote", "Package") + (f.Conteudo?["entradas"] != null ? " · " + (int)f.Conteudo["entradas"] + T(" entrada(s)", " entries") : "");
                 var partes = new List<string> { tipo };
@@ -274,8 +274,8 @@ namespace Bigorna.Menu
                 // o texto inteiro, na bandeja: o resumo, os pacotes exigidos, o que esta acontecendo
                 var det = new List<string>();
                 if (!string.IsNullOrEmpty(f.Resumo)) det.Add(f.Resumo);
-                if (!pacotes && f.Requer.Count > 0) det.Add(T("Precisa de: ", "Needs: ") + string.Join(", ", f.Requer.Select(q => (q.Nome ?? q.Id) + (Loja.Pacotes.EdicaoInstalada(q.Id) >= q.Edicao ? " ✓" : "")).ToArray()));
-                if (pacotes) { var quem = Loja.Loja.QuemExige(f.Id); if (quem.Count > 0) det.Add(T("Usado por: ", "Used by: ") + string.Join(", ", quem.ToArray())); }
+                if (!pacotes && f.Requer.Count > 0) det.Add(T("Precisa de: ", "Needs: ") + string.Join(", ", f.Requer.Select(q => (q.Nome ?? q.Id) + (Acervo.Pacotes.EdicaoInstalada(q.Id) >= q.Edicao ? " ✓" : "")).ToArray()));
+                if (pacotes) { var quem = Acervo.Acervo.QuemExige(f.Id); if (quem.Count > 0) det.Add(T("Usado por: ", "Used by: ") + string.Join(", ", quem.ToArray())); }
                 det.Add(T("Edição ", "Edition ") + f.Edicao + (tem > 0 && tem < f.Edicao ? T(" (você tem a ", " (you have ") + tem + ")" : ""));
                 if (sit != null) det.Insert(0, sit);
                 if (_confirmarRemocao.Contains(f.Id)) det.Insert(0, T("Toque em Remover de novo para confirmar.", "Tap Remove again to confirm."));
@@ -284,28 +284,28 @@ namespace Bigorna.Menu
                 else if (tem == 0) { principal = T("Baixar", "Download"); acao = () => Baixar(f); }
                 else if (tem < f.Edicao) { principal = T("Atualizar", "Update"); acao = () => Baixar(f); }
                 else if (faltam.Count > 0) { principal = T("Baixar pacotes", "Get packages"); acao = () => Baixar(f); }
-                else if (!pacotes) { principal = T("Jogar", "Play"); acao = () => JogarDaLoja(f); }
+                else if (!pacotes) { principal = T("Jogar", "Play"); acao = () => JogarDoAcervo(f); }
                 else { principal = T("Instalado", "Installed"); acao = () => { }; }
-                bool daLoja = Loja.Loja.Registro.EdicaoDe(f.Id) > 0;
+                bool doAcervo = Acervo.Acervo.Registro.EdicaoDe(f.Id) > 0;
                 Ficha(++n, f.Nome ?? f.Id, string.Join(" · ", partes.ToArray()), DataDa(f), f.Autor, f.Ato >= 2 ? Act.ActII : Act.ActI, principal, acao,
-                    daLoja && !ocupado ? T("Remover", "Remove") : null, daLoja && !ocupado ? (Action)(() => RemoverDaLoja(f)) : null, string.Join("\n", det.ToArray()));
+                    doAcervo && !ocupado ? T("Remover", "Remove") : null, doAcervo && !ocupado ? (Action)(() => RemoverDoAcervo(f)) : null, string.Join("\n", det.ToArray()));
             }
             return n;
         }
 
-        static void Baixar(Loja.Ficha f) { _confirmarRemocao.Clear(); Nucleo.Instancia.StartCoroutine(Loja.Loja.Baixar(f, () => { if (_tela != null && _aba >= 3) { PainelMapas.Reler(); Preencher(); } })); }
+        static void Baixar(Acervo.Ficha f) { _confirmarRemocao.Clear(); Nucleo.Instancia.StartCoroutine(Acervo.Acervo.Baixar(f, () => { if (_tela != null && _aba >= 3) { PainelMapas.Reler(); Preencher(); } })); }
 
-        static void RemoverDaLoja(Loja.Ficha f)
+        static void RemoverDoAcervo(Acervo.Ficha f)
         {
             if (!_confirmarRemocao.Contains(f.Id)) { _confirmarRemocao.Clear(); _confirmarRemocao.Add(f.Id); Preencher(); return; }
-            _confirmarRemocao.Clear(); Loja.Loja.Remover(f); PainelMapas.Reler(); Preencher();
+            _confirmarRemocao.Clear(); Acervo.Acervo.Remover(f); PainelMapas.Reler(); Preencher();
         }
 
-        /// <summary>"Jogar" numa ficha da loja: a campanha ou o mapa que ela instalou, como nas abas de cima.</summary>
-        static void JogarDaLoja(Loja.Ficha f)
+        /// <summary>"Jogar" numa ficha do acervo: a campanha ou o mapa que ela instalou, como nas abas de cima.</summary>
+        static void JogarDoAcervo(Acervo.Ficha f)
         {
             PainelMapas.Reler();
-            Loja.Loja.Registro.Itens.TryGetValue(f.Id, out var it); var pasta = it?.Pasta ?? "";
+            Acervo.Acervo.Registro.Itens.TryGetValue(f.Id, out var it); var pasta = it?.Pasta ?? "";
             if (f.Tipo == "campanha")
             {
                 var c = PainelMapas.Campanhas.FirstOrDefault(x => string.Equals(x.Pasta.TrimEnd('/', '\\'), pasta.TrimEnd('/', '\\'), StringComparison.OrdinalIgnoreCase));

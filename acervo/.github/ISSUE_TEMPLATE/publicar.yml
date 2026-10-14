@@ -1,4 +1,4 @@
-name: Publicar na loja / Publish to the store
+name: Publicar no acervo / Publish to the community library
 description: Um mapa, campanha ou pacote feito no editor Bigorna. / A map, campaign or package made in the Bigorna editor.
 title: "[tipo] nome"
 labels: ["publicar"]
@@ -6,8 +6,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Este formulário vem preenchido pelo editor (**🛒 Loja → Publicar**). Falta só arrastar o arquivo `.zip` que o editor salvou para o campo **Arquivo**. Um bot confere na hora e responde aqui; se estiver tudo certo, entra na loja sozinho (sem curadoria).
-        This form comes filled by the editor (**🛒 Store → Publish**). Just drag the `.zip` file the editor saved into the **File** box. A bot checks it right away and answers here; if all is right, it goes into the store by itself (no curation).
+        Este formulário vem preenchido pelo editor (**📚 Acervo → Publicar**). Falta só arrastar o arquivo `.zip` que o editor salvou para o campo **Arquivo**. Um bot confere na hora e responde aqui; se estiver tudo certo, entra no acervo sozinho (sem curadoria).
+        This form comes filled by the editor (**📚 Library → Publish**). Just drag the `.zip` file the editor saved into the **File** box. A bot checks it right away and answers here; if all is right, it goes into the community library by itself (no curation).
   - type: textarea
     id: ficha
     attributes:
@@ -20,7 +20,7 @@ body:
     id: arquivo
     attributes:
       label: Arquivo / File
-      description: Arraste aqui o .zip que o editor salvou (bigorna-loja-….zip). / Drag here the .zip the editor saved (bigorna-loja-….zip).
+      description: Arraste aqui o .zip que o editor salvou (bigorna-acervo-….zip). / Drag here the .zip the editor saved (bigorna-acervo-….zip).
     validations:
       required: true
   - type: checkboxes

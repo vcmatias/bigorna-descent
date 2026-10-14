@@ -7,21 +7,21 @@ using UnityEngine;
 using UnityEngine.Networking;
 using static Bigorna.Idioma;
 
-namespace Bigorna.Loja
+namespace Bigorna.Acervo
 {
     /// <summary>
-    /// A loja no jogo, como a do Valkyrie: o indice do repositorio da loja no GitHub (mapas, campanhas e pacotes da Oficina),
+    /// O acervo no jogo, como o do Valkyrie: o indice do repositorio do acervo no GitHub (mapas, campanhas e pacotes da Oficina),
     /// baixar, atualizar e remover. Baixar um mapa traz junto os pacotes que ele exige (os que faltam ou estao numa edicao
-    /// mais velha). Sem internet, vale o ultimo indice lido (guardado em Loja/indice.json). Formato em loja/FORMATO.md.
+    /// mais velha). Sem internet, vale o ultimo indice lido (guardado em Acervo/indice.json). Formato em acervo/FORMATO.md.
     /// </summary>
-    public static class Loja
+    public static class Acervo
     {
-        const string EnderecoPadrao = "https://raw.githubusercontent.com/vcmatias/bigorna-loja/main/";
-        static string Pasta => Path.Combine(Application.persistentDataPath, "Loja");
+        const string EnderecoPadrao = "https://raw.githubusercontent.com/vcmatias/bigorna-acervo/main/";
+        static string Pasta => Path.Combine(Application.persistentDataPath, "Acervo");
         static string CaminhoIndice => Path.Combine(Pasta, "indice.json");
         static string CaminhoRegistro => Path.Combine(Pasta, "instalados.json");
 
-        /// <summary>A raiz da loja; um endereco em Loja/endereco.txt troca (para testar uma loja de outro lugar).</summary>
+        /// <summary>A raiz do acervo; um endereco em Acervo/endereco.txt troca (para testar um acervo de outro lugar).</summary>
         public static string Endereco
         {
             get
@@ -35,10 +35,22 @@ namespace Bigorna.Loja
         public static bool Lendo { get; private set; }
         public static bool Leu { get; private set; }
         public static bool SemConexao { get; private set; }
-        /// <summary>O que a loja esta fazendo agora com cada id ("Baixando…", um erro), para a ficha mostrar.</summary>
+        /// <summary>O que o acervo esta fazendo agora com cada id ("Baixando…", um erro), para a ficha mostrar.</summary>
         public static readonly Dictionary<string, string> Situacao = new Dictionary<string, string>();
         static Registro _reg;
-        public static Registro Registro => _reg ?? (_reg = Registro.Carregar(CaminhoRegistro));
+        public static Registro Registro => _reg ?? (_reg = Registro.Carregar(Migrar()));
+
+        /// <summary>A 0.1.4 guardava o registro em Loja/ (o acervo se chamava loja): ele vem para Acervo/ na primeira leitura.</summary>
+        static string Migrar()
+        {
+            try
+            {
+                var velho = Path.Combine(Application.persistentDataPath, "Loja", "instalados.json");
+                if (!File.Exists(CaminhoRegistro) && File.Exists(velho)) { Directory.CreateDirectory(Pasta); File.Copy(velho, CaminhoRegistro); Log.Info("acervo: registro trazido de Loja/"); }
+            }
+            catch (Exception ex) { Log.Info("acervo: registro antigo " + ex.Message); }
+            return CaminhoRegistro;
+        }
 
         public static IEnumerable<Ficha> Mapas => Itens.Where(f => f.EhMapa);
         public static IEnumerable<Ficha> DePacotes => Itens.Where(f => f.EhPacote);
@@ -58,9 +70,9 @@ namespace Bigorna.Loja
         public static string TextoFaltam(List<Requisito> faltam) =>
             T("Este mapa precisa ", "This map needs ") + (faltam.Count == 1 ? T("do pacote ", "the package ") : T("dos pacotes ", "the packages ")) +
             string.Join(", ", faltam.Select(q => "«" + (q.Nome ?? q.Id) + "»").ToArray()) +
-            T(". Baixe na aba Pacotes (ou baixe o mapa de novo pela loja, que ele vem junto).", ". Download it in the Packages tab (or download the map again from the store: it comes along).");
+            T(". Baixe na aba Pacotes (ou baixe o mapa de novo pelo acervo, que ele vem junto).", ". Download it in the Packages tab (or download the map again from the community library: it comes along).");
 
-        /// <summary>Le o indice da loja (uma vez por abertura da tela, ou de novo pelo botao). Sem conexao, o guardado.</summary>
+        /// <summary>Le o indice do acervo (uma vez por abertura da tela, ou de novo pelo botao). Sem conexao, o guardado.</summary>
         public static IEnumerator LerIndice(Action fim)
         {
             if (Lendo) yield break;
@@ -73,12 +85,12 @@ namespace Bigorna.Loja
                 yield return req.SendWebRequest();
                 string texto = null;
                 if (req.result == UnityWebRequest.Result.Success) { texto = req.downloadHandler.text; try { Directory.CreateDirectory(Pasta); File.WriteAllText(CaminhoIndice, texto); } catch { } }
-                else { SemConexao = true; Log.Info("loja: não consegui ler o índice (" + req.error + ")"); try { if (File.Exists(CaminhoIndice)) texto = File.ReadAllText(CaminhoIndice); } catch { } }
+                else { SemConexao = true; Log.Info("acervo: não consegui ler o índice (" + req.error + ")"); try { if (File.Exists(CaminhoIndice)) texto = File.ReadAllText(CaminhoIndice); } catch { } }
                 try { if (texto != null) Itens = Ficha.DoIndice(texto); }
-                catch (Exception ex) { Log.Info("loja: índice ilegível: " + ex.Message); }
+                catch (Exception ex) { Log.Info("acervo: índice ilegível: " + ex.Message); }
             }
             Lendo = false; Leu = true;
-            Log.Info("loja: " + Itens.Count + " entrada(s) (" + Mapas.Count() + " mapa(s), " + DePacotes.Count() + " pacote(s))" + (SemConexao ? ", sem conexão" : ""));
+            Log.Info("acervo: " + Itens.Count + " entrada(s) (" + Mapas.Count() + " mapa(s), " + DePacotes.Count() + " pacote(s))" + (SemConexao ? ", sem conexão" : ""));
             fim?.Invoke();
         }
 
@@ -90,7 +102,7 @@ namespace Bigorna.Loja
             foreach (var q in f.EhMapa ? PacotesParaBaixar(f) : new List<Requisito>())
             {
                 var pk = Achar(q.Id);
-                if (pk == null || pk.Edicao < q.Edicao) { Situacao[f.Id] = T("A loja não tem o pacote «", "The store does not have the package «") + (q.Nome ?? q.Id) + "» (" + T("edição ", "edition ") + q.Edicao + ")"; passo?.Invoke(); yield break; }
+                if (pk == null || pk.Edicao < q.Edicao) { Situacao[f.Id] = T("O acervo não tem o pacote «", "The community library does not have the package «") + (q.Nome ?? q.Id) + "» (" + T("edição ", "edition ") + q.Edicao + ")"; passo?.Invoke(); yield break; }
                 fila.Add(pk);
             }
             fila.Add(f);
@@ -108,11 +120,11 @@ namespace Bigorna.Loja
                     if (req.result != UnityWebRequest.Result.Success) erro = req.error; else dados = req.downloadHandler.data;
                 }
                 if (erro == null)
-                    try { Instalador.Instalar(dados, x, Bootstrap.PastaMapas, Bootstrap.PastaPacotes, Registro); Log.Info("loja: instalado «" + x.Nome + "» (" + x.Id + ", edição " + x.Edicao + ")"); }
+                    try { Instalador.Instalar(dados, x, Bootstrap.PastaMapas, Bootstrap.PastaPacotes, Registro); Log.Info("acervo: instalado «" + x.Nome + "» (" + x.Id + ", edição " + x.Edicao + ")"); }
                     catch (Exception ex) { erro = ex.Message; }
                 if (erro != null)
                 {
-                    Log.Info("loja: «" + x.Nome + "» não instalou: " + erro);
+                    Log.Info("acervo: «" + x.Nome + "» não instalou: " + erro);
                     Situacao[f.Id] = T("Não deu: ", "Failed: ") + erro; if (x != f) Situacao.Remove(x.Id);
                     passo?.Invoke(); yield break;
                 }
@@ -124,7 +136,7 @@ namespace Bigorna.Loja
 
         public static void Remover(Ficha f)
         {
-            try { if (Instalador.Remover(f.Id, Registro)) Log.Info("loja: removido «" + f.Nome + "» (" + f.Id + ")"); Situacao.Remove(f.Id); }
+            try { if (Instalador.Remover(f.Id, Registro)) Log.Info("acervo: removido «" + f.Nome + "» (" + f.Id + ")"); Situacao.Remove(f.Id); }
             catch (Exception ex) { Situacao[f.Id] = T("Não deu: ", "Failed: ") + ex.Message; }
         }
 

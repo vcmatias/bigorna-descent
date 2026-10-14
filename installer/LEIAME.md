@@ -70,11 +70,11 @@ Compartilhe os mapas e campanhas que fizer (`.dmap`, `.dcamp`); quem abrir usa a
 Ponha os `.dmap` e `.dcamp` em `%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of the Dark\CustomMaps`
 (o editor exporta direto para lá). Na tela de título, "Mapas da comunidade" lista todos.
 
-## A loja
+## O acervo
 
-Em "Mapas da comunidade", as abas **Baixar mapas** e **Pacotes** listam o que outros autores compartilharam na loja
-(https://github.com/vcmatias/bigorna-loja). Baixar, atualizar, jogar ou remover; um mapa traz os pacotes que exige. Os mapas baixados vão para
-`CustomMaps\<id>\` e os pacotes para `Pacotes\<id>\`, ao lado. Para publicar os seus, use **🛒 Loja** no editor.
+Em "Mapas da comunidade", as abas **Baixar mapas** e **Pacotes** listam o que outros autores compartilharam no acervo
+(https://github.com/vcmatias/bigorna-acervo). Baixar, atualizar, jogar ou remover; um mapa traz os pacotes que exige. Os mapas baixados vão para
+`CustomMaps\<id>\` e os pacotes para `Pacotes\<id>\`, ao lado. Para publicar os seus, use **📚 Acervo** no editor.
 
 ## Relatar um problema
 

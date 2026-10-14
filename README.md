@@ -57,12 +57,12 @@ Put `.dmap` and `.dcamp` files in
 `%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of the Dark\CustomMaps`
 (the editor can export straight there). On the title screen, the **Community maps** panel lists them.
 
-## The store (like Valkyrie's)
+## The community library (like Valkyrie's)
 
-The [store](https://github.com/vcmatias/bigorna-loja) holds maps, campaigns and Workshop packages shared by other authors. In the game, **Community maps →
+The [community library](https://github.com/vcmatias/bigorna-acervo) holds maps, campaigns and Workshop packages shared by other authors. In the game, **Community maps →
 Download maps** and **Packages** list them: download, update, play or remove; the packages a map needs come along with
-it. Authors publish from the editor (**🛒 Store → Publish**): it saves the store file and opens a form on GitHub, already
-filled; a bot checks it and puts it in the store, with no curation.
+it. Authors publish from the editor (**📚 Library → Publish**): it saves the community library file and opens a form on GitHub, already
+filled; a bot checks it and puts it in the community library, with no curation.
 
 ## Compatibility promise
 
@@ -83,7 +83,7 @@ where they are.
 | `editor/salas/` | The Bigorna Rooms editor (plain JavaScript). `montar_salas.py --publico` builds the single-page editor. |
 | `installer/` | The Windows installer (PowerShell with a small WinForms window). |
 | `docs/` | This project's website (GitHub Pages). |
-| `loja/` | The template of the [store](https://github.com/vcmatias/bigorna-loja) repository (form, bot, tools). |
+| `acervo/` | The template of the [community library](https://github.com/vcmatias/bigorna-acervo) repository (form, bot, tools). |
 
 ### Build
 

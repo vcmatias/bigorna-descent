@@ -422,14 +422,14 @@ namespace Bigorna.Encontro
         }
 
         /// <summary>Onde procurar os arquivos de um mapa (modelos, sons, imagens): a pasta do .dmap, a da campanha aberta e as
-        /// dos pacotes da loja que eles exigem.</summary>
+        /// dos pacotes do acervo que eles exigem.</summary>
         public static IEnumerable<string> PastasDeBusca()
         {
             // durante a montagem o roteiro ainda nao comecou (Roteiro.Mapa e null): vale o mapa que o Lancador esta abrindo
             var m = Motor.Roteiro.Mapa ?? Lancador.Atual; var c = Campanha.Campanha.Aberta;
             yield return System.IO.Path.GetDirectoryName(m?.Caminho ?? "") ?? "";
             yield return c?.Pasta ?? "";
-            foreach (var p in Loja.Pacotes.Pastas((m?.Requer ?? new List<Loja.Requisito>()).Concat(c?.Requer ?? new List<Loja.Requisito>()))) yield return p;
+            foreach (var p in Acervo.Pacotes.Pastas((m?.Requer ?? new List<Acervo.Requisito>()).Concat(c?.Requer ?? new List<Acervo.Requisito>()))) yield return p;
         }
 
         /// <summary>Um arquivo ao lado do .dmap (ou do .dcamp da campanha aberta, ou num pacote exigido), ou null.</summary>

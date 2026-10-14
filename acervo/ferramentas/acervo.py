@@ -1,10 +1,10 @@
-"""A loja do Bigorna: conferir um envio e gravá-lo, e refazer o índice. Só a biblioteca padrão do Python.
+"""O acervo do Bigorna: conferir um envio e gravá-lo, e refazer o índice. Só a biblioteca padrão do Python.
 
-  python3 ferramentas/loja.py gravar     (no GitHub Actions: lê o envio do formulário em $CORPO_DO_PEDIDO e $AUTOR_DO_PEDIDO,
+  python3 ferramentas/acervo.py gravar     (no GitHub Actions: lê o envio do formulário em $CORPO_DO_PEDIDO e $AUTOR_DO_PEDIDO,
                                          confere e, se passar, grava em itens/<id>/ e refaz o indice.json: sem curadoria)
-  python3 ferramentas/loja.py conferir   (só confere, sem gravar)
-  python3 ferramentas/loja.py indexar    (refaz o indice.json a partir de itens/*/ficha.json)
-  python3 ferramentas/loja.py zip ARQUIVO.zip [AUTOR]   (confere um zip daqui, sem formulário)
+  python3 ferramentas/acervo.py conferir   (só confere, sem gravar)
+  python3 ferramentas/acervo.py indexar    (refaz o indice.json a partir de itens/*/ficha.json)
+  python3 ferramentas/acervo.py zip ARQUIVO.zip [AUTOR]   (confere um zip daqui, sem formulário)
 
 O resultado vai em $GITHUB_OUTPUT (ok=true/false) e o texto para a resposta no pedido em resposta.md. O formato está em
 FORMATO.md. Tudo que vem do pedido é tratado como dado: nada dele vira comando.
@@ -20,8 +20,8 @@ EXTENSOES = ('.dmap', '.dcamp', '.bigorna', '.json', '.ogg', '.mp3', '.wav', '.m
 NOME = re.compile(r'^[^/\\:*?"<>|\x00-\x1f]{1,120}$')
 MAX_ZIP = 60 * 1024 * 1024          # o arquivo enviado
 MAX_DENTRO = 250 * 1024 * 1024      # tudo descompactado
-# sem curadoria: um limite de envios por pessoa por dia (contra enxurrada); LOJA_LIMITE_POR_DIA muda (0: sem limite)
-LIMITE_POR_DIA = int(os.environ.get('LOJA_LIMITE_POR_DIA', '10'))
+# sem curadoria: um limite de envios por pessoa por dia (contra enxurrada); ACERVO_LIMITE_POR_DIA muda (0: sem limite)
+LIMITE_POR_DIA = int(os.environ.get('ACERVO_LIMITE_POR_DIA', '10'))
 ANEXO = re.compile(r'https://github\.com/(?:user-attachments/files/\d+|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/files/\d+)/[^\s)\]"<>]+\.zip')
 
 
@@ -44,7 +44,7 @@ def ficha_do_pedido(corpo):
     texto = next((v for k, v in s.items() if k.startswith('ficha') or k.startswith('card')), '')
     texto = re.sub(r'^```[a-z]*\s*|\s*```$', '', texto.strip())
     try: f = json.loads(texto)
-    except ValueError: raise Recusa('a ficha do pedido não é JSON (ela vem do editor: use o botão Publicar na loja)')
+    except ValueError: raise Recusa('a ficha do pedido não é JSON (ela vem do editor: use o botão Publicar no acervo)')
     if not isinstance(f, dict): raise Recusa('a ficha do pedido não é um objeto')
     return f
 
@@ -59,7 +59,7 @@ def anexo_do_pedido(corpo):
 
 
 def baixar(url):
-    req = urllib.request.Request(url, headers={'User-Agent': 'bigorna-loja'})
+    req = urllib.request.Request(url, headers={'User-Agent': 'bigorna-acervo'})
     with urllib.request.urlopen(req, timeout=120) as r:
         dados = r.read(MAX_ZIP + 1)
     if len(dados) > MAX_ZIP: raise Recusa('o arquivo passa de %d MB' % (MAX_ZIP // 1024 // 1024))
@@ -83,7 +83,7 @@ def fichas_publicadas():
 
 
 def conferir(zip_bytes, ficha_pedido, autor, publicadas=None):
-    """Confere um envio. Devolve a ficha que vai para a loja; Recusa com a razão, se algo não serve."""
+    """Confere um envio. Devolve a ficha que vai para o acervo; Recusa com a razão, se algo não serve."""
     publicadas = fichas_publicadas() if publicadas is None else publicadas
     if len(zip_bytes) > MAX_ZIP: raise Recusa('o arquivo passa de %d MB' % (MAX_ZIP // 1024 // 1024))
     try: z = zipfile.ZipFile(io.BytesIO(zip_bytes))
@@ -95,9 +95,9 @@ def conferir(zip_bytes, ficha_pedido, autor, publicadas=None):
     for n in nomes:
         if '/' in n or '\\' in n or n.startswith('.') or not NOME.match(n): raise Recusa('nome de arquivo não aceito: %s (o zip é plano, sem pastas)' % n)
         if os.path.splitext(n)[1].lower() not in EXTENSOES: raise Recusa('tipo de arquivo não aceito: %s' % n)
-    if 'bigorna-loja.json' not in nomes: raise Recusa('o zip não traz a ficha (bigorna-loja.json): use o arquivo que o editor salvou')
-    f = ler_json(z.read('bigorna-loja.json'), 'bigorna-loja.json')
-    if f.get('formato') != 'bigorna-loja': raise Recusa('a ficha do zip não é da loja do Bigorna')
+    if 'bigorna-acervo.json' not in nomes: raise Recusa('o zip não traz a ficha (bigorna-acervo.json): use o arquivo que o editor salvou')
+    f = ler_json(z.read('bigorna-acervo.json'), 'bigorna-acervo.json')
+    if f.get('formato') != 'bigorna-acervo': raise Recusa('a ficha do zip não é do acervo do Bigorna')
     for k in ('id', 'tipo', 'edicao'):
         if f.get(k) != ficha_pedido.get(k): raise Recusa('a ficha do pedido e a do zip não batem (%s)' % k)
     id_, tipo, ed = f.get('id'), f.get('tipo'), f.get('edicao')
@@ -130,17 +130,17 @@ def conferir(zip_bytes, ficha_pedido, autor, publicadas=None):
     if LIMITE_POR_DIA and sum(1 for p in publicadas.values() if p.get('publicado') == hoje and (p.get('github') or '').lower() == (autor or '').lower()) >= LIMITE_POR_DIA:
         raise Recusa('limite de %d publicações por dia por pessoa; tente amanhã' % LIMITE_POR_DIA)
     if antes:
-        if antes.get('tipo') != tipo: raise Recusa('a loja tem outra coisa com este id')
+        if antes.get('tipo') != tipo: raise Recusa('o acervo tem outra coisa com este id')
         if (antes.get('github') or '').lower() != (autor or '').lower(): raise Recusa('só quem publicou %s (%s) manda edições novas dele' % (id_, antes.get('github')))
-        if ed <= antes.get('edicao', 0): raise Recusa('a loja já tem a edição %d; esta precisa ser maior' % antes.get('edicao', 0))
-    # os pacotes exigidos estão na loja, na edição pedida ou mais nova
+        if ed <= antes.get('edicao', 0): raise Recusa('o acervo já tem a edição %d; esta precisa ser maior' % antes.get('edicao', 0))
+    # os pacotes exigidos estão no acervo, na edição pedida ou mais nova
     requer = f.get('requer') or []
     if not isinstance(requer, list): raise Recusa('requer não é uma lista')
     for q in requer:
         if not isinstance(q, dict) or not ID.match(str(q.get('id', ''))): raise Recusa('requisito não aceito: %r' % (q,))
         p = publicadas.get(q['id'])
-        if not p or p.get('tipo') != 'pacote': raise Recusa('o pacote exigido %s não está na loja (publique o pacote antes)' % q['id'])
-        if p.get('edicao', 0) < int(q.get('edicao') or 1): raise Recusa('o pacote exigido %s está na edição %d na loja; o mapa pede a %s' % (q['id'], p.get('edicao', 0), q.get('edicao')))
+        if not p or p.get('tipo') != 'pacote': raise Recusa('o pacote exigido %s não está no acervo (publique o pacote antes)' % q['id'])
+        if p.get('edicao', 0) < int(q.get('edicao') or 1): raise Recusa('o pacote exigido %s está na edição %d no acervo; o mapa pede a %s' % (q['id'], p.get('edicao', 0), q.get('edicao')))
     for n in docs:
         d = json.loads(z.read(n).decode('utf-8-sig'))
         ids = sorted(x.get('id') for x in (d.get('requires') or []) if isinstance(x, dict))
@@ -168,7 +168,7 @@ def indexar():
             print('fora do índice (soma não confere):', id_); continue
         itens.append(dict(f, url='itens/%s/%s' % (id_, f.get('arquivo') or (id_ + '.zip'))))
     itens.sort(key=lambda f: (f.get('publicado') or '', f.get('id')), reverse=True)
-    novo = {'formato': 'bigorna-loja-indice', 'versao': 1, 'atualizado': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%MZ'), 'itens': itens}
+    novo = {'formato': 'bigorna-acervo-indice', 'versao': 1, 'atualizado': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%MZ'), 'itens': itens}
     velho = None
     try: velho = json.load(open(INDICE, encoding='utf-8'))
     except (OSError, ValueError): pass
@@ -188,7 +188,7 @@ def main(args):
     acao = args[0] if args else ''
     if acao == 'indexar': indexar(); return 0
     if acao == 'zip':
-        try: print(json.dumps(conferir(open(args[1], 'rb').read(), json.loads(zipfile.ZipFile(args[1]).read('bigorna-loja.json')), args[2] if len(args) > 2 else ''), ensure_ascii=False, indent=1)); return 0
+        try: print(json.dumps(conferir(open(args[1], 'rb').read(), json.loads(zipfile.ZipFile(args[1]).read('bigorna-acervo.json')), args[2] if len(args) > 2 else ''), ensure_ascii=False, indent=1)); return 0
         except Recusa as e: print('RECUSADO:', e); return 1
     if acao not in ('conferir', 'gravar'): print(__doc__); return 2
     corpo = os.environ.get('CORPO_DO_PEDIDO', ''); autor = os.environ.get('AUTOR_DO_PEDIDO', '')
@@ -206,7 +206,7 @@ def main(args):
         saida(True, '✅ Conferido / Checked: %s.' % resumo)
     else:
         gravar(dados, final)
-        saida(True, '🎉 Na loja / In the store: %s. Aparece no jogo e no editor em alguns minutos. / It shows in the game and in the editor in a few minutes.' % resumo)
+        saida(True, '🎉 No acervo / In the community library: %s. Aparece no jogo e no editor em alguns minutos. / It shows in the game and in the editor in a few minutes.' % resumo)
     return 0
 
 

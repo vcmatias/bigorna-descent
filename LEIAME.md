@@ -58,12 +58,12 @@ Ponha os arquivos `.dmap` e `.dcamp` em
 `%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of the Dark\CustomMaps`
 (o editor exporta direto para lá). Na tela de título, o painel **Mapas da comunidade** lista todos.
 
-## A loja (como a do Valkyrie)
+## O acervo (como o do Valkyrie)
 
-A [loja](https://github.com/vcmatias/bigorna-loja) guarda mapas, campanhas e pacotes da Oficina compartilhados por outros autores. No jogo, **Mapas da
+A [acervo](https://github.com/vcmatias/bigorna-acervo) guarda mapas, campanhas e pacotes da Oficina compartilhados por outros autores. No jogo, **Mapas da
 comunidade → Baixar mapas** e **Pacotes** listam tudo: baixar, atualizar, jogar ou remover; os pacotes que um mapa exige vêm
-junto. Os autores publicam pelo editor (**🛒 Loja → Publicar**): ele salva o arquivo da loja e abre um formulário no GitHub,
-já preenchido; um bot confere e põe na loja, sem curadoria.
+junto. Os autores publicam pelo editor (**📚 Acervo → Publicar**): ele salva o arquivo do acervo e abre um formulário no GitHub,
+já preenchido; um bot confere e põe no acervo, sem curadoria.
 
 ## Compatibilidade garantida
 
@@ -84,7 +84,7 @@ estão.
 | `editor/salas/` | O editor Bigorna Rooms (JavaScript puro). `montar_salas.py --publico` monta o editor numa página só. |
 | `installer/` | O instalador para Windows (PowerShell com uma janela WinForms). |
 | `docs/` | O site do projeto (GitHub Pages). |
-| `loja/` | O modelo do repositório da [loja](https://github.com/vcmatias/bigorna-loja) (formulário, bot e ferramentas). |
+| `acervo/` | O modelo do repositório da [acervo](https://github.com/vcmatias/bigorna-acervo) (formulário, bot e ferramentas). |
 
 ### Compilar
 
