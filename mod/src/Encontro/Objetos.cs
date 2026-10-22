@@ -103,7 +103,7 @@ namespace Bigorna.Encontro
             ["Tree"] = "Tree", ["RoundTable"] = "Round table", ["StoneTable"] = "Stone table",
             ["LadderMedium"] = "Medium ladder", ["DragonArch"] = "Dragon arch", ["DragonHead"] = "Dragon head", ["BellFrame"] = "Bell frame",
         };
-        static Dictionary<string, string> Nomes => Idioma.Pt ? NomesPt : NomesEn;
+        static Dictionary<string, string> Nomes => Idioma.Dicionario(NomesPt, NomesEn);
 
         public static readonly List<NaMesa> Postos = new List<NaMesa>();
         public static int[] TamanhoDe(string tipo) => tipo != null && Tamanhos.TryGetValue(tipo, out var t) ? t : new[] { 1, 1 };

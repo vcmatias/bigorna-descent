@@ -62,9 +62,9 @@ namespace Bigorna.Motor
                 case "heroLeavesArea": return T("Um herói saiu da ", "A hero left ") + Area(p) + (g.Nome != null ? " (" + g.Nome + ")" : "");
                 case "specificHeroEnters": return (P.Texto(p, "hero") ?? T("O herói", "The hero")) + T(" entrou na ", " entered ") + Area(p);
                 case "heroOnFire": return T("Um herói pegou fogo", "A hero caught fire");
-                case "enemyActivated": return T("«" + (P.Texto(p, "enemy") ?? "o inimigo") + "» ativou", "“" + (P.Texto(p, "enemy") ?? "the enemy") + "” activated");
+                case "enemyActivated": return P.Texto(p, "enemy") != null ? TF("«{0}» ativou", "“{0}” activated", P.Texto(p, "enemy")) : T("O inimigo ativou", "The enemy activated");
                 case "enemyEntersArea": return T("Um inimigo entrou na ", "An enemy entered ") + Area(p);
-                case "itemObtained": return T("Obtiveram «" + Butim.NomeItem(P.Texto(p, "loot")) + "»", "Obtained “" + Butim.NomeItem(P.Texto(p, "loot")) + "”");
+                case "itemObtained": return TF("Obtiveram «{0}»", "Obtained “{0}”", Butim.NomeItem(P.Texto(p, "loot")));
                 default: return g.Rotulo;
             }
         }
@@ -103,7 +103,7 @@ namespace Bigorna.Motor
             }
             var obj = Roteiro.Objetivo;
             if (obj != null)
-                _itens.Add(new Item { Secao = T("Objetivos", "Objectives"), Rotulo = T("Cumprido: ", "Completed: ") + Roteiro.TextoDe(obj) + (ObjetivosAuto.Automatico(obj) ? T("  (o app também vigia este)", "  (the app also tracks this one)") : ""), Confirmar = true, Acao = () => { Log.Info("a mesa dá o objetivo por cumprido"); Roteiro.Avancar(); } });
+                _itens.Add(new Item { Secao = T("Objetivos", "Objectives"), Rotulo = T("Cumprido: ", "Completed: ") + Roteiro.TextoDe(obj) + (ObjetivosAuto.Automatico(obj) ? T("  (o aplicativo também vigia este)", "  (the app also tracks this one)") : ""), Confirmar = true, Acao = () => { Log.Info("a mesa dá o objetivo por cumprido"); Roteiro.Avancar(); } });
             foreach (var (i, o, feito) in Roteiro.Opcionais)
             {
                 if (feito || !Roteiro.Anunciado(o)) continue;

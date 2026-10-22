@@ -24,6 +24,11 @@ const IDIOMA = (() => {
 /* texts written in both languages: L2(en, pt), T2({en, pt}), TXT of {en, pt} (a list: its first), LP() the key */
 const LP = () => IDIOMA === 'pt' ? 'pt' : 'en';
 const L2 = (en, pt) => IDIOMA === 'pt' ? pt : en;
+/* a text that goes into the exported file (the players read it in the game): in the language of the work being exported
+   (the original, or the language a translated copy is being exported in), not in the language of the editor */
+const LE2 = (en, pt) => { let l = '', o = ''; try { o = linguaOriginal(); l = LINGUA_EDICAO || o; } catch { l = o = IDIOMA; }
+  // (a language other than these two keeps the original's text: only the author's own translations go into the file)
+  if (!/^(pt|en)/.test(l || '')) l = o; return /^pt/.test(l || '') ? pt : en; };
 const T2 = o => L2(o.en, o.pt);
 const TXT = o => { if (typeof o === 'string') return o; const v = o ? (o[LP()] || o.en || '') : ''; return Array.isArray(v) ? (v[0] || '') : v; };
 
@@ -60,17 +65,29 @@ const tr = (() => {
   let usuario = new Set(), usuarioQuando = 0;
   function coletar() {
     const s = new Set();
-    const guarda = (v, k) => { if (v.length > 0 && v.length < 240 && !TECNICAS.has(k) && !v.startsWith('data:') && !ehIdentificador(v)) s.add(v.trim()); };
+    const guarda = (v, k) => { if (v.length > 0 && v.length < 240 && !TECNICAS.has(k) && !v.startsWith('data:') && !v.startsWith('imagens/') && !ehIdentificador(v)) s.add(v.trim()); };
     const anda = (x, k, prof) => {
       if (!x || prof > 30) return;
       if (Array.isArray(x)) { for (const y of x) { if (typeof y === 'string') guarda(y, k); else if (y && typeof y === 'object') anda(y, k, prof + 1); } return; }
       if (typeof x !== 'object') return;
       for (const c in x) { const v = x[c]; if (typeof v === 'string') guarda(v, c); else if (v && typeof v === 'object') anda(v, c, prof + 1); }
     };
-    try { anda(campanha, '', 0); } catch { }
-    try { if (!campanha) anda(projeto, '', 0); } catch { }
+    // (v237: the entries of other packages do not change: their strings are gathered once per set of packages)
+    // (v239: in a campaign every map points to the same Workshop: it is walked once, not once per map)
+    const jaVistos = new Set();
+    const andaSemPacotes = (x, k, prof) => { if (x && typeof x === 'object' && !Array.isArray(x) && x._doPacote) return;
+      if (k === 'bestiario' && x && typeof x === 'object') { if (jaVistos.has(x)) return; jaVistos.add(x); } if (Array.isArray(x)) { for (const y of x) { if (typeof y === 'string') guarda(y, k); else if (y && typeof y === 'object' && !y._doPacote) anda2(y, k, prof + 1); } return; } anda2(x, k, prof); };
+    const anda2 = (x, k, prof) => { if (!x || prof > 30 || typeof x !== 'object') return; for (const c in x) { const v = x[c]; if (typeof v === 'string') guarda(v, c); else if (v && typeof v === 'object') andaSemPacotes(v, c, prof + 1); } };
+    try { andaSemPacotes(campanha, '', 0); } catch { }
+    try { if (!campanha) andaSemPacotes(projeto, '', 0); } catch { }
+    try { const b = typeof oficina === 'function' ? oficina() : null; if (b) { let n = 0; Object.values(b).forEach(l => { if (Array.isArray(l)) l.forEach(x => { if (x && x._doPacote) n++; }); });
+      if (n !== doPacotesN) { doPacotesN = n; const s0 = s; const tmp = new Set(); const guarda0 = (v, k) => { if (v.length > 0 && v.length < 240 && !TECNICAS.has(k) && !v.startsWith('data:') && !v.startsWith('imagens/') && !ehIdentificador(v)) tmp.add(v.trim()); };
+        const anda0 = (x, k, prof) => { if (!x || prof > 30) return; if (Array.isArray(x)) { for (const y of x) { if (typeof y === 'string') guarda0(y, k); else if (y && typeof y === 'object') anda0(y, k, prof + 1); } return; } if (typeof x !== 'object') return; for (const c in x) { const v = x[c]; if (typeof v === 'string') guarda0(v, c); else if (v && typeof v === 'object') anda0(v, c, prof + 1); } };
+        Object.values(b).forEach(l => { if (Array.isArray(l)) l.forEach(x => { if (x && x._doPacote) anda0(x, '', 1); }); }); doPacotesStr = tmp; }
+      doPacotesStr.forEach(v => s.add(v)); } } catch { }
     return s;
   }
+  let doPacotesN = -1, doPacotesStr = new Set();
   /* rebuilt once per batch of changes (the DOM) or every half second (the canvas); a change empties the cache */
   function atualizarUsuario() {
     const novo = coletar(); usuarioQuando = performance.now();
@@ -262,7 +279,7 @@ const tr = (() => {
 /* the language picked in ⚙ Settings: the work is kept first (as the editor keeps it every 2 s), then the page reloads */
 async function mudarIdioma(v) {
   if (!IDIOMAS.some(x => x[0] === v) || v === IDIOMA) return;
-  try { guardarEstado(); } catch { }
+  try { await guardarEstado(); } catch { }
   try { if (typeof Auto !== 'undefined' && Auto.passo) await Promise.race([Auto.passo(true), new Promise(ok => setTimeout(ok, 1500))]); } catch { }
   try { localStorage.setItem('bigorna-idioma', v); } catch { }
   location.reload();

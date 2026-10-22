@@ -14,6 +14,14 @@ namespace Bigorna.Acervo
     // A parte do acervo que nao depende do jogo (testada fora dele): a ficha, o zip, a verificacao, instalar e remover, o
     // registro do que o acervo instalou e a juncao dos pacotes exigidos ao "custom" de um mapa. Formato em acervo/FORMATO.md.
 
+    /// <summary>Os textos de erro do nucleo (a ficha da tela mostra a razao) na lingua do mod: o mod liga Escolher a
+    /// Idioma.T; fora do jogo (nos testes, que compilam este arquivo sozinho), portugues.</summary>
+    public static class LinguaDosErros
+    {
+        public static Func<string, string, string> Escolher = (pt, en) => pt;
+        public static string T(string pt, string en) => Escolher(pt, en);
+    }
+
     /// <summary>Um pacote que um mapa exige (na ficha: id, edicao, nome; no .dmap: id, edition, name).</summary>
     public class Requisito
     {
@@ -62,7 +70,7 @@ namespace Bigorna.Acervo
         public static List<Ficha> DoIndice(string json)
         {
             var j = Pacotes.LerJson(json);
-            if ((string)j["formato"] != "bigorna-acervo-indice") throw new Exception("o índice do acervo não é do Bigorna");
+            if ((string)j["formato"] != "bigorna-acervo-indice") throw new Exception(LinguaDosErros.T("o índice do acervo não é do Bigorna", "the community library index is not a Bigorna one"));
             var r = new List<Ficha>();
             foreach (var x in (j["itens"] as JArray ?? new JArray()).OfType<JObject>())
             {
@@ -90,24 +98,24 @@ namespace Bigorna.Acervo
             var r = new List<Entrada>();
             int fim = -1;
             for (int i = z.Length - 22; i >= Math.Max(0, z.Length - 65557); i--) if (BitConverter.ToUInt32(z, i) == 0x06054b50) { fim = i; break; }
-            if (fim < 0) throw new Exception("zip sem diretório central");
+            if (fim < 0) throw new Exception(LinguaDosErros.T("zip sem diretório central", "zip without a central directory"));
             int n = BitConverter.ToUInt16(z, fim + 10); int p = (int)BitConverter.ToUInt32(z, fim + 16);
             for (int k = 0; k < n; k++)
             {
-                if (p + 46 > z.Length || BitConverter.ToUInt32(z, p) != 0x02014b50) throw new Exception("zip danificado");
+                if (p + 46 > z.Length || BitConverter.ToUInt32(z, p) != 0x02014b50) throw new Exception(LinguaDosErros.T("zip danificado", "damaged zip"));
                 int metodo = BitConverter.ToUInt16(z, p + 10); int comp = (int)BitConverter.ToUInt32(z, p + 20); int tam = (int)BitConverter.ToUInt32(z, p + 24);
                 int ln = BitConverter.ToUInt16(z, p + 28), le = BitConverter.ToUInt16(z, p + 30), lc = BitConverter.ToUInt16(z, p + 32); int local = (int)BitConverter.ToUInt32(z, p + 42);
                 var nome = Encoding.UTF8.GetString(z, p + 46, ln).Replace('\\', '/');
                 p += 46 + ln + le + lc;
                 if (nome.EndsWith("/")) continue;
-                if (tam < 0 || comp < 0 || tam > 300 * 1024 * 1024) throw new Exception("arquivo grande demais no zip: " + nome);
+                if (tam < 0 || comp < 0 || tam > 300 * 1024 * 1024) throw new Exception(LinguaDosErros.T("arquivo grande demais no zip: ", "file too large in the zip: ") + nome);
                 int dados = local + 30 + BitConverter.ToUInt16(z, local + 26) + BitConverter.ToUInt16(z, local + 28);
-                if (dados + comp > z.Length) throw new Exception("zip danificado");
+                if (dados + comp > z.Length) throw new Exception(LinguaDosErros.T("zip danificado", "damaged zip"));
                 byte[] b;
                 if (metodo == 0) { b = new byte[tam]; Buffer.BlockCopy(z, dados, b, 0, tam); }
                 else if (metodo == 8) using (var ms = new MemoryStream(z, dados, comp)) using (var d = new DeflateStream(ms, CompressionMode.Decompress)) using (var o = new MemoryStream(tam)) { d.CopyTo(o); b = o.ToArray(); }
-                else throw new Exception("compressão " + metodo + " desconhecida (" + nome + ")");
-                if (b.Length != tam) throw new Exception("tamanho errado no zip: " + nome);
+                else throw new Exception(LinguaDosErros.T("compressão " + metodo + " desconhecida (", "unknown compression " + metodo + " (") + nome + ")");
+                if (b.Length != tam) throw new Exception(LinguaDosErros.T("tamanho errado no zip: ", "wrong size in the zip: ") + nome);
                 r.Add(new Entrada { Nome = nome, Dados = b });
             }
             return r;
@@ -151,6 +159,7 @@ namespace Bigorna.Acervo
     {
         public static readonly string[] Tipos = { ".dmap", ".dcamp", ".bigorna", ".json", ".ogg", ".mp3", ".wav", ".mp4", ".webm", ".png", ".jpg", ".jpeg", ".webp", ".glb", ".gltf", ".obj", ".bin", ".mtl" };
         static readonly Regex NomeSeguro = new Regex(@"^[^/\\:*?""<>|\x00-\x1f]{1,120}$");
+        static readonly Regex ImagemDaObra = new Regex(@"^imagens/[0-9a-f]{32}\.(png|jpg|webp|gif)$");
 
         public static string Sha256(byte[] b) { using (var h = SHA256.Create()) return string.Concat(h.ComputeHash(b).Select(x => x.ToString("x2"))); }
 
@@ -159,22 +168,24 @@ namespace Bigorna.Acervo
         public static List<Zip.Entrada> Conferir(byte[] zip, Ficha esperada)
         {
             if (!string.IsNullOrEmpty(esperada.Sha256) && !string.Equals(Sha256(zip), esperada.Sha256, StringComparison.OrdinalIgnoreCase))
-                throw new Exception("o arquivo baixado não confere com o acervo (soma diferente)");
+                throw new Exception(LinguaDosErros.T("o arquivo baixado não confere com o acervo (soma diferente)", "the downloaded file does not match the community library (different checksum)"));
             var es = Zip.Ler(zip);
-            var fj = es.FirstOrDefault(e => e.Nome == "bigorna-acervo.json") ?? throw new Exception("o arquivo não traz a ficha do acervo");
+            var fj = es.FirstOrDefault(e => e.Nome == "bigorna-acervo.json") ?? throw new Exception(LinguaDosErros.T("o arquivo não traz a ficha do acervo", "the file has no community library sheet"));
             var f = JsonConvert.DeserializeObject<Ficha>(Encoding.UTF8.GetString(fj.Dados).TrimStart('﻿'));
-            if (f == null || f.Formato != "bigorna-acervo" || f.Id != esperada.Id || f.Tipo != esperada.Tipo) throw new Exception("a ficha de dentro do arquivo não é a desta entrada do acervo");
-            if (f.Edicao != esperada.Edicao) throw new Exception("a edição do arquivo (" + f.Edicao + ") não é a do acervo (" + esperada.Edicao + ")");
+            if (f == null || f.Formato != "bigorna-acervo" || f.Id != esperada.Id || f.Tipo != esperada.Tipo) throw new Exception(LinguaDosErros.T("a ficha de dentro do arquivo não é a desta entrada do acervo", "the sheet inside the file does not belong to this community library entry"));
+            if (f.Edicao != esperada.Edicao) throw new Exception(LinguaDosErros.T("a edição do arquivo (" + f.Edicao + ") não é a do acervo (" + esperada.Edicao + ")", "the file edition (" + f.Edicao + ") is not the community library one (" + esperada.Edicao + ")"));
             var vistos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var e in es)
             {
-                if (e.Nome.Contains("/") || e.Nome.StartsWith(".") || !NomeSeguro.IsMatch(e.Nome)) throw new Exception("nome de arquivo não aceito: " + e.Nome);
-                if (!Tipos.Contains(Path.GetExtension(e.Nome).ToLowerInvariant())) throw new Exception("tipo de arquivo não aceito: " + e.Nome);
-                if (!vistos.Add(e.Nome)) throw new Exception("arquivo repetido: " + e.Nome);
+                // (v240: as imagens da obra vao numa pasta "imagens", com o nome do conteudo; nenhuma outra pasta)
+                if (ImagemDaObra.IsMatch(e.Nome)) { if (!vistos.Add(e.Nome)) throw new Exception(LinguaDosErros.T("arquivo repetido: ", "repeated file: ") + e.Nome); continue; }
+                if (e.Nome.Contains("/") || e.Nome.StartsWith(".") || !NomeSeguro.IsMatch(e.Nome)) throw new Exception(LinguaDosErros.T("nome de arquivo não aceito: ", "file name not accepted: ") + e.Nome);
+                if (!Tipos.Contains(Path.GetExtension(e.Nome).ToLowerInvariant())) throw new Exception(LinguaDosErros.T("tipo de arquivo não aceito: ", "file type not accepted: ") + e.Nome);
+                if (!vistos.Add(e.Nome)) throw new Exception(LinguaDosErros.T("arquivo repetido: ", "repeated file: ") + e.Nome);
             }
-            if (f.Tipo == "mapa" && !es.Any(e => e.Nome.EndsWith(".dmap", StringComparison.OrdinalIgnoreCase))) throw new Exception("o mapa não traz o .dmap");
-            if (f.Tipo == "campanha" && !es.Any(e => e.Nome.EndsWith(".dcamp", StringComparison.OrdinalIgnoreCase))) throw new Exception("a campanha não traz o .dcamp");
-            if (f.Tipo == "pacote" && !es.Any(e => e.Nome == "pacote.json")) throw new Exception("o pacote não traz o pacote.json");
+            if (f.Tipo == "mapa" && !es.Any(e => e.Nome.EndsWith(".dmap", StringComparison.OrdinalIgnoreCase))) throw new Exception(LinguaDosErros.T("o mapa não traz o .dmap", "the map has no .dmap"));
+            if (f.Tipo == "campanha" && !es.Any(e => e.Nome.EndsWith(".dcamp", StringComparison.OrdinalIgnoreCase))) throw new Exception(LinguaDosErros.T("a campanha não traz o .dcamp", "the campaign has no .dcamp"));
+            if (f.Tipo == "pacote" && !es.Any(e => e.Nome == "pacote.json")) throw new Exception(LinguaDosErros.T("o pacote não traz o pacote.json", "the package has no pacote.json"));
             return es;
         }
 
@@ -190,10 +201,10 @@ namespace Bigorna.Acervo
             reg.Itens.TryGetValue(f.Id, out var antes);
             var nossos = new HashSet<string>(antes?.Arquivos ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
             foreach (var e in es) if (!nossos.Contains(e.Nome) && File.Exists(Path.Combine(pasta, e.Nome)) && e.Nome != "bigorna-acervo.json")
-                    throw new Exception("a pasta " + Path.GetFileName(pasta) + " já tem um «" + e.Nome + "» que não veio do acervo");
+                    throw new Exception(LinguaDosErros.T("a pasta " + Path.GetFileName(pasta) + " já tem um «" + e.Nome + "» que não veio do acervo", "the folder " + Path.GetFileName(pasta) + " already has a “" + e.Nome + "” that did not come from the community library"));
             Directory.CreateDirectory(pasta);
-            foreach (var velho in nossos) { var c = Path.Combine(pasta, velho); try { if (File.Exists(c)) File.Delete(c); } catch { } }
-            foreach (var e in es) File.WriteAllBytes(Path.Combine(pasta, e.Nome), e.Dados);
+            foreach (var velho in nossos) { var c = Path.Combine(pasta, velho.Replace('/', Path.DirectorySeparatorChar)); try { if (File.Exists(c)) File.Delete(c); } catch { } }
+            foreach (var e in es) { var alvo = Path.Combine(pasta, e.Nome.Replace('/', Path.DirectorySeparatorChar)); Directory.CreateDirectory(Path.GetDirectoryName(alvo)); File.WriteAllBytes(alvo, e.Dados); }
             reg.Itens[f.Id] = new Registro.Item { Tipo = f.Tipo, Edicao = f.Edicao, Nome = f.Nome, Pasta = pasta, Arquivos = es.Select(e => e.Nome).ToList(), Requer = f.Requer ?? new List<Requisito>() };
             reg.Gravar();
             Pacotes.Esquecer();
@@ -203,7 +214,8 @@ namespace Bigorna.Acervo
         public static bool Remover(string id, Registro reg)
         {
             if (!reg.Itens.TryGetValue(id ?? "", out var it)) return false;
-            foreach (var a in it.Arquivos) { var c = Path.Combine(it.Pasta, a); try { if (File.Exists(c)) File.Delete(c); } catch { } }
+            foreach (var a in it.Arquivos) { var c = Path.Combine(it.Pasta, a.Replace('/', Path.DirectorySeparatorChar)); try { if (File.Exists(c)) File.Delete(c); } catch { } }
+            try { var im = Path.Combine(it.Pasta, "imagens"); if (Directory.Exists(im) && !Directory.EnumerateFileSystemEntries(im).Any()) Directory.Delete(im); } catch { }
             try { if (Directory.Exists(it.Pasta) && !Directory.EnumerateFileSystemEntries(it.Pasta).Any()) Directory.Delete(it.Pasta); } catch { }
             reg.Itens.Remove(id); reg.Gravar();
             Pacotes.Esquecer();
@@ -220,7 +232,27 @@ namespace Bigorna.Acervo
         static readonly Dictionary<string, Lido> _cache = new Dictionary<string, Lido>(StringComparer.OrdinalIgnoreCase);
         public static void Esquecer() { lock (_cache) _cache.Clear(); }
 
-        public static string PastaDo(string id) => string.IsNullOrEmpty(Raiz) || !Ficha.IdValido(id) ? null : Path.Combine(Raiz, id);
+        public static string PastaDo(string id)
+        {
+            if (string.IsNullOrEmpty(Raiz) || !Ficha.IdValido(id)) return null;
+            var p = Path.Combine(Raiz, id);
+            if (File.Exists(Path.Combine(p, "pacote.json"))) return p;
+            // (v241: um pacote numa pasta de outro nome: achado pelo id do pacote.json; a busca de novo so depois de 10 s)
+            lock (_porId)
+            {
+                if ((DateTime.UtcNow - _porIdQuando).TotalSeconds > 10)
+                {
+                    _porId.Clear(); _porIdQuando = DateTime.UtcNow;
+                    try { foreach (var d in Directory.GetDirectories(Raiz)) { var c = Path.Combine(d, "pacote.json"); if (!File.Exists(c)) continue;
+                            try { var t = File.ReadAllText(c); var m = System.Text.RegularExpressions.Regex.Match(t.Length > 4000 ? t.Substring(0, 4000) : t, "\"id\"\\s*:\\s*\"([^\"]+)\""); if (m.Success && !_porId.ContainsKey(m.Groups[1].Value)) _porId[m.Groups[1].Value] = d; } catch { } } }
+                    catch { }
+                }
+                if (_porId.TryGetValue(id, out var achada)) return achada;
+            }
+            return p;
+        }
+        static readonly Dictionary<string, string> _porId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        static DateTime _porIdQuando = DateTime.MinValue;
 
         /// <summary>O pacote.json de um pacote instalado, ou null.</summary>
         public static JObject Ler(string id)
@@ -263,6 +295,8 @@ namespace Bigorna.Acervo
             {
                 var pk = ler(q.Id);
                 if (pk == null) { faltam.Add(q); continue; }
+                // (v241: uma edicao mais velha que a pedida tambem falta: pode nao ter o que o mapa usa; o que ela tem entra)
+                if (Math.Max(1, (int?)pk["edition"] ?? 1) < q.Edicao) faltam.Add(q);
                 var dele = pk["custom"] as JObject; if (dele == null) continue;
                 foreach (var prop in dele.Properties())
                 {

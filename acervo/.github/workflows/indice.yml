@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: python3 ferramentas/acervo.py indexar
       - run: |
-          if git diff --quiet -- indice.json; then echo "sem mudanças"; exit 0; fi
+          if git diff --quiet -- indice.json CATALOGO.md && [ -z "$(git status --porcelain CATALOGO.md)" ]; then echo "sem mudanças"; exit 0; fi
           git config user.name "bigorna-acervo"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add indice.json && git commit -m "acervo: índice" && git push
+          git add indice.json CATALOGO.md && git commit -m "acervo: índice" && git push

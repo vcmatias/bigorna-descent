@@ -331,7 +331,7 @@ namespace Bigorna.Encontro
         static string LinhaDaPeca(GameTile t)
         {
             var p = _pecaDe.TryGetValue(t, out var pp) ? pp : null;
-            return ((t.name ?? "").StartsWith("@Bigorna-") ? Idioma.T("o objeto 3D ", "the 3D object ") : "") + "<b>" + NomeNaMesa(t) + "</b>" + (p != null && EhCaixa(p.Tile) ? Idioma.T(" (uma caixa: no chão, com o topo no nível " + p.Nivel + ", sem pilares)", " (a box: on the floor, its top at level " + p.Nivel + ", no pillars)") : p != null && p.Nivel > 0 ? Idioma.T(", no nível " + p.Nivel + ", sobre pilares", ", at level " + p.Nivel + ", on pillars") : "")
+            return ((t.name ?? "").StartsWith("@Bigorna-") ? Idioma.T("o objeto 3D ", "the 3D object ") : "") + "<b>" + NomeNaMesa(t) + "</b>" + (p != null && EhCaixa(p.Tile) ? Idioma.TF(" (uma caixa: no chão, com o topo no nível {0}, sem pilares)", " (a box: on the floor, its top at level {0}, no pillars)", p.Nivel) : p != null && p.Nivel > 0 ? Idioma.TF(", no nível {0}, sobre pilares", ", at level {0}, on pillars", p.Nivel) : "")
                 + (t.IsUnderlay ? Idioma.T(" (subcamada: as peças de chão vão por cima dela)", " (underlay: the floor tiles go on top of it)") : "");
         }
 
@@ -591,7 +591,7 @@ namespace Bigorna.Encontro
         }
 
         /// <summary>O nome de uma peca para quem joga: o numero dela; o terreno posto como peca (escadaria, ponte), pelo nome.</summary>
-        static string NomeNaMesa(GameTile t) { var n = (t?.name ?? "?").Trim(); return n.StartsWith("@Bigorna-") ? Objetos.Nome(n.Substring(9)) : (t != null && t.IsUnderlay) || n.IndexOf("underlay", StringComparison.OrdinalIgnoreCase) >= 0 ? NomeDaSubcamada(n) : n == NomeDaCaixa ? Idioma.T(NomeDaCaixa, "Game box (Act I)") : n; }
+        static string NomeNaMesa(GameTile t) { var n = (t?.name ?? "?").Trim(); return n.StartsWith("@Bigorna-") ? Objetos.Nome(n.Substring(9)) : (t != null && t.IsUnderlay) || n.IndexOf("underlay", StringComparison.OrdinalIgnoreCase) >= 0 ? NomeDaSubcamada(n) : n == NomeDaCaixa ? Idioma.TF("{0}", "Game box (Act I)", NomeDaCaixa) : n; }
         /// <summary>O nome (go.name) da caixa do jogo posta como peca; na mesa aparece na lingua do mod.</summary>
         const string NomeDaCaixa = "Caixa do jogo (Ato I)";
         /// <summary>As subcamadas (peças de fundo) em portugues: agua, agua fetida, brasas, espinhos.</summary>

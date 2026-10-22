@@ -6,6 +6,7 @@ using FFG.Core;
 using FFG.D3;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
+using static Bigorna.Idioma;
 
 namespace Bigorna.Encontro
 {
@@ -20,6 +21,10 @@ namespace Bigorna.Encontro
         static readonly Desfazer _desfazer = new Desfazer();
         static readonly FieldInfo _campoId = typeof(ModelBase).GetField("_id", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
         static readonly FieldInfo _campoAto = typeof(ModelBase).GetField("_act", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+        /// <summary>Itens no premio (o jogo so da cartas e receitas): facanha -> (item, quantidade). Entregues pelo Batimento.</summary>
+        static readonly Dictionary<string, List<KeyValuePair<string, int>>> _itensDoPremio = new Dictionary<string, List<KeyValuePair<string, int>>>(StringComparer.OrdinalIgnoreCase);
+        static readonly FieldInfo _campoConcluida = typeof(FFG.D3.UI.UIFeatsDialog).GetField("_selectedCompletedFeatId", BindingFlags.Instance | BindingFlags.NonPublic);
+        static string _concluidaAntes;
 
         public static void Registrar(List<JObject> facanhas, List<string> pool, string origem)
         {
@@ -82,6 +87,11 @@ namespace Bigorna.Encontro
                 }
                 f.Rewards = lista.ToArray();
             }
+            if (j["rewardItems"] is JArray its)
+            {
+                var l = its.OfType<JObject>().Select(t => new KeyValuePair<string, int>((string)t["item"] ?? "", Math.Max(1, (int?)t["qty"] ?? 1))).Where(kv => kv.Key != "").ToList();
+                if (l.Count > 0) _itensDoPremio[f.Id] = l; else _itensDoPremio.Remove(f.Id);
+            }
             if (!(j["params"] is JObject p)) return;
             int[] Ints(string k) => p[k] is JArray a ? a.Select(x => (int)x).ToArray() : null;
             var armas = Ints("weapons"); f.WeaponClasses = new FeatModel.WeaponParam(armas != null && armas.Length > 0, (armas ?? new int[0]).Select(x => (WeaponClasses)x).ToArray());
@@ -96,6 +106,35 @@ namespace Bigorna.Encontro
             var vit = (bool?)p["victory"]; f.IsVictory = new FeatModel.SwitchParam(vit.HasValue, vit ?? true);
             var mind = (int?)p["minDamage"]; f.MinimumDamage = new FeatModel.IntParam(mind.HasValue && mind.Value > 0, mind ?? 0);
             var mesmo = (bool?)p["sameEnemy"]; f.SameEnemy = new FeatModel.SwitchParam(mesmo.HasValue, mesmo ?? true);
+            // as condicoes finas, pelos nomes do jogo; "conditionsAll": a lista e inteira (as de fora desligam); senao so as listadas mudam
+            if (p["conditions"] is JObject cs)
+            {
+                bool todas = (bool?)p["conditionsAll"] ?? false;
+                foreach (var nome in Finas)
+                {
+                    var t = cs[nome];
+                    if (t == null && !todas) continue;
+                    try { PorFina(f, nome, t); } catch (Exception ex) { Log.Info("  condição «" + nome + "»: " + ex.Message); }
+                }
+            }
+        }
+
+        /// <summary>As condicoes finas que o editor monta (FeatModel: BoolParam, SwitchParam, IntParam).</summary>
+        static readonly string[] Finas = { "ExcessWeaknessDamage", "RequireObjectRemove", "AttackWithBothWeapons", "DamagedEnemy", "AnyHero", "AnyHeroInjured", "AnyOtherHeroInjured",
+            "EnemyHasTactic", "FirstAttackOfRound", "FirstInteractionOfRound", "FirstTimeInteracted", "FirstTimeAttackedByHero", "HeroAttackedThisRound", "EnemyWasAttackedThisRound",
+            "OtherHeroDidDamage", "AllOtherHeroesDidDamageThisRound", "AllHeroesDidDamageThisRound", "DiedFromAffliction", "AmountOfTimeDuringRound", "ForAmountOfRounds", "StatusCount", "EnemiesOnMap" };
+
+        /// <summary>Uma condicao fina: ausente (null) desliga; uma chave liga (com o valor, numa chave de valor; o numero, numa de numero).</summary>
+        static void PorFina(FeatModel f, string nome, JToken t)
+        {
+            var campo = typeof(FeatModel).GetField(nome); if (campo == null) return;
+            bool liga = t != null && t.Type != JTokenType.Null;
+            object v;
+            if (campo.FieldType == typeof(FeatModel.SwitchParam)) v = new FeatModel.SwitchParam(liga, liga && t.Type == JTokenType.Boolean ? (bool)t : liga);
+            else if (campo.FieldType == typeof(FeatModel.IntParam)) v = new FeatModel.IntParam(liga, liga && (t.Type == JTokenType.Integer || t.Type == JTokenType.Float) ? (int)t : 0);
+            else if (campo.FieldType == typeof(FeatModel.BoolParam)) v = new FeatModel.BoolParam(liga && (t.Type != JTokenType.Boolean || (bool)t));
+            else return;
+            campo.SetValue(f, v);
         }
 
         /// <summary>Guarda tudo o que Aplicar pode mudar numa facanha do jogo, para desfazer ao sair.</summary>
@@ -105,12 +144,14 @@ namespace Bigorna.Encontro
             var wc = f.WeaponClasses; var et = f.EnemyTypes; var it = f.ItemType; var ia = f.InteractableType; var ec = f.EnemyConditions; var hi = f.HeroInjured;
             var gt = f.GoalIsTotalDamage; var wd = f.WeaknessDamage; var iv = f.IsVictory; var md = f.MinimumDamage; var se = f.SameEnemy;
             object ato = null; try { ato = _campoAto?.GetValue(f); } catch { }
+            var finas = Finas.Select(n => typeof(FeatModel).GetField(n)).Where(c => c != null).Select(c => (c, c.GetValue(f))).ToList();
             _desfazer.Add(() =>
             {
                 f.DescriptionKey = dk; f.Goal = g; f.Timing = t; f.HeroSource = hs; f.AmountCompletedRequired = req; f.Rewards = rw;
                 f.WeaponClasses = wc; f.EnemyTypes = et; f.ItemType = it; f.InteractableType = ia; f.EnemyConditions = ec; f.HeroInjured = hi;
                 f.GoalIsTotalDamage = gt; f.WeaknessDamage = wd; f.IsVictory = iv; f.MinimumDamage = md; f.SameEnemy = se;
                 try { if (ato != null) _campoAto?.SetValue(f, ato); } catch { }
+                foreach (var (c, v) in finas) try { c.SetValue(f, v); } catch { }
             });
         }
 
@@ -144,6 +185,22 @@ namespace Bigorna.Encontro
         public static void Restaurar()
         {
             _desfazer.Executar("valores das façanhas do jogo");
+            _itensDoPremio.Clear(); _concluidaAntes = null;
+        }
+
+        /// <summary>Quando a mesa pega o premio de uma facanha concluida (na janela de facanhas, o jogo da as cartas e as
+        /// receitas), os itens do premio entram no inventario e a lista deles vai para o texto do premio na janela.</summary>
+        public static void Batimento()
+        {
+            if (_itensDoPremio.Count == 0 || _campoConcluida == null) return;
+            var janela = Jogo.UI?.FeatsDialog; if (janela == null) return;
+            var id = _campoConcluida.GetValue(janela) as string;
+            if (id == _concluidaAntes) return;
+            _concluidaAntes = id;
+            if (string.IsNullOrEmpty(id) || !_itensDoPremio.TryGetValue(id, out var itens)) return;
+            Log.Info("façanha «" + id + "» concluída: o prêmio dela traz " + itens.Count + " item(ns)");
+            var texto = Motor.Butim.EntregarNaJanela(itens, T("Proeza", "Feat"));
+            try { if (!string.IsNullOrEmpty(texto) && janela.RewardDescription != null) janela.RewardDescription.text = string.IsNullOrEmpty(janela.RewardDescription.text) ? texto : janela.RewardDescription.text + "\n\n" + texto; } catch { }
         }
     }
 }

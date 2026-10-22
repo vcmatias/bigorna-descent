@@ -26,6 +26,9 @@ const TIPOS_GATILHO = [
   { id: 'sound', nome: 'Play a sound', expl: 'Plays a sound effect of the game (listen to them in the game: F7 → sounds) or your own sound file (OGG, MP3 or WAV).' },
   { id: 'item_pool', nome: 'Change the item pool', expl: 'Adds an item to (or removes one from) the item pool of the map, the one “Give an item” draws its random items and materials from, for the rest of the map.' },
   { id: 'reserve', nome: 'Change the spawn pool', expl: 'Adds a monster to (or removes one from) the pool the game draws from, for the rest of the map.' },
+  { id: 'shop', nome: 'Open the shop', expl: 'The party visits a shop in the middle of the map, like the one in the city, then goes on with the adventure: buys with the gold it has and sells crafting materials. You choose where the stock comes from (the city’s shop, your own list, the item pool of the map), the prices, how many purchases per visit and how many times the shop opens.' },
+  { id: 'armory', nome: 'Open the armory', expl: 'The heroes visit an armory in the middle of the map, like the one in the city, then go on with the adventure: each hero changes weapons (those of the hero and the party’s rune weapons) and weapon parts (those the party owns), as the game allows. You choose what may change and how many times the armory opens.' },
+  { id: 'craft', nome: 'Open the crafting', expl: 'The party crafts in the middle of the map, as in the city, then goes on with the adventure: the items of the recipes it knows, with the crafting materials it has, by the game’s rules (each recipe once; an upgrade replaces the item it improves). A weapon part just crafted can go straight onto the hero’s weapon. You choose which kinds may be crafted and how many times it opens.' },
   { id: 'end_map', nome: 'End the map', expl: 'The map ends here, in victory or in defeat (a villain escaped, the time ran out…).' },
   { id: 'escort', nome: 'Escort (a protected one)', oculto: true, expl: 'Someone the heroes protect (a token on the table, with 5 interaction tokens beside it as its health): from now on the monsters may pick it as their target; the activation window shows it by name. The hunters (spawn groups you list) always go for it; the others, with a chance each round. “End” stops it (it fell, or it is safe).' },
   { id: 'move_object', nome: 'Move an object', expl: 'Moves an object of the map to the place of its marker: lay a second object of the same kind where it goes, turned as it should end. The marker does not come out in the setup of the room: it only shows the new place. Click the object, then its marker.' },
@@ -53,6 +56,8 @@ const GRUPOS_GATILHO = [
     ] },
   { id: 'grp:media', nome: 'Play a scene, video or sound', expl: 'A scene of dialogue boxes (like the story flow), your own film full screen, a sound effect of the game or your own sound file.', pergunta: 'Play what?',
     membros: [['scene', 'A scene (dialogue boxes)'], ['cutscene', 'A video (your own film)'], ['sound', 'A sound (game effect or your own file)']] },
+  { id: 'grp:mercado', nome: 'Shop / Armory / Crafting', expl: 'The party visits a shop, an armory or the crafting workshop in the middle of the map, as in the city, and then goes on with the adventure.', pergunta: 'Open what?',
+    membros: [['shop', 'The shop (buy and sell)'], ['armory', 'The armory (weapons and weapon parts)'], ['craft', 'The crafting (items of the recipes the party knows)']] },
   { id: 'grp:pool', nome: 'Change item / spawn pool', expl: 'Adds to (or removes from) the item pool or the monster spawn pool of the map, for the rest of the map.', pergunta: 'Change which pool?',
     membros: [['item_pool', 'Item'], ['reserve', 'Monster spawn']] },
 ];
@@ -94,7 +99,7 @@ function poolSemO(materiais) {
   const mat = pool.some(id => ITENS_B().find(i => i.id === id)?.cls === 'CraftingMaterialModel'), item = pool.some(id => { const i = ITENS_B().find(x => x.id === id); return i && i.cls !== 'CraftingMaterialModel'; });
   return materiais ? (mat ? null : 'The item pool has no materials: add crafting materials to it (Workshop → Items, or Map setup).') : (item ? null : 'The item pool has no items: add items to it (Workshop → Items, or Map setup).');
 }
-const SO_CONSEQUENCIA = new Set(['end_map', 'escort', 'move_object', 'move_tile', 'unlock_map', 'text', 'counter', 'sound', 'skill_test', 'choice', 'spawn', 'enemy_condition', 'highlight', 'give_item', 'remove_enemy', 'move_heroes', 'add_object', 'add_tile', 'remove_object', 'cutscene', 'scene', 'rounds']);
+const SO_CONSEQUENCIA = new Set(['shop', 'armory', 'craft', 'end_map', 'escort', 'move_object', 'move_tile', 'unlock_map', 'text', 'counter', 'sound', 'skill_test', 'choice', 'spawn', 'enemy_condition', 'highlight', 'give_item', 'remove_enemy', 'move_heroes', 'add_object', 'add_tile', 'remove_object', 'cutscene', 'scene', 'rounds']);
 const TIPOS_REQUISITO = [
   { id: 'item', nome: 'The party has an item', expl: 'An item of the workshop must be in the party’s possession.' },
   { id: 'mission', nome: 'An objective was completed', expl: 'An objective added by an “Add an objective” trigger must already be completed.' },
@@ -109,7 +114,7 @@ const TIPOS_REQUISITO = [
 // ------------------------------------------------------------ object panel
 function renderObjeto(el, s, oi) {
   const o = s.objetos[oi]; const terreno = ehTerreno(o);
-  el.innerHTML = `<div class="linha"><img class="icoObj" src="${iconeObj(o.type)}" alt=""><p class="ajuda">${esc(nomeObj(o.type))} · room ${sel.sala + 1} · space ${o.pos[0]},${o.pos[1]}${(o.level || 0) > 0 ? ' · level ' + o.level : ''}${o.hidden ? ' · hidden until a trigger shows it' : ''}${ehTipo(o, 'PillarObj') ? ' · a column standing on a square; it supports no tile' : ''}</p></div>
+  el.innerHTML = `<div class="linha"><img class="icoObj" loading="lazy" decoding="async" ${imgTardia(iconeObj(o.type))} alt=""><p class="ajuda">${esc(nomeObj(o.type))} · room ${sel.sala + 1} · space ${o.pos[0]},${o.pos[1]}${(o.level || 0) > 0 ? ' · level ' + o.level : ''}${o.hidden ? ' · hidden until a trigger shows it' : ''}${ehTipo(o, 'PillarObj') ? ' · a column standing on a square; it supports no tile' : ''}</p></div>
     ${terreno ? `<label class="campo">Base level <select id="o_nivel">${[0, 1, 2, 3].map(l => `<option value="${l}" ${(o.level || 0) === l ? 'selected' : ''}>${l}</option>`).join('')}</select></label><p class="ajuda">${ehTipo(o, 'Staircase') ? 'The arrow shows the way up (R turns it). It climbs from the base level to the next one. From level 1 up it stands on tiles of its base level.' : 'Floor: heroes walk on it. It may sit off the tiles.'}</p>` : ''}
     ${ehTipo(o, 'PillarObj') || ehTipo(o, 'PillarPush') ? `<label class="campo">Size <select id="o_pilar">${Object.entries(SUPORTES).filter(([k]) => !ehTipo(o, 'PillarPush') || TAMANHOS_INTERATIVO.includes(k)).map(([k, v]) => `<option value="${k}" ${(o.tamanho || 'Pillar') === k ? 'selected' : ''}>${v.nome} (reaches level ${v.nivel})</option>`).join('')}</select></label>` : ''}
     <label class="campo">Name <input id="o_nome" value="${esc(o.name || '')}" placeholder="${esc(nomeObj(o.type))}"></label>
@@ -121,8 +126,8 @@ function renderObjeto(el, s, oi) {
     <p class="ajuda">${ehTipo(o, 'SightToken') ? 'They run in order when the point of interest is tapped.' : 'They run in order when a hero uses the object (an action: tap it with the hero chosen). Tapped with no hero, it only shows the text when looked at.'} A requirement goes inside the box of a trigger (open it) and holds back only that trigger.</p>
     <div id="o_gats"></div>
     <div class="linha acoes"><button id="o_copia">⧉ Copy</button><button id="o_apaga" class="perigo">Remove</button></div>
-    ${terreno ? '' : `<div class="sub">Default of “${esc(nomeObj(o.type))}” ${padroesDaOficina()[o.type] ? '<small>(the Workshop’s)</small>' : temPadrao(o.type) ? '<small>(the game’s)</small>' : '<small>(none)</small>'}</div>
-    <div class="linha acoes">${temPadrao(o.type) ? '<button class="sm" id="o_padrao" title="Replaces the texts and triggers of this object with the default of its kind">Apply the default</button>' : ''}<button class="sm" id="o_salvaPadrao" title="The texts and triggers of this object become the default of its kind, in the Workshop: objects placed from now on come with them">Save as the default</button>${padroesDaOficina()[o.type] ? '<button class="sm" id="o_padraoOriginal" title="The Workshop forgets its default for this kind">Back to the game’s default</button>' : ''}</div>`}`;
+    ${terreno || EDITANDO_PADRAO ? '' : `<div class="sub">Default of “${esc(nomeObj(chaveDoPadrao(o)))}” ${padroesDaOficina()[chaveDoPadrao(o)] ? '<small>(the Workshop’s)</small>' : temPadrao(chaveDoPadrao(o)) ? '<small>(the game’s)</small>' : '<small>(none)</small>'}</div>
+    <div class="linha acoes">${temPadrao(chaveDoPadrao(o)) ? '<button class="sm" id="o_padrao" title="Replaces the texts and triggers of this object with the default of its kind">Apply the default</button>' : ''}<button class="sm" id="o_salvaPadrao" title="${esc(tr(ehDaOficina(o.type) ? 'The texts and triggers of this object become its default, in the Workshop: objects placed from now on come with them' : 'The texts and triggers of this object become a new object of the Workshop (a copy of this piece of the game, with this default); you name it'))}">Save as the default</button>${padroesDaOficina()[o.type] && chaveDoPadrao(o) === o.type && !ehDaOficina(o.type) ? '<button class="sm" id="o_padraoOriginal" title="The Workshop forgets its default for this kind">Back to the game’s default</button>' : ''}</div>`}`;
   $('#o_nome').oninput = e => { o.name = e.target.value; desenhar(); renderSalas(); };
   const op = $('#o_pilar'); if (op) op.onchange = e => { o.tamanho = e.target.value; tudo(); };
   if ($('#o_click')) $('#o_click').oninput = e => { o.textClick = e.target.value; };
@@ -138,7 +143,7 @@ function renderObjeto(el, s, oi) {
   $('#o_add').onclick = () => abrirCatalogo(s, oi, 'gatilhos'); ligarExtras(el, o);
   $('#o_copia').onclick = () => copiarObjeto();
   const bp = $('#o_padrao'); if (bp) bp.onclick = () => { if (!confirm(tr('Replace the texts and triggers of this object with the default of its kind?'))) return; aplicarPadrao(o); tudo(); };
-  const bs = $('#o_salvaPadrao'); if (bs) bs.onclick = () => { marcarVisto('dica:salvaPadrao'); const r = salvarComoPadrao(o); aviso(r === 'original' ? tr('This is the game’s default already: nothing to keep in the Workshop.') : tr('Saved: the default of this kind is now this object’s programming (in the Workshop).')); renderObjeto(el, s, oi); };
+  const bs = $('#o_salvaPadrao'); if (bs) bs.onclick = () => { marcarVisto('dica:salvaPadrao'); if (!ehDaOficina(o.type)) return batizarCopia(o, () => renderObjeto(el, s, oi)); const r = salvarComoPadrao(o); aviso(r === 'original' ? tr('This is the game’s default already: nothing to keep in the Workshop.') : tr('Saved: the default of this kind is now this object’s programming (in the Workshop).')); renderObjeto(el, s, oi); };
   const bo = $('#o_padraoOriginal'); if (bo) bo.onclick = () => { delete padroesDaOficina()[o.type]; aviso(tr('The Workshop forgot its default: the game’s one is back.')); renderObjeto(el, s, oi); };
   $('#o_apaga').onclick = () => apagarSelecao({ tipo: 'objeto', sala: sel.sala, i: oi });
   const nv = $('#o_nivel'); if (nv) nv.onchange = e => { const antes = o.level || 0, quer = +e.target.value; o.level = quer; if (escadaSemApoio(o)) { o.level = antes; e.target.value = antes; return aviso(AVISO_ESCADA(quer)); } tudo(); };
@@ -175,40 +180,51 @@ function transferirGatilhos(si, oi, depois) {
 }
 
 // ------------------------------------------------------------ triggers list and fields
+/* the one-line summary of a trigger (the list of triggers, the counters): written in both languages here, because it mixes
+   the author's texts and names with the editor's words (the page translation would have to guess where one ends) */
 function resumoGatilho(g) {
+  const R = L2, nada = R('(none yet)', '(nenhum ainda)'), alvoDe = a => a === 'all' ? R('all monsters', 'todos os monstros') : a === 'group' ? R('a spawn group', 'um grupo de surgimento') : R('the monsters of this room', 'os monstros desta sala');
+  const protegido = g.nome || R('the protected one', 'o protegido');
+  const usos = +g.usos ? R(' · opens ', ' · abre ') + (+g.usos) + '×' : '';
+  const dentro = d => d ? d + R(' trigger(s)', ' gatilho(s)') : R('nothing inside yet', 'nada dentro ainda');
   switch (g.tipo) {
-    case 'open_room': return projeto.salas[g.sala] ? 'opens ' + (projeto.salas[g.sala].nome || 'room ' + (+g.sala + 1)) : 'opens a room (pick it)';
-    case 'give_item': if (g.acao === 'remove') return g.modo === 'material' ? 'takes ' + (g.amount || 1) + ' random material(s)' : 'takes ' + (g.amount || 10) + ' gold'; return g.modo === 'random' || g.modo === 'craft' ? 'random loot (' + (g.points || 3) + ' pts)' : g.modo === 'craft' ? (g.amount || 1) + ' crafting material(s)' : g.modo === 'gold' ? (g.amount || 10) + ' gold' : g.modo === 'newitem' ? (g.amount || 1) + ' random item(s) of the pool' : 'item: ' + (g.item ? nomeItem(g.item) : '?');
-    case 'unlock_map': { const n = noDoDesbloqueio(g); return 'unlocks ' + (n ? rotuloDoNo(n) + (nomeDoNo(n) !== rotuloDoNo(n) ? ' “' + nomeDoNo(n) + '”' : '') : '(no map yet)'); }
-    case 'mission': return 'objective: ' + (g.text || '?').slice(0, 30);
-    case 'text': return 'text: ' + (g.text || '').slice(0, 40);
-    case 'counter': if (g.acao === 'use') { const d = listaDoGatilho(g, 'conta').length; return 'when ' + (g.contador || '(no counter yet)') + ' reaches ' + Math.max(1, +g.n || 1) + (g.desde === 'uso' ? ' (from when it runs)' : '') + ' · ' + (d ? d + ' trigger(s)' : 'nothing inside yet'); }
-      return (g.acao === 'sub' ? '− ' : g.acao === 'set' ? '= ' : '+ ') + (g.n ?? 1) + ' ' + (g.contador || '(no counter yet)');
-    case 'skill_test': return (g.secret ? 'secret' : 'open') + ' test, ' + (g.successes || 2) + ' success(es)'; // outcome counts are added by renderGatilhos
-    case 'spawn': return g.fonte === 'pool' ? (g.cells || []).length + ' balanced space(s) from the pool' : (g.inimigos || []).length ? nomeIni(g.inimigos[0].enemy) + ((g.inimigos || []).length > 1 ? ' +' + (g.inimigos.length - 1) : '') : 'no monster yet';
-    case 'remove_enemy': return 'removes ' + (g.alvo === 'all' ? 'all monsters' : g.alvo === 'group' ? 'a spawn group' : g.alvo === 'one' ? (inimigoRef(g.inimigo) ? nomeIni(inimigoRef(g.inimigo).enemy) + ' at ' + inimigoRef(g.inimigo).pos.join(',') : 'one monster (none picked yet)') : 'the monsters of this room');
-    case 'enemy_condition': if (g.acao === 'mirar') return (g.alvo === 'all' ? 'all monsters' : g.alvo === 'group' ? 'a spawn group' : 'the monsters of this room') + ' may target ' + (g.nome || 'the protected one') + ' (' + ((g.chance ?? 25) >= 100 ? 'always' : (g.chance ?? 25) + '% each round') + ')';
-      if (g.acao === 'desmirar') return 'the monsters stop targeting ' + (g.nome || 'the protected one');
-      return ({ heal: 'heals', damage: 'damages', apply: 'applies ' + (g.condition || '?') + ' to', remove: 'removes ' + (g.condition || '?') + ' from', bonus: 'changes attack/defence of' })[g.acao || 'apply'] + ' ' + (g.alvo === 'all' ? 'all' : g.alvo === 'group' ? 'a spawn group' : 'the monsters of this room');
-    case 'end_map': return 'ends the map in ' + (g.resultado === 'vitoria' ? 'victory' : 'defeat');
-    case 'escort': return g.acao === 'fim' ? 'ends the escort' : 'starts the escort of ' + (g.nome || 'the protected one') + ' (' + (g.chance ?? 25) + '% of the other monsters, ' + (g.cacadores || []).length + ' hunter group(s))';
-    case 'move_object': return 'moves ' + (g.objIndex !== undefined ? rotulo(projeto.salas[g.objSala]?.objetos[g.objIndex] || {}) : '(no object)') + (projeto.salas[g.marcaSala]?.objetos[g.marcaIndex] ? ' to its marker' : g.cell ? ' to ' + g.cell.join(',') : ' (no marker yet)');
-    case 'move_tile': { const p = projeto.salas[g.sala]?.pecas[g.peca]; return 'moves tile ' + (p ? nomePeca(p.tile) : '(none yet)') + (projeto.salas[g.marcaSala]?.pecas[g.marcaPeca] ? ' to its marker' : ' (no marker yet)'); }
-    case 'move_heroes': return 'moves the heroes' + ((g.cells || []).length ? ' to ' + g.cells.map(c => c.join(',')).join('; ') : ' (no destination yet)');
-    case 'add_object': return 'adds ' + nomeObj(g.objType || 'Chest') + (g.objIndex !== undefined ? '' : ' (no place yet)');
-    case 'remove_object': return 'removes ' + (g.proprio ? 'itself' : g.objIndex !== undefined ? rotulo(projeto.salas[g.objSala]?.objetos[g.objIndex] || {}) : '(no target yet)');
-    case 'remove_room': return 'removes ' + (projeto.salas[g.sala]?.nome || '(no room yet)');
-    case 'add_tile': { const p = projeto.salas[g.sala]?.pecas[g.peca]; return 'adds tile ' + (p ? nomePeca(p.tile) + ' of room ' + (g.sala + 1) : '(none yet)'); }
-    case 'remove_tile': { const p = projeto.salas[g.sala]?.pecas[g.peca]; return 'removes tile ' + (p ? nomePeca(p.tile) + ' of room ' + (g.sala + 1) : '(none yet)') + (g.manter ? ' (keeps what stands on it)' : ''); }
-    case 'highlight': return 'highlights ' + (g.objIndex !== undefined ? rotulo(projeto.salas[g.objSala]?.objetos[g.objIndex] || {}) : g.cell ? 'space ' + g.cell.join(',') : '(no target yet)');
-    case 'choice': return 'choice: ' + (g.text || '').slice(0, 30) + ' (' + (g.options || []).length + ' answers)';
-    case 'scene': { const cx = g.caixas || []; const c0 = cx.find(c => c.id === g.inicio) || cx[0]; return 'scene: ' + cx.length + ' box(es)' + (c0 ? ' · ' + (c0.speaker ? nomePersonagem(c0.speaker) + ': ' : '') + '“' + (c0.text || '').slice(0, 30) + ((c0.text || '').length > 30 ? '…' : '') + '”' : ''); }
-    case 'rounds': { const n = Math.max(1, +g.n || 2), d = listaDoGatilho(g, 'rodada').length; return (g.modo === 'uma' ? 'once, ' + n + ' round(s) later' : 'every ' + n + ' round(s)' + (+g.vezes ? ', ' + g.vezes + ' time(s)' : ', to the end')) + ' · ' + (d ? d + ' trigger(s)' : 'nothing inside yet'); }
-    case 'cutscene': return g.video ? 'video ' + (g.video.nome || g.video.arquivo) : g.name ? 'game cutscene ' + (CUTSCENES.find(c => c.id === g.name)?.label || g.name) : '(no video yet)';
-    case 'sound': return g.somModo === 'arquivo' ? 'own sound: ' + (g.som?.nome || '(no file yet)') : 'sound ' + (g.name || '?');
-    case 'reserve': return (g.acao === 'remove' ? 'removes ' : 'adds ') + nomeIni(g.enemy || '?') + (g.acao === 'remove' ? ' from' : ' to') + ' the spawn pool';
-    case 'item_pool': return (g.acao === 'remove' ? 'removes ' : 'adds ') + (g.item ? semGlifo(nomeItem(g.item)) : '(no item yet)') + (g.acao === 'remove' ? ' from' : ' to') + ' the item pool';
-    case 'objective': return 'objective: ' + (g.text || '').slice(0, 30);
+    case 'open_room': return projeto.salas[g.sala] ? R('opens ', 'abre ') + (projeto.salas[g.sala].nome || R('room ', 'sala ') + (+g.sala + 1)) : R('opens a room (pick it)', 'abre uma sala (escolha qual)');
+    case 'give_item': if (g.acao === 'remove') return g.modo === 'material' ? R('takes ' + (g.amount || 1) + ' random material(s)', 'tira ' + (g.amount || 1) + ' material(is) ao acaso') : R('takes ' + (g.amount || 10) + ' gold', 'tira ' + (g.amount || 10) + ' de ouro');
+      return g.modo === 'random' || g.modo === 'craft' ? R('random loot (' + (g.points || 3) + ' pts)', 'espólio ao acaso (' + (g.points || 3) + ' pts)') : g.modo === 'gold' ? R((g.amount || 10) + ' gold', (g.amount || 10) + ' de ouro') : g.modo === 'newitem' ? R((g.amount || 1) + ' random item(s) of the pool', (g.amount || 1) + ' item(ns) ao acaso da reserva') : R('item: ', 'item: ') + (g.item ? nomeItem(g.item) : '?');
+    case 'unlock_map': { const n = noDoDesbloqueio(g); return R('unlocks ', 'libera ') + (n ? rotuloDoNo(n) + (nomeDoNo(n) !== rotuloDoNo(n) ? ' “' + nomeDoNo(n) + '”' : '') : R('(no map yet)', '(nenhum mapa ainda)')); }
+    case 'mission': return R('objective: ', 'objetivo: ') + (g.text || '?').slice(0, 30);
+    case 'text': return R('text: ', 'texto: ') + (g.text || '').slice(0, 40);
+    case 'counter': { const cont = g.contador || R('(no counter yet)', '(nenhum contador ainda)');
+      if (g.acao === 'use') { const d = listaDoGatilho(g, 'conta').length; return R('when ', 'quando ') + cont + R(' reaches ', ' chega a ') + Math.max(1, +g.n || 1) + (g.desde === 'uso' ? R(' (from when it runs)', ' (desde quando roda)') : '') + ' · ' + dentro(d); }
+      return (g.acao === 'sub' ? '− ' : g.acao === 'set' ? '= ' : '+ ') + (g.n ?? 1) + ' ' + cont; }
+    case 'skill_test': return (g.secret ? R('secret test, ', 'teste secreto, ') : R('open test, ', 'teste aberto, ')) + (g.successes || 2) + R(' success(es)', ' sucesso(s)'); // outcome counts are added by renderGatilhos
+    case 'spawn': return g.fonte === 'pool' ? (g.cells || []).length + R(' balanced space(s) from the pool', ' espaço(s) equilibrado(s) da reserva') : (g.inimigos || []).length ? nomeIni(g.inimigos[0].enemy) + ((g.inimigos || []).length > 1 ? ' +' + (g.inimigos.length - 1) : '') : R('no monster yet', 'nenhum monstro ainda');
+    case 'remove_enemy': return R('removes ', 'remove ') + (g.alvo === 'all' ? R('all monsters', 'todos os monstros') : g.alvo === 'group' ? R('a spawn group', 'um grupo de surgimento') : g.alvo === 'one' ? (inimigoRef(g.inimigo) ? nomeIni(inimigoRef(g.inimigo).enemy) + R(' at ', ' em ') + inimigoRef(g.inimigo).pos.join(',') : R('one monster (none picked yet)', 'um monstro (nenhum escolhido ainda)')) : R('the monsters of this room', 'os monstros desta sala'));
+    case 'enemy_condition': if (g.acao === 'mirar') return alvoDe(g.alvo) + R(' may target ', ' podem mirar em ') + protegido + ' (' + ((g.chance ?? 25) >= 100 ? R('always', 'sempre') : (g.chance ?? 25) + R('% each round', '% a cada rodada')) + ')';
+      if (g.acao === 'desmirar') return R('the monsters stop targeting ', 'os monstros param de mirar em ') + protegido;
+      return ({ heal: R('heals', 'cura'), damage: R('damages', 'causa dano em'), apply: R('applies ' + (g.condition || '?') + ' to', 'aplica ' + tr(g.condition || '?') + ' em'), remove: R('removes ' + (g.condition || '?') + ' from', 'remove ' + tr(g.condition || '?') + ' de'), bonus: R('changes attack/defence of', 'muda ataque/defesa de') })[g.acao || 'apply'] + ' ' + (g.alvo === 'all' ? R('all', 'todos') : g.alvo === 'group' ? R('a spawn group', 'um grupo de surgimento') : R('the monsters of this room', 'os monstros desta sala'));
+    case 'shop': { const f = fontesDaLoja(g); return R('shop: ', 'loja: ') + (f.length ? f.map(x => ({ cidade: R('city stock', 'estoque da cidade'), lista: (g.itens || []).length + R(' item(s) of yours', ' item(ns) seus'), pool: R('item pool', 'reserva de itens') })[x]).join(' + ') : R('no stock yet', 'sem estoque ainda')) + ((g.preco ?? 100) !== 100 ? R(' · prices ', ' · preços a ') + g.preco + '%' : '') + usos; }
+    case 'armory': return R('armory: ', 'arsenal: ') + (g.armas === false && g.pecas === false ? R('nothing to change', 'nada para trocar') : g.armas === false ? R('weapon parts', 'peças de arma') : g.pecas === false ? R('weapons', 'armas') : R('weapons and weapon parts', 'armas e peças de arma')) + usos;
+    case 'craft': { const k = tiposDaForja(g); return R('crafting: ', 'fabricação: ') + (k.length === TIPOS_FORJA.length ? R('every kind', 'todo tipo') : k.length ? k.map(x => tr(TIPOS_FORJA.find(t => t[0] === x)[1].toLowerCase())).join(', ') : R('nothing to craft', 'nada para fabricar')) + usos; }
+    case 'end_map': return g.resultado === 'vitoria' ? R('ends the map in victory', 'termina o mapa em vitória') : R('ends the map in defeat', 'termina o mapa em derrota');
+    case 'escort': return g.acao === 'fim' ? R('ends the escort', 'termina a escolta') : R('starts the escort of ', 'começa a escolta de ') + protegido + ' (' + (g.chance ?? 25) + R('% of the other monsters, ', '% dos outros monstros, ') + (g.cacadores || []).length + R(' hunter group(s))', ' grupo(s) de caçadores)');
+    case 'move_object': return R('moves ', 'move ') + (g.objIndex !== undefined ? rotulo(projeto.salas[g.objSala]?.objetos[g.objIndex] || {}) : R('(no object)', '(nenhum objeto)')) + (projeto.salas[g.marcaSala]?.objetos[g.marcaIndex] ? R(' to its marker', ' até a marca') : g.cell ? R(' to ', ' para ') + g.cell.join(',') : R(' (no marker yet)', ' (sem marca ainda)'));
+    case 'move_tile': { const p = projeto.salas[g.sala]?.pecas[g.peca]; return R('moves tile ', 'move a peça ') + (p ? nomePeca(p.tile) : nada) + (projeto.salas[g.marcaSala]?.pecas[g.marcaPeca] ? R(' to its marker', ' até a marca') : R(' (no marker yet)', ' (sem marca ainda)')); }
+    case 'move_heroes': return R('moves the heroes', 'move os heróis') + ((g.cells || []).length ? R(' to ', ' para ') + g.cells.map(c => c.join(',')).join('; ') : R(' (no destination yet)', ' (sem destino ainda)'));
+    case 'add_object': return R('adds ', 'acrescenta ') + nomeObj(g.objType || 'Chest') + (g.objIndex !== undefined ? '' : R(' (no place yet)', ' (sem lugar ainda)'));
+    case 'remove_object': return R('removes ', 'remove ') + (g.proprio ? R('itself', 'a si mesmo') : g.objIndex !== undefined ? rotulo(projeto.salas[g.objSala]?.objetos[g.objIndex] || {}) : R('(no target yet)', '(sem alvo ainda)'));
+    case 'remove_room': return R('removes ', 'remove ') + (projeto.salas[g.sala]?.nome || R('(no room yet)', '(nenhuma sala ainda)'));
+    case 'add_tile': { const p = projeto.salas[g.sala]?.pecas[g.peca]; return R('adds tile ', 'acrescenta a peça ') + (p ? nomePeca(p.tile) + R(' of room ', ' da sala ') + (g.sala + 1) : nada); }
+    case 'remove_tile': { const p = projeto.salas[g.sala]?.pecas[g.peca]; return R('removes tile ', 'remove a peça ') + (p ? nomePeca(p.tile) + R(' of room ', ' da sala ') + (g.sala + 1) : nada) + (g.manter ? R(' (keeps what stands on it)', ' (mantém o que está em cima)') : ''); }
+    case 'highlight': return R('highlights ', 'destaca ') + (g.objIndex !== undefined ? rotulo(projeto.salas[g.objSala]?.objetos[g.objIndex] || {}) : g.cell ? R('space ', 'o espaço ') + g.cell.join(',') : R('(no target yet)', '(sem alvo ainda)'));
+    case 'choice': return R('choice: ', 'escolha: ') + (g.text || '').slice(0, 30) + ' (' + (g.options || []).length + R(' answers)', ' respostas)');
+    case 'scene': { const cx = g.caixas || []; const c0 = cx.find(c => c.id === g.inicio) || cx[0]; return R('scene: ', 'cena: ') + cx.length + R(' box(es)', ' caixa(s)') + (c0 ? ' · ' + (c0.speaker ? nomePersonagem(c0.speaker) + ': ' : '') + '“' + (c0.text || '').slice(0, 30) + ((c0.text || '').length > 30 ? '…' : '') + '”' : ''); }
+    case 'rounds': { const n = Math.max(1, +g.n || 2), d = listaDoGatilho(g, 'rodada').length; return (g.modo === 'uma' ? R('once, ' + n + ' round(s) later', 'uma vez, ' + n + ' rodada(s) depois') : R('every ' + n + ' round(s)', 'a cada ' + n + ' rodada(s)') + (+g.vezes ? R(', ' + g.vezes + ' time(s)', ', ' + g.vezes + ' vez(es)') : R(', to the end', ', até o fim'))) + ' · ' + dentro(d); }
+    case 'cutscene': return g.video ? R('video ', 'vídeo ') + (g.video.nome || g.video.arquivo) : g.name ? R('game cutscene ', 'cena do jogo ') + (CUTSCENES.find(c => c.id === g.name)?.label || g.name) : R('(no video yet)', '(nenhum vídeo ainda)');
+    case 'sound': return g.somModo === 'arquivo' ? R('own sound: ', 'som próprio: ') + (g.som?.nome || R('(no file yet)', '(nenhum arquivo ainda)')) : R('sound ', 'som ') + (g.name || '?');
+    case 'reserve': return (g.acao === 'remove' ? R('removes ', 'remove ') : R('adds ', 'acrescenta ')) + nomeIni(g.enemy || '?') + (g.acao === 'remove' ? R(' from the spawn pool', ' da reserva de monstros') : R(' to the spawn pool', ' à reserva de monstros'));
+    case 'item_pool': return (g.acao === 'remove' ? R('removes ', 'remove ') : R('adds ', 'acrescenta ')) + (g.item ? semGlifo(nomeItem(g.item)) : R('(no item yet)', '(nenhum item ainda)')) + (g.acao === 'remove' ? R(' from the item pool', ' da reserva de itens') : R(' to the item pool', ' à reserva de itens'));
+    case 'objective': return R('objective: ', 'objetivo: ') + (g.text || '').slice(0, 30);
     default: return g.tipo;
   }
 }
@@ -334,8 +350,13 @@ function camposGatilho(el, s, oi, g, lista) {
       html = `<p>Tile: <b>${p ? nomePeca(p.tile) + ' of room ' + (g.sala + 1) : 'none yet'}</b> <button class="sm" id="g_alvo">Click the tile on the board</button></p>
       <p>Marker (where it goes): <b>${mk ? nomePeca(mk.tile) + ' at ' + mk.pos.join(',') + (mk.level ? ', level ' + mk.level : '') : 'none yet'}</b> <button class="sm" id="g_marca">Click the marker</button></p>
       <p class="ajuda">The marker is the same tile laid a second time where it goes (the warning of a tile already in the room offers “Move the tile”). It does not come out in the setup of the room. What stands on the tile goes with it: objects and pillars; the table moves the figures.</p>`; break; }
+    case 'shop': html = camposDaLoja(g); break;
+    case 'armory': html = `<label class="chk"><input type="checkbox" data-k="armas" ${g.armas !== false ? 'checked' : ''}> Change weapons (those of the hero and the party’s rune weapons)</label>
+      <label class="chk"><input type="checkbox" data-k="pecas" ${g.pecas !== false ? 'checked' : ''}> Change weapon parts (those the party owns, of the weapon’s class)</label>` + camposDeAbertura(g, 'armory'); break;
+    case 'craft': html = `<div class="sub">What may be crafted</div>${TIPOS_FORJA.map(([k, n]) => `<label class="chk"><input type="checkbox" data-tipoforja="${k}" ${tiposDaForja(g).includes(k) ? 'checked' : ''}> ${esc(n)}</label>`).join('')}
+      <p class="ajuda">Only the recipes the party already knows (give them with “Give or take away an item”, the shop or the loot), with the materials it has.</p>` + camposDeAbertura(g, 'craft'); break;
     case 'end_map': html = campo('Result', `<select data-k="resultado"><option value="derrota" ${g.resultado !== 'vitoria' ? 'selected' : ''}>Defeat</option><option value="vitoria" ${g.resultado === 'vitoria' ? 'selected' : ''}>Victory</option></select>`); break;
-    case 'escort': html = campo('Action', `<select data-k="acao"><option value="inicio" ${g.acao !== 'fim' ? 'selected' : ''}>Start</option><option value="fim" ${g.acao === 'fim' ? 'selected' : ''}>End</option></select>`) + (g.acao === 'fim' ? '' : campo('Name', `<input data-k="nome" value="${esc(g.nome || '')}">`) + campo('Chance (%)', `<input type="number" min="0" max="100" data-k="chance" value="${g.chance ?? 25}">`) + `<p class="ajuda">${(g.cacadores || []).length} hunter group(s).</p>`); break;
+    case 'escort': html = campo('Action', `<select data-k="acao"><option value="inicio" ${g.acao !== 'fim' ? 'selected' : ''}>Start</option><option value="fim" ${g.acao === 'fim' ? 'selected' : ''}>End</option></select>`) + (g.acao === 'fim' ? '' : campo('Name', `<input data-k="nome" value="${esc(g.nome || '')}">`) + campo('Chance (%)', `<input type="number" min="0" max="100" data-k="chance" value="${g.chance ?? 25}">`) + `<p class="ajuda">${(g.cacadores || []).length}${L2(' hunter group(s).', ' grupo(s) de caçadores.')}</p>`); break;
     case 'highlight': html = campo('Mode', `<select data-k="modo"><option value="object" ${g.modo !== 'space' ? 'selected' : ''}>Outline an object</option><option value="space" ${g.modo === 'space' ? 'selected' : ''}>Highlight a space</option></select>`) + `<p>Target: <b>${g.objIndex !== undefined ? esc(rotulo(projeto.salas[g.objSala]?.objetos[g.objIndex] || {})) : g.cell ? 'space ' + g.cell.join(',') : 'none yet'}</b> <button class="sm" id="g_alvo">Click the ${g.modo === 'space' ? 'space' : 'object'}</button></p>`; break;
     case 'choice': html = campo('Question', `<textarea data-k="text" rows="2">${esc(g.text || '')}</textarea>`) + '<div id="g_ops"></div><button class="sm" id="g_op">+ Answer</button>' +
       `<label class="chk"><input type="checkbox" data-k="umaVez" ${g.umaVez ? 'checked' : ''}> Each answer only once (a search: the answer chosen greys out, the others stay)</label>` +
@@ -358,7 +379,7 @@ function camposGatilho(el, s, oi, g, lista) {
       if (g.tipo === 'open_room' && k === 'sala') { g.sala = +inp.value; limparAbridores(); tudo(); return; }
       if (g.tipo === 'give_item' && k === 'modo' && (inp.value === 'random' || inp.value === 'newitem')) { const falta = poolSemO(inp.value === 'random'); if (falta) aviso(falta); }
       if (k === 'intensidade') { const n = +inp.value; g.intensidade = n === (g.cells || []).length ? 0 : n; renderPropriedades(); return; }
-      if (inp.type === 'checkbox') g[k] = inp.checked; else if (inp.type === 'number') g[k] = +inp.value || 0; else if (k === 'sala' || k === 'salaAlvo') g[k] = inp.value === '' ? undefined : +inp.value; else g[k] = inp.value;
+      if (inp.type === 'checkbox') g[k] = inp.checked; else if (inp.type === 'number' || inp.dataset.num) g[k] = +inp.value || 0; else if (k === 'sala' || k === 'salaAlvo') g[k] = inp.value === '' ? undefined : +inp.value; else g[k] = inp.value;
       if (k === 'alvo' && g.alvo === 'group' && !g.grupo) g.grupo = gruposDaMissao()[0]?.id;   // the list shows the first group as chosen
       // a search: one use of the object per answer
       // a test whose successes add up: the object can be tried again until it is done
@@ -371,6 +392,8 @@ function camposGatilho(el, s, oi, g, lista) {
   });
   el.querySelectorAll('[data-ir]').forEach(b => b.onclick = () => { salaAtual = +b.dataset.ir; sel = null; tudo(); });
   if (g.tipo === 'cutscene') campoVideo(el.querySelector('#g_video'), g, () => { renderGatilhosSoResumo(); renderConferencia(); });
+  if (g.tipo === 'shop') ligarLoja(el, g);
+  el.querySelectorAll('[data-tipoforja]').forEach(c => c.onchange = () => { const k = new Set(tiposDaForja(g)); if (c.checked) k.add(c.dataset.tipoforja); else k.delete(c.dataset.tipoforja); g.tipos = TIPOS_FORJA.map(([x]) => x).filter(x => k.has(x)); renderGatilhosSoResumo(); renderConferencia(); });
   if (g.tipo === 'counter') {
     const tx = el.querySelector('[data-cont-tx]'), pv = el.querySelector('[data-prev-cont]'); const pinta = () => { if (pv) pv.innerHTML = previaContador(g); };
     if (tx) { tx.addEventListener('input', pinta); el.querySelector('[data-k="contador"]')?.addEventListener('input', pinta); el.querySelector('[data-k="n"]')?.addEventListener('change', pinta); }
@@ -491,7 +514,7 @@ function abrirCatalogo(s, oi, lista) {
     if (!gr) { opcoes.push({ id: t.id, titulo: t.nome, sub: explDe(t.id, o) }); return; }
     if (postos.has(gr.id)) return; postos.add(gr.id);
     const ms = membrosDoGrupo(gr).filter(([m]) => ids.has(m));
-    opcoes.push(ms.length > 1 ? { id: gr.id, titulo: gr.nome, sub: gr.expl + ' (' + ms.map(([, r]) => r.split(' (')[0].toLowerCase()).join(', ') + ')' } : { id: ms[0][0], titulo: GATILHO[ms[0][0]].nome, sub: explDe(ms[0][0], o) });
+    opcoes.push(ms.length > 1 ? { id: gr.id, titulo: gr.nome, sub: tr(gr.expl) + ' (' + ms.map(([, r]) => tr(r.split(' (')[0]).toLowerCase()).join(', ') + ')' } : { id: ms[0][0], titulo: GATILHO[ms[0][0]].nome, sub: explDe(ms[0][0], o) });
   });
   const titulo = o.ehContador ? 'When “' + o.nome + '” reaches ' + metaDoContador(o) : (resultado || (lista === 'senao' ? 'When the requirement fails: ' : o.ehGrupo ? 'When the balanced group is defeated: ' : o.enemy ? 'When this monster is defeated: ' : 'Add a trigger to ')) + '“' + rotulo(o) + '”';
   const escolher = id => adicionarGatilho(s, oi, id, id === 'mission' ? 'internal' : undefined, lista);
@@ -501,13 +524,15 @@ function abrirCatalogo(s, oi, lista) {
     if (!gr.ramos) return membros(gr, titulo);
     const ramos = gr.ramos.filter(r => r.membros.some(([m]) => ids.has(m)));
     if (ramos.length === 1) return membros(ramos[0], titulo);
-    escolherOpcao(gr.pergunta + ' · ' + titulo, ramos.map(r => ({ id: r.id, titulo: r.nome, sub: r.expl + ' (' + r.membros.filter(([m]) => ids.has(m)).map(([, rt]) => rt.split(' (')[0].toLowerCase()).join(', ') + ')' })), rid => membros(ramos.find(r => r.id === rid), titulo));
-  }, o.ehContador ? 'What happens once, when the count reaches ' + metaDoContador(o) + ' (the total of the counter). Several triggers run in order.' : lista === 'senao' ? 'Runs instead of the triggers when a requirement is not met.' : o.enemy ? 'What happens when this monster is defeated, after the game’s own effects (loot, objectives). Several triggers run in order, every time it is defeated.' : 'What happens when a hero uses this object. Several triggers run in order.');
+    escolherOpcao(gr.pergunta + ' · ' + titulo, ramos.map(r => ({ id: r.id, titulo: r.nome, sub: tr(r.expl) + ' (' + r.membros.filter(([m]) => ids.has(m)).map(([, rt]) => tr(rt.split(' (')[0]).toLowerCase()).join(', ') + ')' })), rid => membros(ramos.find(r => r.id === rid), titulo));
+  }, o.ehContador ? 'What happens once, when the count reaches ' + metaDoContador(o) + '. Several triggers run in order.' : lista === 'senao' ? 'Runs instead of the triggers when a requirement is not met.' : o.enemy ? 'What happens when this monster is defeated, after the game’s own effects (loot, objectives). Several triggers run in order, every time it is defeated.' : 'What happens when a hero uses this object. Several triggers run in order.');
 }
 function adicionarGatilho(s, oi, tipo, modo, lista) {
   const o = donoDe(s, oi); const si = sel.sala; lista = lista || 'gatilhos';
   const g = { uid: uid(), tipo };
   const gs = o[lista] || (o[lista] = []);
+  // (in the default of a copy, in the Workshop: the room is made when the piece is placed, like the game's doors)
+  if (tipo === 'open_room' && EDITANDO_PADRAO) { g.sala = ''; g.requisitos = []; gs.push(g); gatAberto = chaveDe(o, lista, gs.length - 1); tudo(); return; }
   if (tipo === 'open_room') {
     const outras = projeto.salas.map((r, ri) => ri > 0 && ri !== si ? ri : -1).filter(x => x >= 0);
     const criar = () => { gs.push(g); gatAberto = chaveDe(o, lista, gs.length - 1); const nova = novaSala({ sala: si, objeto: oi }); g.sala = nova; limparAbridores(); aviso('“' + rotulo(o) + '” opens room ' + (nova + 1) + '. Lay its tiles; they stay hidden until the object is used.'); };
@@ -534,6 +559,11 @@ function adicionarGatilho(s, oi, tipo, modo, lista) {
   if (tipo === 'sound') g.name = 'Place_Generic';
   if (tipo === 'counter') { g.acao = 'add'; g.n = 1; g.contador = contadoresDoMapa()[0] || tr('Keys'); g.texto = TEXTO_CONTADOR.add; }
   if (tipo === 'reserve' || tipo === 'item_pool') g.acao = 'add';
+  if (tipo === 'shop') { g.fontes = ['cidade']; g.itens = []; g.preco = 100; g.precoVenda = 100; g.vender = true; g.maxCompras = 0; g.usos = 0; }
+  if (tipo === 'armory') { g.armas = true; g.pecas = true; g.usos = 0; }
+  if (tipo === 'craft') { g.tipos = TIPOS_FORJA.map(([k]) => k); g.usos = 0; }
+  // the shop and the armory may be visited again: the object stays usable (the trigger says how many times it opens)
+  if ((tipo === 'shop' || tipo === 'armory' || tipo === 'craft') && !o.enemy && !o.ehContador && !o.usos && !ehTipo(o, 'Door') && !ehTipo(o, 'Gate') && lista === 'gatilhos') { o.usos = 'always'; aviso('“' + rotulo(o) + '” can now be used every time (change it in “Can be used”); the trigger says how many times the ' + ({ shop: 'shop', armory: 'armory', craft: 'crafting' })[tipo] + ' opens.'); }
   if (tipo === 'move_heroes') { g.cells = []; if (!o.enemy && !o.ehContador && !o.usos && !ehTipo(o, 'Door') && !ehTipo(o, 'Gate')) { o.usos = 'always'; aviso('“' + rotulo(o) + '” can now be used every time (change it in “Can be used”).'); } }
   gs.push(g); gatAberto = chaveDe(o, lista, gs.length - 1); tudo();
   if (tipo === 'scene') abrirCenaDoGatilho(g, () => tudo());
@@ -634,24 +664,32 @@ function irParaDono(si, chave) {
   tudo();
 }
 /* consequences of a counter: what can happen when the count is complete (nothing tied to an object being used) */
-const CONSEQ_CONTADOR = new Set(['end_map', 'escort', 'move_object', 'move_tile', 'give_item', 'text', 'counter', 'mission', 'unlock_map', 'remove_room', 'remove_tile', 'add_tile', 'remove_enemy', 'remove_object', 'enemy_condition', 'move_heroes', 'add_object', 'highlight', 'cutscene', 'scene', 'sound', 'reserve', 'item_pool']);
-const metaDoContador = c => Math.max(1, totalDoContador(c.nome));
-const textoMissaoContador = c => c.conta === 'rodadas' ? 'Hold out for ' + metaDoContador(c) + ' rounds.' : c.conta === 'monstros' ? 'Defeat ' + metaDoContador(c) + ' monsters' + (c.monstro ? ' (' + nomeIni(c.monstro) + ')' : '') + '.' : 'Find the ' + metaDoContador(c) + ' ' + c.nome + '.';
+const CONSEQ_CONTADOR = new Set(['shop', 'armory', 'craft', 'end_map', 'escort', 'move_object', 'move_tile', 'give_item', 'text', 'counter', 'mission', 'unlock_map', 'remove_room', 'remove_tile', 'add_tile', 'remove_enemy', 'remove_object', 'enemy_condition', 'move_heroes', 'add_object', 'highlight', 'cutscene', 'scene', 'sound', 'reserve', 'item_pool']);
+/* the number the counter's objective and consequence wait for (chosen in the phrase "completed when the count reaches …"),
+   never above the counter's limit; without one chosen: what the "add" triggers add up to */
+const limiteDoContador = c => Math.max(0, +(c && c.limite) || 0);
+const metaDoContador = c => { const l = limiteDoContador(c); const m = +c.meta > 0 ? +c.meta : Math.max(1, totalAutomatico(c.nome)); return l ? Math.min(l, m) : m; };
+/* the choice of that number: 1 up to the limit (without a limit, up to 30 or the number already chosen) */
+const seletorMetaContador = (c, attr) => { const l = limiteDoContador(c), m = metaDoContador(c); const fim = l || Math.max(30, m); return `<select ${attr} title="${esc(tr('The number the objective and the consequence wait for'))}">${Array.from({ length: fim }, (_, i) => i + 1).map(n => `<option value="${n}" ${n === m ? 'selected' : ''}>${n}</option>`).join('')}</select>`; };
+/* the objective of a counter left without a text of its own: it goes into the exported file, in the language of the work */
+const textoMissaoContador = c => { const n = metaDoContador(c); return c.conta === 'rodadas' ? LE2('Hold out for ' + n + ' rounds.', 'Resistam por ' + n + ' rodadas.')
+  : c.conta === 'monstros' ? LE2('Defeat ' + n + ' monsters', 'Derrotem ' + n + ' monstros') + (c.monstro ? ' (' + nomeIni(c.monstro) + ')' : '') + '.'
+  : c.nome + LE2(': reach ' + n + '.', ': cheguem a ' + n + '.'); };
 /* a counter counts by the triggers (Add / subtract / use a count), or by itself: monsters defeated (any, or one kind) or rounds passed */
 const CONTA_CONTADOR = { '': 'Triggers', monstros: 'Monsters defeated', rodadas: 'Rounds passed' };
 const textoContaAuto = c => c.conta === 'monstros' ? '+1 per ' + (c.monstro ? nomeIni(c.monstro) : 'monster') + ' defeated' : c.conta === 'rodadas' ? '+1 per round passed' : '';
-function novoContador(nome) { const c = { id: uid(), nome, inicio: 0, ehContador: true, gatilhos: [] }; projeto.contadores = projeto.contadores || []; projeto.contadores.push(c); return c; }
+function novoContador(nome) { const c = { id: uid(), nome, ehContador: true, gatilhos: [] }; projeto.contadores = projeto.contadores || []; projeto.contadores.push(c); return c; }
 /* the map mission of a counter: listed with the objectives and completed when the count reaches its total */
 function htmlMissaoContador(c) {
   const m = c.missao;
-  return `<label class="chk"><input type="checkbox" data-cm="on" ${m ? 'checked' : ''}> An objective of the map: completed when the count reaches ${metaDoContador(c)}</label>` + (m ? `
+  return `<div class="linha fraseMeta"><label class="chk"><input type="checkbox" data-cm="on" ${m ? 'checked' : ''}> ${esc(tr('An objective of the map: completed when the count reaches'))}</label> ${seletorMetaContador(c, 'data-cm="meta"')}</div>` + (m ? `
     <label class="campo">Objective text <input data-cm="texto" value="${esc(m.texto || '')}" placeholder="${esc(textoMissaoContador(c))}"></label>
     <label class="campo">Listed <select data-cm="quando"><option value="start" ${m.quando !== 'first' ? 'selected' : ''}>From the start of the map</option><option value="first" ${m.quando === 'first' ? 'selected' : ''}>When the count first changes (announced then)</option></select></label>` : '');
 }
 function ligarMissaoContador(el, c, depois) {
   el.querySelectorAll('[data-cm]').forEach(inp => {
     const k = inp.dataset.cm;
-    const h = () => { if (k === 'on') { c.missao = inp.checked ? { uid: 'cm' + uid(), texto: '', quando: 'start' } : undefined; depois(); return; } c.missao[k] = inp.value; if (k === 'quando') depois(); renderConferencia(); };
+    const h = () => { if (k === 'on') { c.missao = inp.checked ? { uid: 'cm' + uid(), texto: '', quando: 'start' } : undefined; depois(); return; } if (k === 'meta') { c.meta = +inp.value; depois(); renderConferencia(); return; } c.missao[k] = inp.value; if (k === 'quando') depois(); renderConferencia(); };
     if (inp.tagName === 'INPUT' && inp.type !== 'checkbox') inp.oninput = h; else inp.onchange = h;
   });
 }
@@ -662,7 +700,7 @@ function abrirConsequencia(c, gi) {
 /* the counter in the side panel: its map mission and its consequence */
 function fichaContador(el, s, c) {
   const chave = 'C:' + c.id;
-  el.innerHTML = `<p class="ajuda">Starts at ${+c.inicio || 0}; total ${metaDoContador(c)}${c.conta ? '; ' + esc(textoContaAuto(c)) : ''}. <button class="sm" id="c_contas">Counts…</button></p>
+  el.innerHTML = `<p class="ajuda">${+c.inicio > 0 ? esc(tr('Starts at')) + ' ' + (+c.inicio) : esc(tr('Starts at 0'))}${limiteDoContador(c) ? '; ' + esc(tr('limit')) + ' ' + limiteDoContador(c) : ''}${c.conta ? '; ' + esc(textoContaAuto(c)) : ''}. <button class="sm" id="c_contas">Counts…</button></p>
     <div class="sub">Map objective</div><div id="c_missao">${htmlMissaoContador(c)}</div>
     <div class="sub">Consequence <button class="sm" id="c_add">+ Add</button></div>
     <p class="ajuda">What happens once, when the count reaches ${metaDoContador(c)}: open the way, give a reward, show a text…</p>
@@ -679,21 +717,22 @@ function abrirContadores() {
   projeto.contadores = projeto.contadores.filter(c => c.nome).sort((a, b) => a.nome.localeCompare(b.nome));
   const chip = u => `<button class="sm usoCont" data-si="${u.si}" data-ch="${esc(String(u.chave))}" title="${u.si >= 0 ? 'Room ' + (u.si + 1) + ' · ' + esc(projeto.salas[u.si].nome) + ': select it' : 'Open this counter'}">${esc(rotulo(u.o))} <small>${esc(u.texto)}</small></button>`;
   const linhas = projeto.contadores.map((c, i) => { const us = usosDoContador(c.nome); const muda = us.filter(u => u.muda), missoes = us.filter(u => u.espera), requer = us.filter(u => u.requer);
-    return `<div class="contador" data-c="${i}"><div class="linha"><input data-cn="${i}" value="${esc(c.nome)}" title="Rename: every trigger and requirement that uses it follows"><label class="campo" style="margin:0">Starts at <input data-ci="${i}" type="number" min="0" value="${+c.inicio || 0}" style="width:64px"></label><label class="campo" style="margin:0" title="[total] in the messages, the objective and the consequence. Empty: what the “Add” triggers add up to">Total <input data-ct="${i}" type="number" min="0" value="${+c.total || ''}" placeholder="${totalAutomatico(c.nome) || ''}" style="width:64px"></label><button class="sm" data-cx="${i}" title="${us.length ? 'Used by ' + us.length + ' trigger(s) or requirement(s): they lose the counter' : 'Delete'}">✕</button></div>
-      <div class="linha contaLinha"><label class="campo" style="margin:0;flex:0 0 auto" title="Triggers: only the “Add / subtract / use a count” triggers change it. Monsters defeated or rounds passed: it also adds 1 by itself">Counts <select data-cc2="${i}">${Object.entries(CONTA_CONTADOR).map(([k, t]) => `<option value="${k}" ${(c.conta || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>${c.conta === 'monstros' ? `<select data-cmo="${i}" title="Which monsters count"><option value="">Any monster</option>${MONSTROS().map(m => `<option value="${m.id}" ${c.monstro === m.id ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}${c.monstro && !MONSTROS().some(m => m.id === c.monstro) ? `<option value="${esc(c.monstro)}" selected>? (no longer in the workshop)</option>` : ''}</select>` : ''}</div>
+    return `<div class="contador" data-c="${i}"><div class="linha"><input data-cn="${i}" value="${esc(c.nome)}" title="Rename: every trigger and requirement that uses it follows"><label class="campo" style="margin:0" title="${esc(tr('The count never goes above this number. Empty: no limit. It always starts at 0.'))}">${esc(tr('Limit'))} <input data-cl="${i}" type="number" min="0" value="${limiteDoContador(c) || ''}" placeholder="${esc(tr('none'))}" style="width:64px"></label><button class="sm" data-cx="${i}" title="${us.length ? 'Used by ' + us.length + ' trigger(s) or requirement(s): they lose the counter' : 'Delete'}">✕</button></div>
+      <div class="linha contaLinha"><label class="campo" style="margin:0;flex:0 0 auto" title="Triggers: only the “Add / subtract / use a count” triggers change it. Monsters defeated or rounds passed: it also adds 1 by itself">Counts <select data-cc2="${i}">${Object.entries(CONTA_CONTADOR).map(([k, t]) => `<option value="${k}" ${(c.conta || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>${c.conta === 'monstros' ? botaoMonstroDoContador(c, i) : ''}</div>
       <div class="usos"><span class="rotuloTx">Changed by</span> ${c.conta ? `<span class="ajuda contaAuto">${esc(textoContaAuto(c))}</span>` : ''}${muda.map(chip).join('') || (c.conta ? '' : '<span class="ajuda">nothing yet: give an object (or a monster) an “Add / subtract / use a count” trigger, or make it count monsters defeated or rounds passed</span>')}</div>
       <div class="usos"><span class="rotuloTx">Map objective</span> <div class="missaoCont" data-mc="${i}">${htmlMissaoContador(c)}</div>${missoes.map(chip).join('')}</div>
       ${requer.length ? `<div class="usos"><span class="rotuloTx">Required / used by</span> ${requer.map(chip).join('')}</div>` : ''}
-      <div class="usos"><span class="rotuloTx">Consequence</span> ${(c.gatilhos || []).map((g, gi) => `<button class="sm consCont" data-cc="${i}" data-gi="${gi}" title="Open it">${esc(GATILHO[g.tipo]?.nome || g.tipo)} <small>${esc(resumoGatilho(g))}</small></button>`).join('')}<button class="sm primario" data-cadd="${i}" title="What happens once, when the count reaches ${metaDoContador(c)}">+ Trigger</button></div></div>`; }).join('');
-  janelaFlutuante('janelaContadores', 'Counts of the map', `<p class="ajuda">Counters keep a number during the map: keys found, levers pulled, seals broken… They live only in the app (nothing goes to the inventory). Triggers add to them or take from them; when a count reaches its total, its map objective is completed and its consequence runs (once). A counter can also count by itself the monsters defeated or the rounds passed.</p>
+      <div class="usos"><span class="rotuloTx">Consequence</span> ${(c.gatilhos || []).map((g, gi) => `<span class="chipCons"><button class="sm consCont" data-cc="${i}" data-gi="${gi}" title="${esc(tr('Open it to change it'))}">✎ ${esc(tr(GATILHO[g.tipo]?.nome || g.tipo))} <small>${esc(resumoGatilho(g))}</small></button><button class="sm" data-ccx="${i}:${gi}" title="${esc(tr('Remove'))}">✕</button></span>`).join('')}<button class="sm primario" data-cadd="${i}" title="What happens once, when the count reaches ${metaDoContador(c)}">+ Trigger</button></div></div>`; }).join('');
+  janelaFlutuante('janelaContadores', 'Counts of the map', `<p class="ajuda">Counters keep a number during the map: keys found, levers pulled, seals broken… They live only in the app (nothing goes to the inventory). Triggers add to them or take from them; a count starts at 0 and never goes above its limit, if it has one. When it reaches the number its objective waits for, the map objective is completed and its consequence runs (once). A counter can also count by itself the monsters defeated or the rounds passed.</p>
     ${linhas || '<p class="ajuda">No counter yet.</p>'}
     <div class="linha" style="margin-top:10px"><input id="cn_novo" placeholder="New counter (Keys, Levers, Seals…)"><button class="sm primario" id="cn_mais">+ New counter</button></div>`, (el, fechar) => {
     const volta = () => { abrirContadores(); renderFaixa(); renderPropriedades(); };
     el.querySelectorAll('[data-cn]').forEach(inp => inp.onchange = () => { const c = projeto.contadores[+inp.dataset.cn]; const novo = inp.value.trim(); if (!novo) { inp.value = c.nome; return; } if (novo !== c.nome && projeto.contadores.some(x => x.nome === novo)) { aviso('There is already a counter called ' + novo + '.'); inp.value = c.nome; return; } renomearContador(c.nome, novo); volta(); });
     el.querySelectorAll('[data-cc2]').forEach(sl => sl.onchange = () => { const c = projeto.contadores[+sl.dataset.cc2]; if (sl.value) c.conta = sl.value; else delete c.conta; if (c.conta !== 'monstros') delete c.monstro; renderConferencia(); volta(); });
-    el.querySelectorAll('[data-cmo]').forEach(sl => sl.onchange = () => { const c = projeto.contadores[+sl.dataset.cmo]; if (sl.value) c.monstro = sl.value; else delete c.monstro; renderConferencia(); volta(); });
-    el.querySelectorAll('[data-ci]').forEach(inp => inp.oninput = () => { projeto.contadores[+inp.dataset.ci].inicio = Math.max(0, +inp.value || 0); });
-    el.querySelectorAll('[data-ct]').forEach(inp => inp.oninput = () => { projeto.contadores[+inp.dataset.ct].total = Math.max(0, +inp.value || 0); renderPropriedades(); });
+    el.querySelectorAll('[data-cmo]').forEach(b => b.onclick = () => { const c = projeto.contadores[+b.dataset.cmo]; escolherMonstroDoContador(c, () => { renderConferencia(); volta(); }); });
+    el.querySelectorAll('[data-cl]').forEach(inp => inp.onchange = () => { const c = projeto.contadores[+inp.dataset.cl]; const l = Math.max(0, +inp.value || 0); if (l) c.limite = l; else delete c.limite; if (l && +c.meta > l) c.meta = l; renderConferencia(); volta(); });
+    el.querySelectorAll('[data-ccx]').forEach(b => b.onclick = () => { const [i, gi] = b.dataset.ccx.split(':').map(Number); const c = projeto.contadores[i]; const g = c.gatilhos[gi];
+      if (!confirm(tr('Remove this consequence?') + ' ' + (GATILHO[g.tipo]?.nome || g.tipo))) return; c.gatilhos.splice(gi, 1); Object.keys(c).filter(k => k.endsWith(':' + g.uid)).forEach(k => delete c[k]); renderConferencia(); renderPropriedades(); volta(); });
     el.querySelectorAll('[data-mc]').forEach(d => ligarMissaoContador(d, projeto.contadores[+d.dataset.mc], volta));
     el.querySelectorAll('[data-cx]').forEach(b => b.onclick = () => { const c = projeto.contadores[+b.dataset.cx]; const us = usosDoContador(c.nome);
       if ((us.length || (c.gatilhos || []).length || c.missao) && !confirm('Delete “' + c.nome + '”? ' + (us.length ? us.length + ' trigger(s) or requirement(s) lose the counter. ' : '') + ((c.gatilhos || []).length ? 'Its consequence (' + c.gatilhos.length + ' trigger(s)) goes too. ' : '') + (c.missao ? 'Its map objective goes too.' : ''))) return;
@@ -707,10 +746,19 @@ function abrirContadores() {
   }, true);
 }
 /* the message of a count: [count] (the counter's name, highlighted), [n] (the count now), [total] */
+/* the monsters a counter counts: a window with every monster of the Workshop (yours too), by their pictures */
+function botaoMonstroDoContador(c, i) { const m = c.monstro && MONSTROS().find(x => x.id === c.monstro); const r = m ? retratoDoMonstro(m) : '';
+  return `<button class="sm escolhaMonstroCont" data-cmo="${i}" title="${esc(tr('Which monsters count'))}">${r ? `<img loading="lazy" decoding="async" ${imgTardia(r)} alt="">` : ''}${esc(m ? m.nome : c.monstro ? tr('? (no longer in the workshop)') : tr('Any monster'))} ▾</button>`; }
+function escolherMonstroDoContador(c, depois) {
+  const ms = MONSTROS();
+  modal(tr('Which monsters count'), `<p class="ajuda">${esc(tr('Every monster of the Workshop, the game’s and yours. A defeat of one of them adds 1.'))}</p><div class="grade escolhaItem"><div class="item ${!c.monstro ? 'marcado' : ''}" data-mm=""><span class="vazio"></span><div>${esc(tr('Any monster'))}</div></div>${ms.map(m => { const r = retratoDoMonstro(m); return `<div class="item ${c.monstro === m.id ? 'marcado' : ''}" data-mm="${esc(m.id)}">${r ? `<img loading="lazy" decoding="async" ${imgTardia(r)} alt="">` : '<span class="vazio"></span>'}<div data-sem-traducao>${esc(m.nome)}<small>${esc(m.base ? tr('from the game') : tr('custom'))}</small></div></div>`; }).join('')}</div>${ms.length ? '' : `<p class="ajuda">${esc(tr('The workshop has no monsters: import or create them first.'))}</p>`}`, (el, fechar) => {
+    el.querySelectorAll('[data-mm]').forEach(d => d.onclick = () => { if (d.dataset.mm) c.monstro = d.dataset.mm; else delete c.monstro; fechar(); depois(); });
+  }, true);
+}
 const TEXTO_CONTADOR = { add: tr('You found a [count] ([n] of [total]).'), sub: tr('You lost a [count] ([n] of [total]).'), set: tr('[count]: [n] of [total].') };   // default messages, in the editor's language
-const VAGAS_CONTADOR = { count: 'the name of the counter, highlighted', n: 'the count after this trigger', total: 'the total of the counter (Counts button)' };
+const VAGAS_CONTADOR = { count: 'the name of the counter, highlighted', n: 'the count after this trigger', total: 'the number the counter’s objective waits for (Counts button)' };
 function totalDoContador(nome) {
-  const c = (projeto.contadores || []).find(x => x.nome === nome); if (c && +c.total > 0) return +c.total;
+  const c = (projeto.contadores || []).find(x => x.nome === nome); if (c) return metaDoContador(c);
   return totalAutomatico(nome);
 }
 /* without a total set: what the "add" triggers add up to (3 keys of +1 → 3), else the number a mission or requirement waits for */
@@ -743,13 +791,52 @@ function camposContador(g, uso) {
     <label class="campo">Message to the players (optional) <input data-k="texto" data-cont-tx value="${esc(g.texto || '')}" placeholder="${esc(TEXTO_CONTADOR[g.acao || 'add'])}"></label>
     <div class="barraTx"><span>Insert:</span>${Object.entries(VAGAS_CONTADOR).map(([k, x]) => `<button class="sm fichaTx" data-ins-cont="[${k}]" title="${esc(x)}">${k}</button>`).join('')}</div>
     <div class="previaTx" data-prev-cont>${previaContador(g)}</div>
-    <p class="ajuda">[count] is the name of the counter (highlighted like the rule words of the game), [n] the count after this trigger, [total] the total of the counter (Counts button). Missions and requirements can wait for the counter to reach a number (“A counter reaches a number”).</p>`;
+    <p class="ajuda">[count] is the name of the counter (highlighted like the rule words of the game), [n] the count after this trigger, [total] the number its objective waits for (Counts button). Missions and requirements can wait for the counter to reach a number (“A counter reaches a number”).</p>`;
+}
+
+// ------------------------------------------------------------ "Open the shop" / "Open the armory"
+/* g.fontes: where the stock comes from ('cidade': the campaign's shop, as in the city; 'lista': g.itens [{item, qtd}] (qtd 0:
+   no end); 'pool': the item pool of the map). g.preco / g.precoVenda: % of the game's prices (selling: 75% of the value, as in
+   the game). g.vender: the party may sell crafting materials. g.maxCompras: units per visit (0: no limit). g.usos: times it
+   opens (0: every time); g.fechado: the text once it no longer opens. */
+const FONTES_LOJA = [['cidade', 'The city’s shop', 'the campaign’s current stock: what the party buys here leaves the city’s shop, what it sells goes there, as in the game'], ['lista', 'My list', 'items, consumables, recipes and materials you pick, with how many of each'], ['pool', 'The item pool of the map', 'what the item pool holds (Map setup): one of each item, ten of each material or consumable']];
+/* "Open the crafting": g.tipos, the kinds of item that may be crafted (all, when new) */
+const TIPOS_FORJA = [['armadura', 'Armor'], ['consumivel', 'Consumables'], ['adorno', 'Trinkets'], ['peca', 'Weapon parts']];
+const tiposDaForja = g => (Array.isArray(g.tipos) ? g.tipos : TIPOS_FORJA.map(([k]) => k)).filter(k => TIPOS_FORJA.some(([x]) => x === k));
+const fontesDaLoja = g => (Array.isArray(g.fontes) ? g.fontes : ['cidade']).filter(f => FONTES_LOJA.some(([k]) => k === f));
+function camposDeAbertura(g, tipo) {
+  const nome = ({ shop: 'shop', armory: 'armory', craft: 'crafting' })[tipo];
+  return `<label class="campo">Opens <select data-k="usos" data-num="1">${[[0, 'Every time the trigger runs (no limit)'], [1, 'Once'], [2, 'Twice'], [3, 'Three times'], [5, 'Five times'], [10, 'Ten times']].map(([v, n]) => `<option value="${v}" ${(+g.usos || 0) === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>`
+    + (+g.usos ? `<label class="campo">Text once it no longer opens <input data-k="fechado" value="${esc(g.fechado || '')}" placeholder="${esc(({ shop: 'The shop has closed.', armory: 'The armory has closed.', craft: 'The crafting workshop has closed.' })[tipo])}"></label>` : '')
+    + `<p class="ajuda">The ${nome} opens in its own window over the board; the next triggers run when it closes. ${tipo === 'armory' ? 'Heroes whose weapons this map sets (Workshop) keep them.' : 'To charge an entrance or limit who may enter, put a requirement on this trigger.'}</p>`;
+}
+function camposDaLoja(g) {
+  const f = fontesDaLoja(g);
+  const fontes = FONTES_LOJA.map(([k, n, sub]) => `<label class="chk" title="${esc(sub)}"><input type="checkbox" data-fonte="${k}" ${f.includes(k) ? 'checked' : ''}> ${esc(n)} <small>(${esc(sub)})</small></label>`).join('');
+  const itens = (g.itens || []).map((x, i) => `<div class="linha itemLoja"><span>${esc(semGlifo(nomeItem(x.item)))}${itemDaOficina(x.item) ? '' : ' <small class="erro">not in the workshop!</small>'}</span><label class="sm">How many <input type="number" min="0" data-qtdloja="${i}" value="${+x.qtd || 0}" style="width:60px"></label><button class="sm" data-tiraloja="${i}" title="Remove">✕</button></div>`).join('');
+  return `<div class="sub">Stock</div>${fontes}
+    ${f.includes('lista') ? `<div class="listaLoja">${itens || '<p class="ajuda">No items in your list yet.</p>'}</div><button class="sm" data-poeloja>+ Item…</button><p class="ajuda">How many: 0 = no end. What the party buys from your list does not come back at another visit of this map.</p>` : ''}
+    ${f.includes('pool') && !(projeto.itensPool || []).length ? '<p class="ajuda erro">The item pool of the map is empty (Map setup).</p>' : ''}
+    ${f.length ? '' : '<p class="ajuda erro">Pick at least one source of stock.</p>'}
+    <div class="sub">Prices and limits</div>
+    <div class="linha">${campo2('Buying prices (%)', `<input type="number" min="0" max="1000" data-k="preco" value="${g.preco ?? 100}" style="width:70px">`)}${campo2('Selling prices (%)', `<input type="number" min="0" max="1000" data-k="precoVenda" value="${g.precoVenda ?? 100}" style="width:70px">`)}</div>
+    <p class="ajuda">100% = the game’s prices (the party sells for 75% of the value, as in the city).</p>
+    <label class="chk"><input type="checkbox" data-k="vender" ${g.vender !== false ? 'checked' : ''}> The party may sell crafting materials</label>
+    ${campo2('Purchases per visit (0 = no limit)', `<input type="number" min="0" data-k="maxCompras" value="${+g.maxCompras || 0}" style="width:70px">`)}
+    ${camposDeAbertura(g, 'shop')}`;
+}
+const campo2 = (rot, html) => `<label class="campo">${rot} ${html}</label>`;
+function ligarLoja(el, g) {
+  el.querySelectorAll('[data-fonte]').forEach(c => c.onchange = () => { const f = new Set(fontesDaLoja(g)); if (c.checked) f.add(c.dataset.fonte); else f.delete(c.dataset.fonte); g.fontes = FONTES_LOJA.map(([k]) => k).filter(k => f.has(k)); if (c.checked && c.dataset.fonte === 'pool' && !(projeto.itensPool || []).length) aviso('The item pool of the map is empty: add items to it in Map setup.'); renderPropriedades(); renderConferencia(); });
+  el.querySelectorAll('[data-qtdloja]').forEach(c => c.onchange = () => { const x = (g.itens || [])[+c.dataset.qtdloja]; if (x) x.qtd = Math.max(0, +c.value || 0); renderGatilhosSoResumo(); });
+  el.querySelectorAll('[data-tiraloja]').forEach(b => b.onclick = () => { g.itens.splice(+b.dataset.tiraloja, 1); renderPropriedades(); renderConferencia(); });
+  const pb = el.querySelector('[data-poeloja]'); if (pb) pb.onclick = () => abrirEscolhaDeItem(null, id => { g.itens = g.itens || []; const ja = g.itens.find(x => x.item === id); if (ja) ja.qtd = (+ja.qtd || 0) + 1; else g.itens.push({ item: id, qtd: 1 }); renderPropriedades(); renderConferencia(); });
 }
 
 // ------------------------------------------------------------ picking an item: a window with the items by kind, with their pictures
 function escolhaDeItem(atual) {
   const img = atual ? imagemDoItemEscolhido(atual) : '';
-  return `<div class="itemEscolhido">${img ? `<img src="${img}" alt="">` : '<span class="vazio"></span>'}<div><b>${atual ? esc(semGlifo(nomeItem(atual))) : 'No item yet'}</b>${atual && !itemDaOficina(atual) ? '<small class="erro">not in the workshop!</small>' : ''}</div><button class="sm" data-escolheitem>${atual ? 'Change…' : 'Pick the item…'}</button></div>`;
+  return `<div class="itemEscolhido">${img ? `<img loading="lazy" decoding="async" ${imgTardia(img)} alt="">` : '<span class="vazio"></span>'}<div><b>${atual ? esc(semGlifo(nomeItem(atual))) : 'No item yet'}</b>${atual && !itemDaOficina(atual) ? '<small class="erro">not in the workshop!</small>' : ''}</div><button class="sm" data-escolheitem>${atual ? 'Change…' : 'Pick the item…'}</button></div>`;
 }
 function imagemDoItemEscolhido(id) {
   const w = ITENS_B().find(i => i.id === id); if (w) return retratoDoItem(w);
@@ -757,14 +844,15 @@ function imagemDoItemEscolhido(id) {
   const rc = receitaDoItem(id); if (rc) return itemAlvo(rc.item)?.img || '';
   return '';
 }
-function abrirEscolhaDeItem(atual, escolher) {
+function abrirEscolhaDeItem(atual, escolher, so = {}) {
   const grupos = [['Armor', ITENS_B().filter(i => i.cls === 'ArmorModel')], ['Consumables', ITENS_B().filter(i => i.cls === 'ConsumableModel')], ['Trinkets', ITENS_B().filter(i => i.cls === 'TrinketModel' || i.cls === 'TableItem')],
     ['Weapon parts', ITENS_B().filter(i => i.cls === 'WeaponPartsModel')], ['Materials', ITENS_B().filter(i => i.cls === 'CraftingMaterialModel')]].map(([n, xs]) => [n, xs.map(i => ({ id: i.id, nome: semGlifo(i.nome) + (/[\uE000-\uF8FF]/.test(i.nome || '') ? ' +' : ''), img: retratoDoItem(i), sub: i.cls === 'WeaponPartsModel' ? (i.classe || '') + ' · ' + (i.slot || '') : '' }))])
     .concat([['Runes of the workshop', (oficina().armas || []).filter(a => a.runa).map(a => ({ id: 'RUNA:' + a.id, nome: nomeItem('RUNA:' + a.id), img: imagemDoItemEscolhido('RUNA:' + a.id), sub: 'the weapon comes with it' }))],
-      ['Recipes (the party learns them)', (oficina().receitas || []).map(r => ({ id: 'RECEITA:' + r.id, nome: nomeReceita(r), img: itemAlvo(r.item)?.img || '', sub: custoResumo(r) }))]]).filter(([, xs]) => xs.length);
+      ['Recipes (the party learns them)', (oficina().receitas || []).map(r => ({ id: 'RECEITA:' + r.id, nome: nomeReceita(r), img: itemAlvo(r.item)?.img || '', sub: custoResumo(r) }))]]).filter(([n, xs]) => xs.length && !(so.soItens && /^(Runes|Recipes)/.test(n)));
+  if (so.antes) grupos.unshift(...so.antes.filter(([n, xs]) => xs.length));
   if (!grupos.length) return aviso('The workshop has no items yet: import or create them in the Items tab.');
-  modal('Pick the item', `<input id="ei_filtro" placeholder="filter…"><div id="ei_grupos"></div>`, (el, fechar) => {
-    const pinta = f => { el.querySelector('#ei_grupos').innerHTML = grupos.map(([n, xs]) => { const v = xs.filter(x => !f || x.nome.toLowerCase().includes(f)); return v.length ? `<div class="sub">${esc(n)} <small>(${v.length})</small></div><div class="grade escolhaItem">${v.map(x => `<div class="item ${x.id === atual ? 'marcado' : ''}" data-ei="${esc(x.id)}">${x.img ? `<img src="${x.img}" alt="">` : '<span class="vazio"></span>'}<div>${esc(x.nome)}${x.sub ? `<small>${esc(x.sub)}</small>` : ''}</div></div>`).join('')}</div>` : ''; }).join('') || '<p class="ajuda">Nothing matches.</p>';
+  modal(so.titulo || 'Pick the item', `<input id="ei_filtro" placeholder="filter…"><div id="ei_grupos"></div>`, (el, fechar) => {
+    const pinta = f => { el.querySelector('#ei_grupos').innerHTML = grupos.map(([n, xs]) => { const v = xs.filter(x => !f || x.nome.toLowerCase().includes(f)); return v.length ? `<div class="sub">${esc(n)} <small>(${v.length})</small></div><div class="grade escolhaItem">${v.map(x => `<div class="item ${x.id === atual ? 'marcado' : ''}" data-ei="${esc(x.id)}">${x.img ? `<img loading="lazy" decoding="async" ${imgTardia(x.img)} alt="">` : '<span class="vazio"></span>'}<div>${esc(x.nome)}${x.sub ? `<small>${esc(x.sub)}</small>` : ''}</div></div>`).join('')}</div>` : ''; }).join('') || '<p class="ajuda">Nothing matches.</p>';
       el.querySelectorAll('[data-ei]').forEach(d => d.onclick = () => { fechar(); escolher(d.dataset.ei); }); };
     pinta(''); el.querySelector('#ei_filtro').oninput = e => pinta(e.target.value.toLowerCase());
   }, true);
@@ -785,12 +873,12 @@ function abrirCenaDoGatilho(g, aoFechar) {
   const { fundo } = modal('Scene: the dialogue boxes', `<div class="cenaG"><div class="cenaEsq"><div class="linha botoes"><button class="sm" data-cn="box">+ Box after the chosen one</button><button class="sm" data-cn="choice">+ Question after it</button><button class="sm" data-cn="ler">▶ Read it</button></div><div class="cenaFluxo"></div></div><div class="cenaDir"></div></div>`, el => {
     const numDe = c => ordemDaCena(g).indexOf(c) + 1;
     const porId = id => g.caixas.find(c => c.id === id);
-    const opcoesDestino = (atual, eu) => `<option value="">End of the scene</option>${ordemDaCena(g).filter(c => c !== eu).map(c => `<option value="${c.id}" ${atual === c.id ? 'selected' : ''}>Box ${numDe(c)}${c.speaker ? ' · ' + esc(nomePersonagem(c.speaker)) : ''}: ${esc((c.text || '').slice(0, 30))}</option>`).join('')}`;
+    const opcoesDestino = (atual, eu) => `<option value="">End of the scene</option>${ordemDaCena(g).filter(c => c !== eu).map(c => `<option value="${c.id}" ${atual === c.id ? 'selected' : ''}>${L2('Box ', 'Caixa ')}${numDe(c)}${c.speaker ? ' · ' + esc(nomePersonagem(c.speaker)) : ''}: ${esc((c.text || '').slice(0, 30))}</option>`).join('')}`;
     const fluxo = () => {
       const f = el.querySelector('.cenaFluxo'); const ordem = ordemDaCena(g);
       f.innerHTML = ordem.map((c, i) => { const rosto = c.speaker ? retratoDoPersonagem(PERSONAGENS_B().find(p => p.id === c.speaker)) : '';
-        const seta = c.type === 'choice' ? (c.options || []).map((o, k) => `<div class="cenaOp">${esc(o.text || 'Answer ' + (k + 1))} → ${o.next && porId(o.next) ? 'Box ' + numDe(porId(o.next)) : 'end'}</div>`).join('') : `<div class="cenaSeg">${c.next && porId(c.next) ? '↓ Box ' + numDe(porId(c.next)) : '■ end of the scene'}</div>`;
-        return `<div class="cenaCx ${c.id === selId ? 'ativo' : ''} ${c.type === 'choice' ? 'pergunta' : ''}" data-cx="${c.id}"><div class="cab">${rosto ? `<img src="${rosto}" alt="">` : '<span class="semRosto">✦</span>'}<b>Box ${i + 1}${c.id === (g.inicio || ordem[0]?.id) ? ' (first)' : ''}</b><small>${esc(c.speaker ? nomePersonagem(c.speaker) : 'Narrator')}${c.title ? ' · ' + esc(c.title) : ''}</small></div><p>${esc((c.text || '(no text yet)').slice(0, 140))}</p>${seta}</div>`; }).join('');
+        const seta = c.type === 'choice' ? (c.options || []).map((o, k) => `<div class="cenaOp">${esc(o.text || L2('Answer ', 'Resposta ') + (k + 1))} → ${o.next && porId(o.next) ? L2('Box ', 'Caixa ') + numDe(porId(o.next)) : L2('end', 'fim')}</div>`).join('') : `<div class="cenaSeg">${c.next && porId(c.next) ? '↓ ' + L2('Box ', 'Caixa ') + numDe(porId(c.next)) : L2('■ end of the scene', '■ fim da cena')}</div>`;
+        return `<div class="cenaCx ${c.id === selId ? 'ativo' : ''} ${c.type === 'choice' ? 'pergunta' : ''}" data-cx="${c.id}"><div class="cab">${rosto ? `<img loading="lazy" decoding="async" ${imgTardia(rosto)} alt="">` : '<span class="semRosto">✦</span>'}<b>${L2('Box ', 'Caixa ')}${i + 1}${c.id === (g.inicio || ordem[0]?.id) ? L2(' (first)', ' (primeira)') : ''}</b><small>${esc(c.speaker ? nomePersonagem(c.speaker) : 'Narrator')}${c.title ? ' · ' + esc(c.title) : ''}</small></div><p>${esc((c.text || '(no text yet)').slice(0, 140))}</p>${seta}</div>`; }).join('');
       f.querySelectorAll('[data-cx]').forEach(d => d.onclick = () => { selId = d.dataset.cx; pinta(); });
     };
     const props = () => {

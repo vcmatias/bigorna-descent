@@ -24,6 +24,10 @@ namespace Bigorna
             {
                 Directory.CreateDirectory(PastaMapas);
                 Acervo.Pacotes.Raiz = PastaPacotes;
+                Dados.ImagensDaObra.Dados = Application.persistentDataPath;
+                // mapas em varias linguas: a lingua do jogo (so depois da tela de titulo; antes, a do mod) e as escolhas das fichas
+                Formato.Traducao.ArquivoDeEscolhas = Path.Combine(Application.persistentDataPath, "bigorna-linguas.json");
+                Formato.Traducao.LinguaDoJogoAgora = () => Idioma.JogoPronto ? Dados.DadosDoEditor.LinguaDoJogo() : Idioma.Codigo;
                 Log.Novo();
                 string compilado = ""; try { compilado = " (DLL de " + System.IO.File.GetLastWriteTime(typeof(Bootstrap).Assembly.Location).ToString("dd/MM HH:mm") + ")"; } catch { }
                 Log.Info("Bigorna " + Versao + compilado + " em marcha. Unity " + Application.unityVersion + " · " + Application.productName);

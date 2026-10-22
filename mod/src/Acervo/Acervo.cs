@@ -16,6 +16,7 @@ namespace Bigorna.Acervo
     /// </summary>
     public static class Acervo
     {
+        static Acervo() { LinguaDosErros.Escolher = T; }   // (os erros do nucleo, que a ficha mostra, na lingua do mod)
         const string EnderecoPadrao = "https://raw.githubusercontent.com/vcmatias/bigorna-acervo/main/";
         static string Pasta => Path.Combine(Application.persistentDataPath, "Acervo");
         static string CaminhoIndice => Path.Combine(Pasta, "indice.json");
@@ -68,9 +69,15 @@ namespace Bigorna.Acervo
         public static List<Requisito> PacotesParaBaixar(Ficha f) => (f.Requer ?? new List<Requisito>()).Where(q => Pacotes.EdicaoInstalada(q.Id) < q.Edicao).ToList();
 
         public static string TextoFaltam(List<Requisito> faltam) =>
-            T("Este mapa precisa ", "This map needs ") + (faltam.Count == 1 ? T("do pacote ", "the package ") : T("dos pacotes ", "the packages ")) +
-            string.Join(", ", faltam.Select(q => "«" + (q.Nome ?? q.Id) + "»").ToArray()) +
-            T(". Baixe na aba Pacotes (ou baixe o mapa de novo pelo acervo, que ele vem junto).", ". Download it in the Packages tab (or download the map again from the community library: it comes along).");
+            T("Para jogar, falta ", "To play it, you need ") + (faltam.Count == 1 ? T("o pacote ", "the package ") : T("os pacotes ", "the packages ")) +
+            string.Join(", ", faltam.Select(q => { int tem = Pacotes.EdicaoInstalada(q.Id); return T("«", "“") + (q.Nome ?? q.Id) + T("»", "”") + (tem > 0 ? T(" (edição ", " (edition ") + q.Edicao + T("; você tem a ", "; you have ") + tem + ")" : ""); }).ToArray()) +
+            T(", com os monstros, tiles e outras peças que ele usa. Toque em «Baixar pacote» para ir até ele na aba Pacotes.", ", with the monsters, tiles and other pieces it uses. Tap “Get the package” to go to it in the Packages tab.");
+
+        /// <summary>v241: os pacotes exigidos que faltam aqui (ou numa edicao mais velha), de uma lista de requisitos.</summary>
+        public static List<Requisito> Faltam(List<Requisito> requer) => (requer ?? new List<Requisito>()).Where(q => Pacotes.EdicaoInstalada(q.Id) < q.Edicao).ToList();
+
+        /// <summary>v241: os pacotes instalados com uma edicao nova no acervo.</summary>
+        public static int AtualizacoesDePacotes() => DePacotes.Count(f => { int tem = Instalada(f); return tem > 0 && tem < f.Edicao; });
 
         /// <summary>Le o indice do acervo (uma vez por abertura da tela, ou de novo pelo botao). Sem conexao, o guardado.</summary>
         public static IEnumerator LerIndice(Action fim)
@@ -94,21 +101,16 @@ namespace Bigorna.Acervo
             fim?.Invoke();
         }
 
-        /// <summary>Baixa e instala uma entrada; de um mapa, antes os pacotes que ele exige. A ficha da tela se refaz a cada passo.</summary>
+        /// <summary>Baixa e instala uma entrada. v241: um mapa ou campanha so depois dos pacotes que exige (como no Valkyrie: o
+        /// jogador baixa antes os pacotes, na aba Pacotes). A ficha da tela se refaz a cada passo.</summary>
         public static IEnumerator Baixar(Ficha f, Action passo)
         {
             if (Situacao.ContainsKey(f.Id) && Situacao[f.Id].EndsWith("…")) yield break;
-            var fila = new List<Ficha>();
-            foreach (var q in f.EhMapa ? PacotesParaBaixar(f) : new List<Requisito>())
-            {
-                var pk = Achar(q.Id);
-                if (pk == null || pk.Edicao < q.Edicao) { Situacao[f.Id] = T("O acervo não tem o pacote «", "The community library does not have the package «") + (q.Nome ?? q.Id) + "» (" + T("edição ", "edition ") + q.Edicao + ")"; passo?.Invoke(); yield break; }
-                fila.Add(pk);
-            }
-            fila.Add(f);
+            if (f.EhMapa && PacotesParaBaixar(f).Count > 0) { Situacao[f.Id] = T("Baixe antes os pacotes que ele exige.", "Download the packages it needs first."); passo?.Invoke(); yield break; }
+            var fila = new List<Ficha> { f };
             foreach (var x in fila)
             {
-                Situacao[f.Id] = x == f ? T("Baixando…", "Downloading…") : T("Baixando o pacote «", "Downloading the package «") + x.Nome + "»…";
+                Situacao[f.Id] = x == f ? T("Baixando…", "Downloading…") : T("Baixando o pacote «", "Downloading the package “") + x.Nome + T("»…", "”…");
                 if (x != f) Situacao[x.Id] = T("Baixando…", "Downloading…");
                 passo?.Invoke();
                 string erro = null; byte[] dados = null;

@@ -38,6 +38,9 @@ namespace Bigorna.Menu
         static bool _falhou;
         static GameObject _bandejaAberta;
         const float Escala = 0.8f;
+        // v241: os pacotes que um mapa ou campanha pediu (destacados na aba Pacotes) e quem pediu
+        static readonly List<Acervo.Requisito> _pedidos = new List<Acervo.Requisito>();
+        static string _pedidosPor;
 
         public static bool Aberta => _tela != null && _tela.activeSelf;
 
@@ -82,7 +85,7 @@ namespace Bigorna.Menu
         }
 
         /// <summary>A cena de titulo saiu: a copia sai com ela (a proxima visita monta de novo).</summary>
-        public static void Esquecer() { _missao = null; _tela = null; _grade = null; _fichas.Clear(); _abas.Clear(); _modeloBotao = null; _vazio = null; _bandejaAberta = null; }
+        public static void Esquecer() { _missao = null; _alerta = null; _tela = null; _grade = null; _fichas.Clear(); _abas.Clear(); _modeloBotao = null; _vazio = null; _bandejaAberta = null; }
 
         /// <summary>Os sons dos botoes do proprio jogo (clique; "embarcar" ao jogar).</summary>
         static void Som(string ev) { try { Jogo.Persistente?.Audio?.PostEvent(ev); } catch { } }
@@ -187,12 +190,13 @@ namespace Bigorna.Menu
             _abas.Add(Botao(cima, T("Mapas oficiais", "Official maps"), () => { _aba = 2; MapasOficiais.Reler(); Preencher(); }));
             // o acervo (como no Valkyrie): mapas e campanhas para baixar; pacotes da Oficina que os mapas exigem
             _abas.Add(Botao(cima, T("Baixar mapas", "Download maps"), () => { _aba = 3; LerAcervo(); }));
-            _abas.Add(Botao(cima, T("Pacotes", "Packages"), () => { _aba = 4; LerAcervo(); }));
+            _abas.Add(Botao(cima, T("Pacotes", "Packages"), () => { _aba = 4; _pedidos.Clear(); LerAcervo(); }));
+            // (v241: o indice lido em segundo plano, para a aba Pacotes dizer se ha atualizacao)
+            if (!Acervo.Acervo.Leu && !Acervo.Acervo.Lendo) Nucleo.Instancia.StartCoroutine(Acervo.Acervo.LerIndice(() => { if (_tela != null) Preencher(); }));
             var baixo = Fileira("Bigorna ferramentas", new Vector2(0.5f, 0f), 60f);
             Botao(baixo, T("Abrir pasta", "Open folder"), PainelMapas.AbrirAPasta);
             if (Dados.DadosDoEditor.EditorInstalado) Botao(baixo, T("Abrir editor", "Open editor"), Dados.DadosDoEditor.AbrirEditor);
             Botao(baixo, T("Relatar um problema", "Report a problem"), () => { Nucleo.Visivel = true; Relatos.Alternar(); });
-            Botao(baixo, Pt ? "English" : "Português", () => { Definir(!Pt); var era = _tela; Esquecer(); if (era != null) UnityEngine.Object.Destroy(era); if (Montar()) { PainelMapas.Reler(); Preencher(); Mostrar(); } });
         }
 
         /// <summary>As fichas da aba: uma por campanha ou mapa avulso, do modelo das partidas gravadas.</summary>
@@ -203,19 +207,59 @@ namespace Bigorna.Menu
             _fichas.Clear(); _bandejaAberta = null;
             var lc = Cena?.CampaignLoad; var modelo = lc?.SaveSlotPool?.Prefab; if (modelo == null) return;
             for (int i = 0; i < _abas.Count; i++) { var t = _abas[i].GetComponentInChildren<TMP_Text>(true); if (t != null) t.alpha = i == _aba ? 1f : 0.55f; }
+            // (v241: atualizacoes de pacotes, no nome da aba: discreto)
+            if (_abas.Count > 4) { int nAt = Acervo.Acervo.AtualizacoesDePacotes(); Texto(_abas[4].GetComponentInChildren<TMP_Text>(true), T("Pacotes", "Packages") + (nAt > 0 ? " (" + nAt + (nAt == 1 ? T(" atualização", " update") : T(" atualizações", " updates")) + ")" : "")); }
             int n = 0;
             if (_aba == 0)
                 foreach (var c in PainelMapas.Campanhas)
                 {
                     var p = PainelMapas.ProgressoDe(c); bool comecada = p.Completados.Count > 0;
-                    var resumo = c.Nos.Count(x => x.EhMapa) + T(" mapa(s)", " map(s)") + (comecada ? " · " + p.Completados.Count + T(" concluído(s)", " done") : "");
-                    Ficha(++n, c.NomeVisivel, resumo, PainelMapas.AlteradoEm(c), c.Metadados?.Autor, AtoExigido.Ato2(c) ? Act.ActII : Act.ActI,
-                        comecada ? T("Continuar", "Continue") : T("Jogar", "Play"), () => { var e = Campanha.Campanha.Comecar(c, false); Lancou(e); },
-                        comecada ? T("Recomeçar", "Restart") : null, comecada ? (Action)(() => { var e = Campanha.Campanha.Comecar(c, true); Lancou(e); }) : null);
+                    // (com uma partida em andamento: "Continuar campanha" carrega a partida dela, com o grupo dela; as partidas
+                    //  das campanhas da comunidade ficam fora da tela "Carregar campanha" do jogo)
+                    var andamento = Campanha.SavesDaComunidade.EmAndamento(c);
+                    var resumo = c.Nos.Count(x => x.EhMapa) + T(" mapa(s)", " map(s)") + (comecada ? " · " + p.Completados.Count + T(" concluído(s)", " done") : "") + (andamento != null ? T(" · em andamento", " · in progress") : "");
+                    // (v241: sem os pacotes que ela exige, a campanha leva ate eles)
+                    var faltamC = c.PacotesFaltando ?? new List<Acervo.Requisito>();
+                    if (faltamC.Count > 0)
+                    {
+                        Ficha(++n, c.NomeVisivel, resumo + T(" · falta pacote", " · package missing"), PainelMapas.AlteradoEm(c), c.Metadados?.Autor, AtoExigido.Ato2(c) ? Act.ActII : Act.ActI,
+                            T("Baixar pacote", "Get the package"), () => IrParaPacotes(faltamC, c.NomeVisivel), null, null, Acervo.Acervo.TextoFaltam(faltamC));
+                        continue;
+                    }
+                    Action recomecar = () => { _paginaSaves = 0; AbrirSaves(c.NomeVisivel + T(" · recomeçar", " · restart"), () => Lancou(Campanha.Campanha.Comecar(c, true)), s => Lancou(Campanha.Campanha.Comecar(c, true, s))); };
+                    string principal, outro, detalhe = null; Action aoPrincipal, aoOutro;
+                    if (andamento != null)
+                    {
+                        int ranhura = andamento.Value.Key; var info = andamento.Value.Value;
+                        principal = T("Continuar campanha", "Continue campaign"); aoPrincipal = () => Lancou(Campanha.SavesDaComunidade.Continuar(ranhura, c.NomeVisivel));
+                        outro = T("Recomeçar…", "Restart…"); aoOutro = recomecar;
+                        detalhe = T("Em andamento com o grupo «", "In progress with the party “") + info.PartyName + T("»", "”") + (info.Timestamp > 0 ? " · " + DataHora(new DateTime(info.Timestamp)) : "")
+                            + T(". «Recomeçar» começa de novo, com um grupo novo ou com os seus heróis.", ". “Restart” starts over, with a new party or with your heroes.");
+                    }
+                    else if (comecada) { principal = T("Continuar", "Continue"); aoPrincipal = () => Lancou(Campanha.Campanha.Comecar(c, false)); outro = T("Recomeçar…", "Restart…"); aoOutro = recomecar; }
+                    else
+                    {
+                        principal = T("Grupo novo", "New party"); aoPrincipal = () => Lancou(Campanha.Campanha.Comecar(c, false));
+                        outro = T("Usar meus heróis", "Use my heroes"); aoOutro = () => { _paginaSaves = 0; AbrirSaves(c.NomeVisivel, null, s => Lancou(Campanha.Campanha.Comecar(c, false, s))); };
+                        detalhe = Encontro.GrupoDoSave.TextoCurto;
+                    }
+                    Ficha(++n, c.NomeVisivel, resumo, PainelMapas.AlteradoEm(c), c.Metadados?.Autor, AtoExigido.Ato2(c) ? Act.ActII : Act.ActI, principal, aoPrincipal, outro, aoOutro,
+                        detalhe, c.Linguas.Count > 1 ? string.Join(",", c.Linguas.ToArray()) : null, c.LinguaEmUso, c.Linguas.Count > 1 ? EscolherLingua(c.Caminho) : null);
                 }
             else if (_aba == 1)
                 foreach (var m in PainelMapas.Mapas)
-                    Ficha(++n, m.NomeVisivel, m.Resumo(Pt), PainelMapas.AlteradoEm(m), m.Metadados?.Autor, AtoExigido.Ato2(m) ? Act.ActII : Act.ActI, T("Jogar", "Play"), () => { var e = Lancador.Lancar(m); Lancou(e); }, null, null);
+                {
+                    var faltamM = m.PacotesFaltando ?? new List<Acervo.Requisito>();
+                    if (faltamM.Count > 0)
+                    {
+                        Ficha(++n, m.NomeVisivel, m.Resumo(T) + T(" · falta pacote", " · package missing"), PainelMapas.AlteradoEm(m), m.Metadados?.Autor, AtoExigido.Ato2(m) ? Act.ActII : Act.ActI,
+                            T("Baixar pacote", "Get the package"), () => IrParaPacotes(faltamM, m.NomeVisivel), null, null, Acervo.Acervo.TextoFaltam(faltamM));
+                        continue;
+                    }
+                    Ficha(++n, m.NomeVisivel, m.Resumo(T), PainelMapas.AlteradoEm(m), m.Metadados?.Autor, AtoExigido.Ato2(m) ? Act.ActII : Act.ActI, T("Grupo novo", "New party"), () => { var e = Lancador.Lancar(m); Lancou(e); },
+                        T("Usar meus heróis", "Use my heroes"), () => { _paginaSaves = 0; AbrirSaves(m.NomeVisivel, null, s => Lancou(Lancador.Lancar(m, s))); },
+                        Encontro.GrupoDoSave.TextoCurto, m.Linguas.Count > 1 ? string.Join(",", m.Linguas.ToArray()) : null, m.LinguaEmUso, m.Linguas.Count > 1 ? EscolherLingua(m.Caminho) : null);
+                }
             else if (_aba == 3 || _aba == 4)
                 n = FichasDoAcervo(_aba == 4);
             else
@@ -231,7 +275,7 @@ namespace Bigorna.Menu
                 _vazio.SetActive(n == 0);
                 if (n == 0 && _aba >= 3) Texto(_textoVazio, Acervo.Acervo.Lendo || !Acervo.Acervo.Leu ? T("Consultando o acervo…", "Asking the community library…") : Acervo.Acervo.SemConexao ? T("Sem conexão com o acervo. Confira a internet e toque na aba de novo.", "No connection to the community library. Check the internet and tap the tab again.")
                                                      : _aba == 3 ? T("O acervo ainda não tem mapas.", "The community library has no maps yet.") : T("O acervo ainda não tem pacotes.", "The community library has no packages yet."));
-                else if (n == 0) Texto(_textoVazio, _aba == 2 ? T("Nenhuma missão do jogo encontrada na sua coleção.", "No game quests found in your collection.") : _aba == 0 ? T("Nenhuma campanha na pasta de mapas. No editor, «Create campaign» e depois «Export campaign».", "No campaigns in the maps folder. In the editor, use \"Create campaign\" and then \"Export campaign\".")
+                else if (n == 0) Texto(_textoVazio, _aba == 2 ? T("Nenhuma missão do jogo encontrada na sua coleção.", "No game quests found in your collection.") : _aba == 0 ? T("Nenhuma campanha na pasta de mapas. No editor, «Iniciar campanha» e depois «Exportar campanha».", "No campaigns in the maps folder. In the editor, use “Start a campaign” and then “Export campaign”.")
                                                      : T("Nenhum mapa avulso na pasta de mapas. Exporte um mapa no editor.", "No standalone maps in the maps folder. Export a map in the editor."));
             }
         }
@@ -252,14 +296,17 @@ namespace Bigorna.Menu
             return !string.IsNullOrEmpty(t) && DateTime.TryParseExact(t.Length > 10 ? t.Substring(0, 10) : t, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out d) ? d : DateTime.MinValue;
         }
 
-        static string Lingua(string l) => string.IsNullOrEmpty(l) ? "" : string.Join("/", l.Split(',').Select(x => x.Trim() == "pt" ? "PT" : x.Trim() == "en" ? "EN" : x.Trim().ToUpperInvariant()).ToArray());
 
         /// <summary>As fichas do acervo: os mapas e campanhas (aba 3) ou os pacotes (aba 4), primeiro os da lingua de quem joga.</summary>
         static int FichasDoAcervo(bool pacotes)
         {
             var L = Acervo.Acervo.Itens.Where(f => f.EhPacote == pacotes)
-                .OrderByDescending(f => (f.Lingua ?? "").Contains(Pt ? "pt" : "en")).ThenByDescending(DataDa).ToList();
+                .OrderByDescending(f => pacotes && _pedidos.Any(q => q.Id == f.Id)).ThenByDescending(f => (f.Lingua ?? "").Contains(Codigo)).ThenByDescending(DataDa).ToList();
             int n = 0;
+            // (v241: um pacote pedido que o acervo nao tem: a ficha diz, e a quem perguntar)
+            if (pacotes) foreach (var q in _pedidos.Where(q => !L.Any(f => f.Id == q.Id)).ToList())
+                Ficha(++n, q.Nome ?? q.Id, T("Pacote · não está no acervo", "Package · not in the community library"), DateTime.MinValue, null, Act.ActI, T("Indisponível", "Unavailable"), () => { }, null, null,
+                    T("«", "“") + (_pedidosPor ?? "") + T("» precisa dele (edição ", "” needs it (edition ") + q.Edicao + T("), mas o acervo não o tem. Peça o pacote a quem fez o mapa: com o arquivo dele na pasta Pacotes, o mapa abre.", "), but the community library does not have it. Ask the map's author for the package: with its file in the Pacotes folder, the map opens."));
             foreach (var f in L)
             {
                 int tem = Acervo.Acervo.Instalada(f);
@@ -268,8 +315,9 @@ namespace Bigorna.Menu
                 string tipo = f.Tipo == "campanha" ? T("Campanha", "Campaign") + (f.Conteudo?["mapas"] != null ? " · " + (int)f.Conteudo["mapas"] + T(" mapa(s)", " map(s)") : "")
                             : f.Tipo == "mapa" ? T("Mapa", "Map") : T("Pacote", "Package") + (f.Conteudo?["entradas"] != null ? " · " + (int)f.Conteudo["entradas"] + T(" entrada(s)", " entries") : "");
                 var partes = new List<string> { tipo };
-                if (!string.IsNullOrEmpty(f.Lingua)) partes.Add(Lingua(f.Lingua));
-                if (tem > 0) partes.Add(tem < f.Edicao ? T("edição nova: ", "new edition: ") + f.Edicao : T("instalado", "installed"));
+                bool pedido = pacotes && _pedidos.Any(q => q.Id == f.Id);
+                if (pedido) partes.Insert(0, T("necessário", "needed"));
+                if (tem > 0) partes.Add(tem < f.Edicao ? T("atualização disponível: edição ", "update available: edition ") + f.Edicao : T("instalado", "installed"));
                 if (!pacotes && f.Requer.Count > 0) partes.Add(T("precisa de ", "needs ") + f.Requer.Count + T(" pacote(s)", " package(s)"));
                 // o texto inteiro, na bandeja: o resumo, os pacotes exigidos, o que esta acontecendo
                 var det = new List<string>();
@@ -278,19 +326,27 @@ namespace Bigorna.Menu
                 if (pacotes) { var quem = Acervo.Acervo.QuemExige(f.Id); if (quem.Count > 0) det.Add(T("Usado por: ", "Used by: ") + string.Join(", ", quem.ToArray())); }
                 det.Add(T("Edição ", "Edition ") + f.Edicao + (tem > 0 && tem < f.Edicao ? T(" (você tem a ", " (you have ") + tem + ")" : ""));
                 if (sit != null) det.Insert(0, sit);
+                if (pedido) det.Insert(0, T("«", "“") + (_pedidosPor ?? "") + T("» precisa deste pacote: baixe-o e volte para jogar.", "” needs this package: download it, then go back to play."));
+                if (!pacotes && faltam.Count > 0 && !ocupado) det.Insert(0, T("Antes, baixe ", "First, download ") + (faltam.Count == 1 ? T("o pacote ", "the package ") : T("os pacotes ", "the packages ")) + string.Join(", ", faltam.Select(q => T("«", "“") + (q.Nome ?? q.Id) + T("»", "”")).ToArray()) + T(", na aba Pacotes.", ", in the Packages tab."));
                 if (_confirmarRemocao.Contains(f.Id)) det.Insert(0, T("Toque em Remover de novo para confirmar.", "Tap Remove again to confirm."));
                 string principal; Action acao;
                 if (ocupado) { principal = sit; acao = () => { }; }
+                else if (faltam.Count > 0) { var fl = faltam; principal = fl.Count == 1 ? T("Ver o pacote", "See the package") : T("Ver os pacotes", "See the packages"); acao = () => IrParaPacotes(fl, f.Nome ?? f.Id); }   // (v241: os pacotes antes)
                 else if (tem == 0) { principal = T("Baixar", "Download"); acao = () => Baixar(f); }
                 else if (tem < f.Edicao) { principal = T("Atualizar", "Update"); acao = () => Baixar(f); }
-                else if (faltam.Count > 0) { principal = T("Baixar pacotes", "Get packages"); acao = () => Baixar(f); }
                 else if (!pacotes) { principal = T("Jogar", "Play"); acao = () => JogarDoAcervo(f); }
                 else { principal = T("Instalado", "Installed"); acao = () => { }; }
                 bool doAcervo = Acervo.Acervo.Registro.EdicaoDe(f.Id) > 0;
                 Ficha(++n, f.Nome ?? f.Id, string.Join(" · ", partes.ToArray()), DataDa(f), f.Autor, f.Ato >= 2 ? Act.ActII : Act.ActI, principal, acao,
-                    doAcervo && !ocupado ? T("Remover", "Remove") : null, doAcervo && !ocupado ? (Action)(() => RemoverDoAcervo(f)) : null, string.Join("\n", det.ToArray()));
+                    doAcervo && !ocupado ? T("Remover", "Remove") : null, doAcervo && !ocupado ? (Action)(() => RemoverDoAcervo(f)) : null, string.Join("\n", det.ToArray()), f.Lingua);
             }
             return n;
+        }
+
+        /// <summary>v241: a aba Pacotes, com os pacotes que um mapa ou campanha pediu em primeiro, destacados.</summary>
+        static void IrParaPacotes(List<Acervo.Requisito> faltam, string quem)
+        {
+            _pedidos.Clear(); _pedidos.AddRange(faltam ?? new List<Acervo.Requisito>()); _pedidosPor = quem; _aba = 4; LerAcervo();
         }
 
         static void Baixar(Acervo.Ficha f) { _confirmarRemocao.Clear(); Nucleo.Instancia.StartCoroutine(Acervo.Acervo.Baixar(f, () => { if (_tela != null && _aba >= 3) { PainelMapas.Reler(); Preencher(); } })); }
@@ -310,13 +366,16 @@ namespace Bigorna.Menu
             {
                 var c = PainelMapas.Campanhas.FirstOrDefault(x => string.Equals(x.Pasta.TrimEnd('/', '\\'), pasta.TrimEnd('/', '\\'), StringComparison.OrdinalIgnoreCase));
                 if (c == null) { Lancou(T("A campanha baixada não apareceu na pasta de mapas.", "The downloaded campaign is not in the maps folder.")); return; }
-                Lancou(Campanha.Campanha.Comecar(c, false));
+                // (a escolha: continuar a partida em andamento, grupo novo ou os seus heróis)
+                var andamento = Campanha.SavesDaComunidade.EmAndamento(c); int ranhura = andamento?.Key ?? -1; _paginaSaves = 0;
+                AbrirSaves(c.NomeVisivel, () => Lancou(Campanha.Campanha.Comecar(c, false)), s => Lancou(Campanha.Campanha.Comecar(c, false, s)),
+                    andamento != null ? (Action)(() => Lancou(Campanha.SavesDaComunidade.Continuar(ranhura, c.NomeVisivel))) : null);
             }
             else
             {
                 var m = PainelMapas.Mapas.FirstOrDefault(x => string.Equals(Path.GetDirectoryName(x.Caminho ?? "")?.TrimEnd('/', '\\'), pasta.TrimEnd('/', '\\'), StringComparison.OrdinalIgnoreCase));
                 if (m == null) { Lancou(T("O mapa baixado não apareceu na pasta de mapas.", "The downloaded map is not in the maps folder.")); return; }
-                Lancou(Lancador.Lancar(m));
+                _paginaSaves = 0; AbrirSaves(m.NomeVisivel, () => Lancou(Lancador.Lancar(m)), s => Lancou(Lancador.Lancar(m, s)));
             }
         }
 
@@ -328,7 +387,7 @@ namespace Bigorna.Menu
         static int _nivel = 1;
         static readonly HashSet<string> _grupo = new HashSet<string>();
         static readonly DifficultySetting[] Niveis = { DifficultySetting.Journey, DifficultySetting.Standard, DifficultySetting.Heroic, DifficultySetting.Warfare };
-        static string[] NomesDosNiveis => Pt ? new[] { "Fácil", "Normal", "Difícil", "Brutal" } : new[] { "Easy", "Normal", "Hard", "Brutal" };
+        static string[] NomesDosNiveis => new[] { T("Fácil", "Easy"), T("Normal", "Normal"), T("Difícil", "Hard"), T("Brutal", "Brutal") };
 
         static Transform Achar(Transform raiz, string nome)
         {
@@ -458,6 +517,156 @@ namespace Bigorna.Menu
             catch (Exception ex) { Log.Erro("missão oficial", ex); if (_missao != null) UnityEngine.Object.Destroy(_missao); _missao = null; Fechar(); PainelMapas.AbrirNaAba(2); }
         }
 
+        // ------------------------------------------------ "Continuar herois": a escolha da partida gravada
+        // O mesmo quadro do jogo da missao oficial: o nome do mapa ou da campanha, o que cada botao traz, "Grupo novo" (quando
+        // cabe) e as partidas gravadas, dez por pagina, a mais recente primeiro; tocar numa joga com o grupo dela.
+        static int _paginaSaves;
+        static void AbrirSaves(string titulo, Action novo, Action<Encontro.GrupoDoSave.Save> escolher, Action continuar = null)
+        {
+            try
+            {
+                if (_missao != null) UnityEngine.Object.Destroy(_missao);
+                var raiz = _tela.transform;
+                var editar = Achar(raiz, "Canvas_EditSaveSlot"); var aviso = Achar(raiz, "Canvas_LoadBackupWarning");
+                if (editar == null) throw new Exception("sem o quadro do jogo");
+                _missao = Copia(editar, raiz, "saves");
+                var fundoBtn = _missao.GetComponent<Button>(); if (fundoBtn != null) fundoBtn.onClick.AddListener(FecharMissao);
+                var cg = _missao.GetComponent<CanvasGroup>(); if (cg != null) { cg.alpha = 0f; cg.interactable = true; cg.blocksRaycasts = true; }
+                var bg = Achar(_missao.transform, "Image_BG") as RectTransform; if (bg == null) throw new Exception("sem Image_BG");
+                bg.sizeDelta = new Vector2(1260f, 860f); bg.anchoredPosition = Vector2.zero;
+                var bgBtn = bg.gameObject.AddComponent<Button>(); bgBtn.transition = Selectable.Transition.None;
+                var tituloT = Achar(bg, "Text_PartyName")?.GetComponent<TMP_Text>();
+                if (tituloT != null) { var r = tituloT.transform as RectTransform; r.sizeDelta = new Vector2(1150f, 56f); r.anchoredPosition = new Vector2(0f, -60f); }
+                Texto(tituloT, titulo);
+                var opcoes = Achar(bg, "Layout_Options");
+                var rotuloModelo = Achar(opcoes, "Label_RestoreDesc"); var botaoModelo = Achar(opcoes, "Button_Restore"); var divisoria = Achar(opcoes, "Imade_Divider");
+                if (opcoes != null) opcoes.gameObject.SetActive(false);
+                if (rotuloModelo == null || botaoModelo == null) throw new Exception("sem os modelos de texto e botão");
+                var col = new GameObject("Bigorna coluna", typeof(RectTransform)); col.transform.SetParent(bg, false);
+                var rc = col.GetComponent<RectTransform>(); rc.anchorMin = new Vector2(0f, 0f); rc.anchorMax = new Vector2(1f, 1f); rc.offsetMin = new Vector2(70f, 150f); rc.offsetMax = new Vector2(-70f, -110f);
+                var v = col.AddComponent<VerticalLayoutGroup>(); v.spacing = 10f; v.childAlignment = TextAnchor.UpperCenter; v.childControlWidth = true; v.childControlHeight = true; v.childForceExpandWidth = true; v.childForceExpandHeight = false;
+                TMP_Text Linha(string texto, float altura, float tamanho)
+                {
+                    var go = Copia(rotuloModelo, col.transform, "texto"); var t = go.GetComponent<TMP_Text>(); Texto(t, texto);
+                    t.fontSize = tamanho; t.enableAutoSizing = false; t.alignment = TextAlignmentOptions.Center; t.enableWordWrapping = true; t.overflowMode = TextOverflowModes.Ellipsis;
+                    var le = go.GetComponent<LayoutElement>() ?? go.AddComponent<LayoutElement>(); le.preferredHeight = altura; le.minHeight = altura;
+                    return t;
+                }
+                Button Botao(Transform pai, string texto, Vector2 tam, Action acao)
+                {
+                    var go = Copia(botaoModelo, pai, "botão"); var r = go.GetComponent<RectTransform>(); r.sizeDelta = tam;
+                    var le = go.GetComponent<LayoutElement>() ?? go.AddComponent<LayoutElement>(); le.preferredWidth = tam.x; le.preferredHeight = tam.y;
+                    foreach (var dd in go.GetComponentsInChildren<TMP_Dropdown>(true)) dd.gameObject.SetActive(false);
+                    var t = go.GetComponentInChildren<TMP_Text>(true); if (t != null) { Texto(t, texto); t.enableAutoSizing = true; t.fontSizeMin = 13f; t.fontSizeMax = 24f; }
+                    var b = go.GetComponent<Button>(); b.onClick.AddListener(() => { Som("UI_Click"); acao(); }); b.interactable = true;
+                    return b;
+                }
+                GameObject Grade(float altura)
+                {
+                    var go = new GameObject("Bigorna grade", typeof(RectTransform)); go.transform.SetParent(col.transform, false);
+                    var le = go.AddComponent<LayoutElement>(); le.preferredHeight = altura; le.minHeight = altura;
+                    var g = go.AddComponent<GridLayoutGroup>(); g.cellSize = new Vector2(540f, 70f); g.spacing = new Vector2(16f, 10f); g.childAlignment = TextAnchor.UpperCenter; g.constraint = GridLayoutGroup.Constraint.FixedColumnCount; g.constraintCount = 2;
+                    return go;
+                }
+                void Divisoria() { if (divisoria == null) return; var go = Copia(divisoria, col.transform, "divisória"); var le = go.GetComponent<LayoutElement>() ?? go.AddComponent<LayoutElement>(); le.preferredHeight = 4f; le.minHeight = 4f; }
+
+                Linha(Encontro.GrupoDoSave.TextoDosBotoes, 120f, 20f);
+                if (novo != null || continuar != null)
+                {
+                    var f = Grade(74f);
+                    if (continuar != null) Botao(f.transform, T("Continuar campanha (a partida em andamento)", "Continue campaign (the game in progress)"), new Vector2(540f, 70f), () => { FecharMissao(); continuar(); });
+                    if (novo != null) Botao(f.transform, T("Grupo novo (com o inventário inicial do criador)", "New party (with the creator's starting inventory)"), new Vector2(540f, 70f), () => { FecharMissao(); novo(); });
+                }
+                Divisoria();
+                // (as partidas das campanhas oficiais primeiro, destacadas com o selo da Asmodee, como na tela "Carregar campanha"
+                //  do jogo; depois as das campanhas da comunidade; em cada grupo, a mais recente primeiro)
+                try { Campanha.SavesDaComunidade.ClassificarTodas(); } catch (Exception ex) { Log.Info("partidas da comunidade: " + ex.Message); }
+                var saves = Encontro.GrupoDoSave.Saves().OrderBy(x => x.Campanha == null ? 0 : 1).ThenByDescending(x => x.Quando).ToList();
+                var selo = SeloAsmodee();
+                Linha(saves.Count == 0 ? T("Nenhuma partida gravada do jogo.", "No saved games of the game.") : T("Usar meus heróis: escolham a partida gravada", "Use my heroes: choose the saved game"), 40f, 26f);
+                const int porPagina = 10;
+                int paginas = Mathf.Max(1, Mathf.CeilToInt(saves.Count / (float)porPagina)); _paginaSaves = Mathf.Clamp(_paginaSaves, 0, paginas - 1);
+                var grade = Grade(5 * 80f);
+                foreach (var sv in saves.Skip(_paginaSaves * porPagina).Take(porPagina))
+                {
+                    var este = sv;
+                    var bt = Botao(grade.transform, este.Rotulo + "\n<size=70%>" + este.Detalhe + "</size>", new Vector2(540f, 70f), () =>
+                    {
+                        Action ir = () => { Log.Info("«Usar meus heróis» com o save " + este.Slot + " («" + este.Nome + "»)"); FecharMissao(); escolher(este); };
+                        // (uma partida oficial: o aviso de quando o butim pode voltar a ela)
+                        if (este.Campanha == null) Alerta(T("Partida oficial «", "Official game “") + este.Rotulo + T("»", "”") + "\n\n"
+                            + T("No fim desta aventura, o ouro, os itens e as armas oficiais que o grupo ganhar podem voltar para ela, desde que ela fique exatamente como está até lá. Se ela mudar, vocês poderão gravar uma cópia dela com o grupo atualizado, e a original fica como está.",
+                                "At the end of this adventure, the gold, items and official weapons the party wins can go back to it, as long as it stays exactly as it is until then. If it changes, you can create a copy of it with the updated party, and the original stays as it is."),
+                            T("Continuar", "Continue"), ir);
+                        else ir();
+                    });
+                    if (este.Campanha == null) Destacar(bt, selo);
+                }
+                // embaixo: voltar e as paginas
+                var cancelar = aviso != null ? Achar(aviso, "Button_Cancel") : null; var seguir = aviso != null ? Achar(aviso, "Button_Proceed") : null;
+                Button Embaixo(Transform modelo, string texto, Vector2 pos, Action acao)
+                {
+                    var go = modelo != null ? Copia(modelo, bg, texto) : Copia(botaoModelo, bg, texto);
+                    var r = go.GetComponent<RectTransform>(); r.anchorMin = r.anchorMax = new Vector2(pos.x < 0 ? 1f : 0f, 0f); r.anchoredPosition = pos; r.sizeDelta = new Vector2(280f, 90f);
+                    Texto(go.GetComponentInChildren<TMP_Text>(true), texto);
+                    var b = go.GetComponent<Button>(); b.onClick.AddListener(() => acao()); b.interactable = true;
+                    return b;
+                }
+                Embaixo(cancelar, T("Voltar", "Back"), new Vector2(220f, 80f), FecharMissao);
+                if (paginas > 1) Embaixo(seguir, T("Mais ▸ ", "More ▸ ") + (_paginaSaves + 1) + "/" + paginas, new Vector2(-220f, 80f), () => { Som("UI_Click"); _paginaSaves = (_paginaSaves + 1) % paginas; AbrirSaves(titulo, novo, escolher, continuar); });
+                _missao.transform.SetAsLastSibling();
+                if (cg != null) { if (_paginaSaves == 0) Nucleo.Instancia.StartCoroutine(Fade(cg, 1f, null)); else cg.alpha = 1f; }
+                Log.Info("usar meus heróis: " + saves.Count + " partida(s) gravada(s)");
+            }
+            catch (Exception ex) { Log.Erro("lista de partidas gravadas", ex); if (_missao != null) UnityEngine.Object.Destroy(_missao); _missao = null; Lancou(T("Não consegui abrir a lista de partidas gravadas.", "Could not open the list of saved games.")); }
+        }
+
+        /// <summary>Um aviso no quadro de aviso do proprio jogo (o de carregar a copia de seguranca): o texto, voltar e seguir.</summary>
+        static GameObject _alerta;
+        static void Alerta(string texto, string seguir, Action aoSeguir)
+        {
+            try
+            {
+                if (_alerta != null) UnityEngine.Object.Destroy(_alerta);
+                var raiz = _tela.transform; var modelo = Achar(raiz, "Canvas_LoadBackupWarning"); if (modelo == null) { aoSeguir(); return; }
+                _alerta = Copia(modelo, raiz, "alerta"); var go = _alerta;
+                var cg = go.GetComponent<CanvasGroup>(); if (cg != null) { cg.alpha = 0f; cg.interactable = true; cg.blocksRaycasts = true; }
+                var quadro = Achar(go.transform, "Image_WarningMessage") as RectTransform; if (quadro != null) quadro.sizeDelta = new Vector2(980f, 560f);
+                var t = Achar(go.transform, "Text_Warning")?.GetComponent<TMP_Text>(); if (t != null) { Texto(t, texto); t.enableAutoSizing = true; t.fontSizeMin = 16f; t.fontSizeMax = 30f; t.enableWordWrapping = true; t.alignment = TextAlignmentOptions.Center; }
+                void Fechar() { if (_alerta == null) return; var a = _alerta; _alerta = null; var c = a.GetComponent<CanvasGroup>(); Nucleo.Instancia.StartCoroutine(Fade(c, 0f, () => UnityEngine.Object.Destroy(a))); }
+                var cancelar = Achar(go.transform, "Button_Cancel"); var ok = Achar(go.transform, "Button_Proceed");
+                if (cancelar != null) { Texto(cancelar.GetComponentInChildren<TMP_Text>(true), T("Voltar", "Back")); var b = cancelar.GetComponent<Button>(); b.onClick.AddListener(() => { Som("UI_Click"); Fechar(); }); b.interactable = true; }
+                if (ok != null) { Texto(ok.GetComponentInChildren<TMP_Text>(true), seguir); var b = ok.GetComponent<Button>(); b.onClick.AddListener(() => { Som("UI_Click"); var a = _alerta; _alerta = null; if (a != null) UnityEngine.Object.Destroy(a); aoSeguir(); }); b.interactable = true; }
+                go.transform.SetAsLastSibling();
+                if (cg != null) Nucleo.Instancia.StartCoroutine(Fade(cg, 1f, null));
+            }
+            catch (Exception ex) { Log.Erro("aviso", ex); if (_alerta != null) UnityEngine.Object.Destroy(_alerta); _alerta = null; aoSeguir(); }
+        }
+
+        /// <summary>O selo da Asmodee das fichas de partida gravada do jogo (o da sincronizacao na nuvem).</summary>
+        static Sprite SeloAsmodee()
+        {
+            try { var p = Cena?.CampaignLoad?.SaveSlotPool?.Prefab; var t = p != null ? Achar(p.transform, "Image_Logo") : null; return t != null ? t.GetComponent<Image>()?.sprite : null; }
+            catch { return null; }
+        }
+
+        /// <summary>Uma partida de campanha oficial na lista: contorno dourado, texto dourado e o selo da Asmodee a direita.</summary>
+        static void Destacar(Button b, Sprite selo)
+        {
+            try
+            {
+                var img = b.GetComponent<Image>(); if (img != null) { var ol = b.gameObject.AddComponent<Outline>(); ol.effectColor = new Color(0.95f, 0.78f, 0.38f, 1f); ol.effectDistance = new Vector2(3f, -3f); }
+                var t = b.GetComponentInChildren<TMP_Text>(true); if (t != null) { t.color = new Color(1f, 0.86f, 0.55f, 1f); var m = t.margin; t.margin = new Vector4(m.x, m.y, Mathf.Max(m.z, 110f), m.w); }
+                if (selo == null) return;
+                var go = new GameObject("Bigorna selo Asmodee", typeof(RectTransform)); go.transform.SetParent(b.transform, false);
+                var le = go.AddComponent<LayoutElement>(); le.ignoreLayout = true;
+                var rt = go.GetComponent<RectTransform>(); rt.anchorMin = rt.anchorMax = new Vector2(1f, 0.5f); rt.pivot = new Vector2(1f, 0.5f); rt.sizeDelta = new Vector2(92f, 33f); rt.anchoredPosition = new Vector2(-14f, 0f);
+                var im = go.AddComponent<Image>(); im.sprite = selo; im.preserveAspect = true; im.raycastTarget = false;
+                go.transform.SetAsLastSibling();
+            }
+            catch (Exception ex) { Log.Info("destaque da partida oficial: " + ex.Message); }
+        }
+
         static void Lancou(string erro)
         {
             if (erro != null) { Log.Info("tela de mapas: " + erro); Fechar(); Nucleo.Visivel = true; PainelMapas.MostrarErro(erro, _aba > 2 ? 1 : _aba); return; }
@@ -466,7 +675,10 @@ namespace Bigorna.Menu
         }
 
 
-        static void Ficha(int numero, string nome, string resumo, DateTime data, string autor, Act ato, string jogar, Action aoJogar, string outro, Action aoOutro, string detalhe = null)
+        /// <summary>Um mapa (ou campanha) em varias linguas: tocar numa bandeira da ficha escolhe a lingua dele (fica guardada).</summary>
+        static Action<string> EscolherLingua(string caminho) => l => { Formato.Traducao.Definir(Formato.Traducao.Chave(caminho), l); Log.Info("língua escolhida para «" + System.IO.Path.GetFileName(caminho) + "»: " + l); PainelMapas.Reler(); Preencher(); };
+
+        static void Ficha(int numero, string nome, string resumo, DateTime data, string autor, Act ato, string jogar, Action aoJogar, string outro, Action aoOutro, string detalhe = null, string lingua = null, string linguaEmUso = null, Action<string> aoEscolherLingua = null)
         {
             var lc = Cena.CampaignLoad; var go = UnityEngine.Object.Instantiate(lc.SaveSlotPool.Prefab, _grade, false); go.name = "Bigorna ficha " + numero;
             go.SetActive(true); var lp = go.transform.localPosition; go.transform.localPosition = new Vector3(lp.x, lp.y, 0f); go.transform.localScale = Vector3.one;
@@ -475,7 +687,7 @@ namespace Bigorna.Menu
             {
                 Texto(s.LabelPartyName, nome); Texto(s.LabelSlotIndex, numero.ToString());
                 Texto(s.LabelLastLocation, string.IsNullOrEmpty(autor) ? resumo : resumo + " · " + autor);
-                Texto(s.LabelLastPlayDate, data == DateTime.MinValue ? "" : data.ToString(Pt ? "dd/MM/yyyy" : "yyyy-MM-dd"));
+                Texto(s.LabelLastPlayDate, data == DateTime.MinValue ? "" : Data(data));
                 Texto(s.LabelTotalPlayTime, "");
                 if (s.SaveSlotComponents != null) { s.SaveSlotComponents.gameObject.SetActive(true); s.SaveSlotComponents.alpha = 1f; }
                 if (s.LoadingComponents != null) { s.LoadingComponents.alpha = 0f; s.LoadingComponents.gameObject.SetActive(false); }
@@ -501,7 +713,36 @@ namespace Bigorna.Menu
             if (detalhe != null && s != null && bandeja != null) TextoNaBandeja(bandeja, s.LabelLastLocation, detalhe);
             if (detalhe != null && s != null && s.LabelLastLocation != null) { s.LabelLastLocation.enableWordWrapping = false; s.LabelLastLocation.overflowMode = TextOverflowModes.Ellipsis; }
             if (s != null) UnityEngine.Object.DestroyImmediate(s);
+            if (!string.IsNullOrEmpty(lingua)) PorBandeiras(go, lingua, linguaEmUso, aoEscolherLingua);
             _fichas.Add(go);
+        }
+
+        /// <summary>As bandeiras da lingua de uma entrada do acervo, no canto de cima a direita da ficha. Num mapa em varias
+        /// linguas, cada bandeira e um botao: a lingua em uso acesa, as outras apagadas.</summary>
+        static void PorBandeiras(GameObject ficha, string lingua, string emUso = null, Action<string> escolher = null)
+        {
+            try
+            {
+                var bs = Acervo.Bandeiras.Da(lingua); var r = ficha.transform as RectTransform; if (bs.Count == 0 || r == null) return;
+                var cods = (lingua ?? "").Split(',').Select(Acervo.Bandeiras.Codigo).Where(k => Acervo.BandeirasPng.Base64.ContainsKey(k)).ToList();
+                for (int i = 0; i < bs.Count; i++)
+                {
+                    var go = new GameObject("Bigorna bandeira " + i, typeof(RectTransform)); go.transform.SetParent(ficha.transform, false);
+                    var le = go.AddComponent<LayoutElement>(); le.ignoreLayout = true;
+                    var rt = go.GetComponent<RectTransform>(); rt.anchorMin = rt.anchorMax = new Vector2(1f, 1f); rt.pivot = new Vector2(1f, 1f);
+                    rt.sizeDelta = new Vector2(39f, 26f); rt.anchoredPosition = new Vector2(-14f - (bs.Count - 1 - i) * 45f, -12f);
+                    var img = go.AddComponent<Image>(); img.sprite = bs[i]; img.preserveAspect = true; img.raycastTarget = false;
+                    if (escolher != null && i < cods.Count)
+                    {
+                        var cod = cods[i]; bool acesa = cod == Acervo.Bandeiras.Codigo(emUso);
+                        img.color = new Color(1f, 1f, 1f, acesa ? 1f : 0.4f); img.raycastTarget = true;
+                        if (acesa) { var ol = go.AddComponent<Outline>(); ol.effectColor = new Color(0.95f, 0.8f, 0.45f, 1f); ol.effectDistance = new Vector2(2f, -2f); }
+                        var bt = go.AddComponent<Button>(); bt.targetGraphic = img; bt.onClick.AddListener(() => { Som("UI_Click"); if (!acesa) escolher(cod); });
+                    }
+                    go.transform.SetAsLastSibling();
+                }
+            }
+            catch (Exception ex) { Log.Info("tela de mapas: bandeira " + ex.Message); }
         }
 
         /// <summary>A bandeja de uma ficha com texto longo (a descricao de uma missao oficial): o texto inteiro, em azul, sobre o fundo
@@ -512,15 +753,18 @@ namespace Bigorna.Menu
             {
                 var hl = bandeja.GetComponent<HorizontalLayoutGroup>(); if (hl != null) hl.enabled = false;
                 var fundo = bandeja.transform.Find("Image_BG") as RectTransform; var pai = fundo != null ? fundo : bandeja.transform as RectTransform;
-                foreach (var b in bandeja.GetComponentsInChildren<Button>(true))
+                // (os botoes ativos lado a lado, da direita para a esquerda: o de jogar na ponta; um em cima do outro, so o
+                //  ultimo aparecia, e o "Usar meus herois" de um mapa ou campanha sumia atras do "Grupo novo")
+                var ativos = bandeja.GetComponentsInChildren<Button>(true).Where(b => b.gameObject.activeSelf).ToList(); float x = 0f;
+                for (int i = ativos.Count - 1; i >= 0; i--)
                 {
-                    if (!b.gameObject.activeSelf) continue; var r = b.GetComponent<RectTransform>();
-                    r.anchorMin = r.anchorMax = new Vector2(1f, 0.5f); r.pivot = new Vector2(1f, 0.5f); r.anchoredPosition = new Vector2(0f, 0f);
+                    var r = ativos[i].GetComponent<RectTransform>();
+                    r.anchorMin = r.anchorMax = new Vector2(1f, 0.5f); r.pivot = new Vector2(1f, 0.5f); r.anchoredPosition = new Vector2(-x, 0f); x += r.sizeDelta.x + 12f;
                 }
                 var go = UnityEngine.Object.Instantiate(modelo.gameObject, pai, false); go.name = "Bigorna texto inteiro"; go.SetActive(true);
                 SemTraducao(go); var le = go.GetComponent<LayoutElement>(); if (le != null) le.ignoreLayout = true;
                 var rt = go.GetComponent<RectTransform>(); rt.anchorMin = new Vector2(0f, 0f); rt.anchorMax = new Vector2(1f, 1f); rt.pivot = new Vector2(0.5f, 0.5f);
-                rt.offsetMin = new Vector2(20f, 10f); rt.offsetMax = new Vector2(-240f, -10f);
+                rt.offsetMin = new Vector2(20f, 10f); rt.offsetMax = new Vector2(-(Mathf.Max(200f, x) + 28f), -10f);
                 var t = go.GetComponent<TMP_Text>(); t.text = texto; t.enableWordWrapping = true; t.enableAutoSizing = true; t.fontSizeMin = 11f; t.fontSizeMax = 20f;
                 t.overflowMode = TextOverflowModes.Ellipsis; t.alignment = TextAlignmentOptions.MidlineLeft;
             }

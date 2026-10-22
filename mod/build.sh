@@ -18,7 +18,12 @@ echo "namespace Bigorna { static class VersaoDoPacote { public const string Text
 # o editor publico (sem nada do jogo) vai embutido: o mod o grava na pasta Editor dos dados do jogo
 python3 ../editor/salas/montar_salas.py --publico >/dev/null
 EDITOR=../editor/dist/publico/Bigorna-Salas.html
+# o aplicativo Bigorna Editor (app/: a janela do editor, que grava os arquivos sem pedir) vai embutido tambem: o mod o grava
+# na pasta Editor, ao lado do editor
+bash ../app/build.sh >/dev/null
+APP=()
+for f in ../app/out/*; do APP+=("-resource:$f,Bigorna.App.$(basename "$f" | tr ' ' '_')"); done
 dotnet "$CSC" -nologo -target:library -out:out/Bigorna.dll -langversion:8.0 -nullable:disable -optimize+ -debug:portable \
-  -nowarn:CS1701,CS1702,CS0618 -define:BIGORNA -resource:"$EDITOR",Bigorna.Salas.html \
+  -nowarn:CS1701,CS1702,CS0618 -define:BIGORNA -resource:"$EDITOR",Bigorna.Salas.html "${APP[@]}" \
   $R out/VersaoDoPacote.cs $(find src -name '*.cs' | sort)
 echo "Bigorna $VERSAO -> out/Bigorna.dll ($(stat -c %s out/Bigorna.dll) bytes)"

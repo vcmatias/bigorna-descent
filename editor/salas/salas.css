@@ -121,6 +121,7 @@ main{flex:1;display:flex;min-height:0}
 #telaCampanha,#telaFichas{position:fixed;inset:0;background:var(--fundo);display:flex;flex-direction:column;z-index:70}
 #telaCampanha[hidden],#telaFichas[hidden]{display:none}
 #abasC,#abasF{display:flex;gap:4px;background:#15171b;border:1px solid var(--borda);border-radius:8px;padding:3px}
+#topoF{gap:10px}#topoF #fVoltar,#topoF #fLote{white-space:nowrap;flex:none}#abasF{min-width:0;overflow-x:auto;scrollbar-width:thin}#topoF #abasF button{padding:5px 7px;white-space:nowrap;flex:none}#topoF .marca h1{white-space:nowrap}
 #fAjuda{width:30px;height:30px;padding:0;border-radius:50%;font-weight:700;flex:none}
 #abasC button,#abasF button{border:none;background:transparent;padding:5px 12px}#abasC button.ativo,#abasF button.ativo{background:var(--cobre);color:#1d1710}
 #abasC button.caixas{background:var(--painel2);border:1px solid var(--borda)}
@@ -142,6 +143,7 @@ main{flex:1;display:flex;min-height:0}
 .cabAtiv{display:flex;gap:8px;align-items:center;margin:-10px -12px 10px;padding:8px 12px;background:rgba(224,164,88,.12);border-bottom:1px solid var(--borda);border-radius:6px 6px 0 0}.ativ.tatica .cabAtiv{background:rgba(180,143,224,.12)}
 .cabAtiv .numAtiv{flex:none;font-family:Georgia,serif;font-weight:600;color:var(--cobreClaro)}.ativ.tatica .numAtiv{color:#d6c1f2}.cabAtiv input{flex:1;margin:0!important;font-weight:600}
 .ativ .txAtiv{margin-top:8px}
+.ativ.disparo{border-color:#3f6a5f;border-left-color:var(--verde)}.ativ.disparo .cabAtiv{background:rgba(105,180,161,.12);flex-wrap:wrap}.ativ.disparo .numAtiv{color:#bfe6dc}.ativ.disparo .cabAtiv>select{flex:1;min-width:180px}.ativ.disparo .chance{display:flex;align-items:center;gap:4px;white-space:nowrap}.ativ.disparo .efeitosTat{margin:4px 0 8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}.efeitoDisp{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;padding:4px 8px}.efeitoDisp select{width:auto;max-width:300px;margin:0;padding:3px 6px}.ativ.disparo .efeitosTat>small{flex-basis:100%}.efeitoDisp small.aviso{color:var(--erro)}
 .resultado{margin-top:10px;padding:2px 0 4px 10px;border-left:3px solid var(--ok)}.resultado.fail{border-left-color:var(--erro)}.resultado .sub{margin-top:4px}
 .wr{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 10px}.wr label{display:flex;justify-content:space-between;align-items:center;font-size:12px;gap:6px}.wr select{width:118px;padding:2px 4px}
 .botoes{display:flex;gap:6px;flex-wrap:wrap}
@@ -174,6 +176,7 @@ main{flex:1;display:flex;min-height:0}
 
 /* 3D view controls */
 #centro{position:relative}
+.fotoDaTela{position:absolute;pointer-events:none;z-index:2}
 #controles3d{position:absolute;top:12px;left:12px;background:rgba(35,38,45,.92);border:1px solid var(--borda);border-radius:10px;padding:8px;box-shadow:var(--sombra);display:flex;flex-direction:column;gap:4px;z-index:5;user-select:none}
 #controles3d[hidden]{display:none}
 #controles3d .tit{font-family:Georgia,serif;color:var(--cobreClaro);font-size:13px;text-align:center}
@@ -207,6 +210,7 @@ main{flex:1;display:flex;min-height:0}
 .mtPeca{border:1px solid var(--borda);border-radius:6px;padding:6px 8px;margin-bottom:6px;cursor:pointer;display:flex;flex-wrap:wrap;gap:6px;align-items:center}.mtPeca.ativo{border-color:var(--cobre);background:rgba(224,164,88,.08)}.mtPeca select{max-width:100%;flex:1 1 100%;order:5}
 
 /* items by kind, recipes, weapons by kind and slot */
+.buscaItens{display:flex;align-items:center;gap:6px;margin:4px 0 8px}.buscaItens input{flex:1;min-width:0}.buscaItens small{color:var(--fraco,#9a9080);white-space:nowrap}.outrosTipos .sub{margin-top:8px}.no[hidden]{display:none}
 .tiposItem{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 8px}.tiposItem .sm.ativo{background:var(--cobre);color:#1a1510;border-color:var(--cobre)}
 .subLista{margin:-2px 0 6px 18px;border-left:2px solid var(--borda);padding-left:6px}.subLista .no.sub{padding:5px 8px;min-height:0}.subLista .no.sub small{display:block}
 .secaoSlot{margin:10px 0 6px;padding:8px 10px;background:rgba(143,168,255,.07);border-radius:6px}.secaoSlot h3{margin:0 0 4px;font-size:15px;color:#c9d5ff}
@@ -330,3 +334,194 @@ button.carregando::before{content:'';position:absolute;left:8px;top:50%;width:11
 .no.apagado{opacity:.5}.tabHist select{max-width:180px}.jsonHist{margin-top:10px}.jsonHist textarea{width:100%;font-family:monospace;font-size:11.5px}
 .fichaPacote { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; }
 .fichaPacote .linha { flex-wrap: nowrap; gap: 6px; }
+/* v184: the languages of the work (Map setup, campaign screen), the flags of the top bar, the strip and the Translations window */
+.linguasObra{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0 0}.linguasObra .rotulo{font-size:12px;color:var(--fraco)}
+.linguasObra select{width:auto;padding:3px 6px;font-size:12px}.linguaExtra{display:inline-flex;gap:5px;align-items:center;background:var(--painel2);border:1px solid var(--borda);border-radius:12px;padding:1px 4px 1px 8px;font-size:12px}
+.linguaCampanha{position:relative}#c_bandeira{display:inline-flex;gap:4px;align-items:center}#c_bandeira .seta{color:var(--fraco);font-size:10px}
+#c_painelLingua{position:absolute;top:calc(100% + 6px);left:0;z-index:60;width:460px;background:var(--painel);border:1px solid var(--borda);border-radius:8px;padding:6px 12px 10px;box-shadow:var(--sombra)}#c_painelLingua[hidden]{display:none}#c_painelLingua .campo{display:block}
+#linguasEdicao{display:inline-flex;gap:3px;margin-right:6px}#linguasEdicao[hidden]{display:none}.bandeiraEdicao{padding:2px 5px;opacity:.55}.bandeiraEdicao.ativo{opacity:1;background:var(--painel2);border-color:var(--cobre);box-shadow:0 0 0 1px var(--cobre)}
+#faixaLingua{position:absolute;left:10px;right:380px;top:8px;z-index:30;background:rgba(36,30,20,.95);border:1px solid var(--cobreEscuro);border-radius:8px;padding:6px 10px;font-size:12.5px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#faixaLingua[hidden]{display:none}#faixaLingua span{color:var(--fraco)}
+.trCab{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.trCab select{width:auto}#tr_lista{max-height:62vh;overflow:auto;margin-top:8px}
+.trLinha{border-top:1px solid var(--borda);padding:6px 0}.trLinha.rever{background:rgba(224,164,88,.08)}.trPar{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:3px}
+.trOrig{white-space:pre-wrap;color:var(--texto);background:#15171b;border:1px dashed var(--borda);border-radius:6px;padding:6px 8px;font-size:12.5px}
+/* v186: categories of weapons in the Workshop */
+.modoArmas{margin:6px 0 8px}.catArmas{border:1px solid var(--borda);border-radius:8px;padding:4px 6px;margin:6px 0;background:rgba(255,255,255,.02)}.catArmas.subcat{margin:6px 0 4px 12px;border-style:dashed}.catArmas.sem{opacity:.9}
+.catCab{display:flex;gap:6px;align-items:center;padding:2px 2px 4px}.catCab small{color:var(--fraco)}.catCab .espaco{flex:1}.catCab button.sm{padding:1px 6px}
+/* v187: the Weapons sheet in two columns: the parts of the slot (middle) and the forge (right, larger) */
+.armasGrade{display:grid;grid-template-columns:300px minmax(0,1fr);gap:18px;align-items:start}
+.armasMeio{position:sticky;top:0;max-height:calc(100vh - 90px);overflow-y:auto;padding-right:6px;border-right:1px solid var(--borda)}
+.cabMeio{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}.cabMeio b{color:var(--cobre)}
+.pecaMeio{display:flex;align-items:center;gap:10px;padding:6px 8px;margin-bottom:6px;border:1px solid var(--borda);border-radius:6px;cursor:pointer}
+.pecaMeio:hover{border-color:var(--cobre)}.pecaMeio.naForja{border-color:var(--cobre);background:rgba(224,164,88,.12)}
+.pecaMeio img,.pecaMeio .semImg{width:44px;height:44px;object-fit:contain;flex:none;background:rgba(0,0,0,.25);border-radius:4px}
+.pecaMeio div{min-width:0;display:flex;flex-direction:column}.pecaMeio b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pecaMeio small{color:var(--fraco);font-size:12px}
+.armasForja{min-width:0}.armasForja .montagem{flex-wrap:nowrap}.armasForja .montagem canvas{width:min(480px,58%);height:auto;aspect-ratio:1;flex:none}
+.armasForja .mtLado{min-width:260px}.mtNome{flex:1;min-width:0;overflow-wrap:anywhere}.mtPeca .espaco{display:none}
+.statsPeca{min-width:min(640px,90vw)}
+/* v188: ✎ Adjust the picture */
+.ajusteImg{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}.ajusteImg canvas{border-radius:8px;border:1px solid var(--borda);cursor:grab;touch-action:none;outline:none;max-width:100%}
+.ajLado{flex:1;min-width:220px}
+/* v189: the feat built step by step */
+.condFeito{border:1px solid var(--borda);border-radius:6px;padding:6px 8px;margin-bottom:6px}.condFeito .cab{display:flex;align-items:center;gap:6px;margin-bottom:4px}.condFeito .cab .espaco{flex:1}
+.condFeito select,.condFeito input[type=number]{max-width:100%}.condFeito.foraDoMomento{border-color:var(--erro)}
+/* v190: the text box as it shows in the app */
+.caixaApp{outline:none;cursor:text;white-space:pre-wrap;line-height:1.5;padding:8px 10px;border:1px solid var(--borda);border-radius:6px}
+.caixaApp:focus{border-color:var(--cobre)}.caixaApp:empty::before{content:attr(data-placeholder);color:var(--fraco);font-style:italic}
+.caixaApp[contenteditable=false]{opacity:.85;cursor:default}
+.caixaApp .icoTx{font-size:13px;padding:0 4px;text-transform:none}.caixaApp .vagaTx,.caixaApp .icoTx{user-select:all}
+.menuIcones{position:relative;display:inline-block}.paletaIcones{position:absolute;z-index:30;top:100%;left:0;background:var(--painel);border:1px solid var(--borda);border-radius:6px;padding:6px;display:flex;flex-wrap:wrap;gap:4px;width:300px;box-shadow:var(--sombra)}
+.paletaIcones[hidden]{display:none}.paletaIcones .icoTx{display:inline-block;background:#3a2c1c;color:var(--cobreClaro);border-radius:4px;padding:0 5px}
+.ativ.recem{box-shadow:0 0 0 2px var(--cobre)}
+.lootMonstro{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;margin-bottom:6px}.lootMonstro .itemEscolhido{margin:0}
+/* v191: counters */
+.escolhaMonstroCont{display:inline-flex;align-items:center;gap:6px}.escolhaMonstroCont img{width:22px;height:22px;border-radius:4px;object-fit:cover}
+.chipCons{display:inline-flex;gap:2px;margin:2px}.fraseMeta{align-items:center;gap:6px;flex-wrap:wrap}.fraseMeta .chk{margin:0}
+/* v193: the pencil beside a name, parts of the game in the forge */
+.pecaMeio .lapis,.mtPeca .lapis{padding:1px 6px;font-size:12px;flex:none;margin-left:auto}.pecaMeio div{flex:1}
+[data-travado]{pointer-events:none}
+.mtPeca .mtForjar{padding:1px 8px;font-size:12px;flex:none}.mtPeca .mtRedef{padding:1px 8px;font-size:12px;flex:none}.mtPeca .mtForjada{margin-left:0;padding:1px 6px;color:#7fd68a;border-color:rgba(127,214,138,.5)}
+.mtBotoes{flex-wrap:wrap;gap:4px;margin:4px 0}.mtPct{min-width:44px;text-align:right;font-size:12px;color:var(--fraco)}.mtCamadas{margin:2px 0 8px}
+.pintor{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}.pintorTela{width:min(600px,70vw);height:auto;aspect-ratio:1;border-radius:8px;border:1px solid var(--borda);cursor:crosshair;outline:none;touch-action:none}.pintorLado{flex:1;min-width:220px}.pintorFerr{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px}.pintorFerr button{text-align:left;white-space:nowrap}.pintorFerr span{display:inline-block;width:18px;text-align:center}.pintorCores{display:flex;flex-wrap:wrap;gap:3px;align-items:center;margin-bottom:8px}.pintorCores input[type=color]{width:34px;height:26px;padding:0;border:1px solid var(--borda);border-radius:4px}.pintorCor{width:20px;height:20px;padding:0;border:1px solid rgba(255,255,255,.25);border-radius:3px;cursor:pointer}.pintorCor.ativa{outline:2px solid var(--cobre);outline-offset:1px}
+.mtAlvo{display:flex;gap:6px;align-items:center;margin:4px 0 8px}.mtAlvo span{color:var(--fraco);font-size:12px}
+.mtPeca.doJogo{opacity:.85}.mtPeca.doJogo .mtNome{color:var(--fraco)}
+.pintorSel .sm{padding:2px 7px}
+
+/* the party of heroes (Workshop, Heroes tab): a group picture */
+.botaoEquipe{display:block;width:100%;margin:12px 0 6px;text-align:left;font-weight:600}
+.fotoEquipe{position:relative;height:430px;margin-top:14px;border-radius:12px;overflow:hidden;
+  background:radial-gradient(ellipse 70% 60% at 50% 42%,#4a3a28 0%,#2a2119 45%,#141110 100%);box-shadow:inset 0 0 80px #000c,0 6px 24px #0008}
+.fotoEquipe::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 40% 30% at 50% 18%,#ffd9a033,transparent 70%);pointer-events:none}
+.chaoEquipe{position:absolute;left:4%;right:4%;bottom:62px;height:70px;border-radius:50%;background:radial-gradient(ellipse at 50% 50%,#0009 0%,#0000 70%)}
+.fotoEquipe button.membro,.fotoEquipe button.membro:hover,.fotoEquipe button.membro:focus{background:transparent!important;border:0!important;box-shadow:none!important;outline:none}
+.membro{position:absolute;bottom:58px;width:22%;max-width:250px;transform:translateX(-50%);padding:0;cursor:pointer;display:block;transition:transform .18s,filter .18s,opacity .18s;z-index:3}
+.membro.tras{bottom:104px;width:19%;z-index:2;filter:brightness(.8)}
+.membro .corpo{width:100%;aspect-ratio:1;display:flex;align-items:flex-end;justify-content:center}
+.membro .corpo img{width:100%;height:100%;object-fit:contain;object-position:bottom;filter:drop-shadow(0 8px 10px #000a)}
+.membro.camafeu .corpo img,.membro .corpo i{width:62%;height:62%;border-radius:50%;object-fit:cover;margin-bottom:12%;box-shadow:0 0 0 3px #b87333,0 8px 18px #000c}
+.membro .corpo i{display:flex;align-items:center;justify-content:center;font-style:normal;font-size:46px;font-weight:700;color:#e8c99a;background:radial-gradient(circle at 40% 35%,#5a4430,#21180f)}
+.membro:hover,.membro.luz{transform:translateX(-50%) translateY(-6px);filter:brightness(1.12);z-index:5}
+.fotoEquipe.escolhendo .membro:not(.aberto),.fotoEquipe.escolhendo .placa:not(.aberto){opacity:.4;filter:grayscale(.4) brightness(.7)}
+.membro.aberto{transform:translateX(-50%) translateY(-6px);filter:brightness(1.15) drop-shadow(0 0 14px #e8a85c88);z-index:6}
+.fotoEquipe .placa{position:absolute;bottom:14px;transform:translateX(-50%);z-index:8;padding:3px 12px 4px;border-radius:3px;background:linear-gradient(#3a2c1e,#21180f);border:1px solid #6b4f33;box-shadow:0 3px 8px #0009;display:flex;flex-direction:column;align-items:center;white-space:nowrap;cursor:pointer;color:inherit;transition:opacity .18s}
+.fotoEquipe .placa b{color:#f0dcb8;font-size:13px;letter-spacing:.3px}.fotoEquipe .placa small{color:#bfa684;font-size:10.5px;opacity:.85;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.fotoEquipe .placa.trocado{border-color:#d9944d;background:linear-gradient(#5a3a1c,#2c1c0e)}
+.fotoEquipe .placa:hover,.fotoEquipe .placa.aberto{border-color:#e8a85c}
+.equipeWrap{position:relative;padding-bottom:4px}
+.escolhaHeroi{position:absolute;top:calc(100% + 6px);z-index:10;min-width:280px;max-width:min(620px,100%);padding:12px 14px;border-radius:10px;background:#1b1612;border:1px solid #8a6440;box-shadow:0 12px 30px #000c;animation:surgir .16s ease-out}
+.escolhaHeroi::before{content:'';position:absolute;top:-8px;left:calc(var(--seta,50%) - 8px);width:14px;height:14px;background:#1b1612;border-left:1px solid #8a6440;border-top:1px solid #8a6440;transform:rotate(45deg)}
+@keyframes surgir{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.escolhaHeroi .tit{font-weight:600;color:#f0dcb8;margin-bottom:8px}
+.escolhaHeroi .chips{display:flex;flex-wrap:wrap;gap:10px}
+.chipHeroi{display:flex;flex-direction:column;align-items:center;gap:2px;width:78px;padding:6px 4px;border:1px solid transparent;border-radius:8px;background:none;cursor:pointer;color:inherit}
+.chipHeroi img,.chipHeroi i{width:54px;height:54px;border-radius:50%;object-fit:cover;background:#0f0d0b;box-shadow:0 0 0 2px #4a3a2a;display:block}
+.chipHeroi i{display:flex;align-items:center;justify-content:center;font-style:normal;font-size:22px;font-weight:700;color:#e8c99a;background:radial-gradient(circle at 40% 35%,#5a4430,#21180f)}
+.chipHeroi span{font-size:12px;text-align:center;line-height:1.15}.chipHeroi small{font-size:10px;opacity:.7;text-align:center}
+.fotoEquipe~.escolhaHeroi .chipHeroi,.chipHeroi{background:transparent!important;color:inherit!important}.chipHeroi:hover{background:#ffffff12!important;border-color:#6b4f33}.chipHeroi.ativo img{box-shadow:0 0 0 3px #e8a85c}.chipHeroi.ativo span{color:#f3c98a;font-weight:600}
+.rodapeEscolha{margin-top:8px;text-align:right}
+/* the game's pieces in the Workshop (tiles and objects tabs): to read and to duplicate */
+.rolJogo{margin-top:12px;border-top:1px solid #3a322a;padding-top:8px}
+.rolJogo>summary{cursor:pointer;font-weight:600;padding:4px 0}
+.rolJogo .lista{max-height:46vh;overflow:auto}
+.previaPixel{image-rendering:pixelated;width:min(100%,280px);height:auto}
+
+/* the default of a copy, in the Workshop: the object panel of the map, without what belongs to a placed piece */
+.painelCopia>.linha:first-child,.painelCopia label.campo:has(#o_nome),.painelCopia #o_copia,.painelCopia #o_apaga,.painelCopia label.campo:has(#o_nivel),.painelCopia label.campo:has(#o_pilar){display:none!important}
+.opcoesCopia{margin:8px 0}
+
+.escolhaReforco img{width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px}
+
+/* the loading screen: the editor's own layout and colours, with no text, while the page and the game data load (the
+   editor takes it away once it is ready) */
+#esqueleto{position:fixed;inset:0;z-index:5000;display:flex;flex-direction:column;background:var(--fundo);transition:opacity .28s ease}
+#esqueleto.saindo{opacity:0;pointer-events:none}
+#esqueleto .sk{display:block;border-radius:6px;background:linear-gradient(100deg,#2a2e36 30%,#343945 50%,#2a2e36 70%);background-size:300% 100%;animation:skBrilho 1.6s ease-in-out infinite}
+#esqueleto .skCobre{background:linear-gradient(100deg,#8a6236 30%,#a8743a 50%,#8a6236 70%);background-size:300% 100%}
+@keyframes skBrilho{from{background-position:100% 0}to{background-position:0 0}}
+.skTopo{display:flex;align-items:center;gap:10px;padding:8px 14px;height:47px;background:linear-gradient(180deg,#262a32,#1f2228);border-bottom:1px solid var(--borda)}
+.skTopo .skMarca{width:150px;height:22px}.skTopo .skCampo{width:260px;height:30px;border-radius:6px;background:#15171b;animation:none;border:1px solid var(--borda)}
+.skTopo .skB{height:30px}.skCresce{flex:1}
+.skFaixa{display:flex;gap:0;padding:6px 10px;height:86px;background:#20232a;border-bottom:1px solid var(--borda)}
+.skG{display:flex;flex-direction:column;justify-content:space-between;gap:8px;padding:2px 14px 4px;border-right:1px solid var(--borda)}
+.skLin{display:flex;gap:5px}.skG .skQ{width:52px;height:50px}.skG .skL{width:60%;height:8px;margin:0 auto;opacity:.6}
+.skMain{flex:1;display:flex;min-height:0}
+.skEsq{width:270px;flex:none;background:var(--painel);border-right:1px solid var(--borda);padding:12px 10px;display:flex;flex-direction:column;gap:16px}
+.skBloco{display:flex;flex-direction:column;gap:8px}
+.skBloco .skH{width:38%;height:14px;margin-bottom:4px}.skBloco .skT{height:9px}.skBloco .skBt{height:32px;width:100%}
+.skLinha{display:flex;gap:10px;align-items:center;padding:8px;border:1px solid var(--borda);border-radius:8px;background:#262a31}
+.skLinha .skBola{width:28px;height:28px;border-radius:50%;flex:none}.skLinha span{flex:1;display:flex;flex-direction:column;gap:6px}.skLinha .skT{height:10px}.skLinha .skT2{height:8px;opacity:.7}
+.skCentro{flex:1;position:relative;overflow:hidden;background-color:var(--fundo);background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px);background-size:32px 32px}
+.skSala{position:absolute;left:30%;top:28%;width:22%;height:34%;border-radius:4px;background:#5f5a5218;border:1px solid #ffffff10;box-shadow:inset 0 0 40px #0004}
+.skPainel{position:absolute;top:14px;right:14px;width:330px;max-width:40%;padding:12px;display:flex;flex-direction:column;gap:10px;border-radius:10px;background:var(--painel);border:1px solid var(--borda);box-shadow:var(--sombra)}
+.skPainel .skH{width:50%;height:14px}.skPainel .skCx{height:30px}.skPainel .skAlto{height:64px}.skPainel .skT{height:9px}
+@media (prefers-reduced-motion:reduce){#esqueleto .sk{animation:none}}
+.filtrosF[hidden]{display:none}.filtrosF{display:flex;flex-direction:column;gap:5px;margin:2px 0 10px;padding:8px;border:1px solid var(--borda);border-radius:8px;background:rgba(0,0,0,.18)}.filtrosF #f_limpaF{align-self:flex-start}
+#esqF .botaoFiltro.ativo{background:rgba(224,164,88,.14);border-color:var(--cobre);color:var(--cobreClaro)}.botaoFiltro .etq{margin-left:2px}
+.grupoJogo .lista{max-height:none}
+.ativ.receitaInline{border-color:#5a4a2c;border-left-color:#c9a25a;margin:8px 0}.ativ.receitaInline .cabAtiv{background:rgba(201,162,90,.12)}.ativ.receitaInline .cresce{flex:1}.custosR{margin-bottom:6px}.receitaJogo{gap:8px;align-items:center;justify-content:space-between;margin:4px 0}.receitaSolta{gap:6px;align-items:center;justify-content:space-between;margin:4px 0}.receitaSolta>span{flex:1;min-width:0}
+.iconesPool{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.iconePool{position:relative;width:46px;height:46px;border-radius:8px;border:1px solid var(--borda);background:#15171b;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.iconePool img{width:100%;height:100%;object-fit:contain}.iconePool .sigla{font-weight:700;color:var(--fraco)}.iconePool.falta{border-color:var(--erro)}
+.iconePool a{position:absolute;top:1px;right:1px;width:16px;height:16px;line-height:15px;text-align:center;font-size:11px;border-radius:50%;background:rgba(0,0,0,.75);color:#fff;text-decoration:none;opacity:0;transition:opacity .12s}.iconePool:hover a{opacity:1}
+.linhaProezas{position:relative;height:38px;margin-top:6px}.linhaProezas .definirProezas{position:absolute;top:2px;transform:translateX(-50%);white-space:nowrap}
+.definirProezas.erro{border-color:var(--erro);color:#ffb3ab}.avisoVermelho{display:block;color:#ff8a7f;font-weight:600;margin-top:3px}
+.listaProezas{display:flex;flex-direction:column;gap:6px;margin:8px 0}.no.proeza{justify-content:space-between}.no.proeza>div{flex:1;min-width:0}.no.proeza.erro{border-color:var(--erro);background:rgba(224,90,79,.08)}
+#fp_ficha{margin-top:14px;border-top:1px solid var(--borda);padding-top:10px}
+/* v234: every feat beside a hero's feats; the hero's feats on the sheet */
+.proezasDuas{display:grid;grid-template-columns:minmax(230px,290px) 1fr;gap:16px;align-items:start}
+.proezasDoHeroi{min-width:0}
+.todasProezas{position:sticky;top:0;display:flex;flex-direction:column;gap:6px;max-height:calc(100vh - 150px);background:var(--painel);border:1px solid var(--borda);border-radius:8px;padding:8px 10px}
+.todasProezas .sub{margin-top:0}.todasProezas input[type=search]{width:100%}
+.listaTodas{overflow:auto;display:flex;flex-direction:column;gap:3px;padding-right:2px;min-height:120px}
+.tierTodas{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--cobre);margin:6px 0 1px;border-bottom:1px solid var(--borda);padding-bottom:2px}
+.proezaTodas{display:flex;align-items:center;gap:6px;text-align:left;padding:4px 8px;font-size:12px;background:transparent;border-color:transparent}
+.proezaTodas>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.proezaTodas i{font-style:normal;color:var(--cobre);font-weight:700}.proezaTodas:hover{border-color:var(--cobreEscuro);background:var(--painel2)}
+.proezaTodas.ja{opacity:.5}.proezaTodas.ja i{color:var(--ok)}.proezaTodas.erro>span{color:#ffb3ab}
+.proezaTodas .avisoVermelho{display:inline;margin:0;font-size:10.5px;font-weight:500}.proezaTodas .etq{margin-left:0}
+.rolProezas{margin:8px 0 6px;padding:6px 8px;border:1px solid var(--borda);border-radius:8px;background:var(--painel)}
+.rolProezas .cabRol{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--fraco);margin-bottom:5px}
+.chipsProezas{display:flex;flex-wrap:wrap;gap:4px}
+.chipProeza{display:inline-flex;align-items:center;gap:5px;padding:1px 8px 1px 2px;border-radius:12px;font-size:11.5px;max-width:100%}
+.chipProeza b{display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:9px;background:var(--fundo);color:var(--cobre);font-size:10.5px}
+.chipProeza span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chipProeza.erro{border-color:var(--erro);color:#ffb3ab}.chipProeza.erro b{color:var(--erro)}
+/* v235: the feat's text, made from its rules */
+.textoGerado{margin:2px 0 4px;padding:8px 10px;border:1px solid var(--borda);border-left:3px solid var(--cobre);border-radius:6px;background:var(--painel);line-height:1.5}
+.textoGerado b{color:var(--cobreClaro)}
+/* v237: the feats by tier (an inverted pyramid of squares: the low tiers hold more) */
+.casaProeza{--c:var(--cobre);display:inline-grid;place-items:center;width:18px;height:18px;padding:0;margin:0;border-radius:4px;border:1px solid color-mix(in srgb,var(--c) 70%,#000);background:linear-gradient(160deg,color-mix(in srgb,var(--c) 85%,#fff),var(--c));color:#1b1610;font:700 10px/1 "Segoe UI",system-ui,sans-serif;box-shadow:0 1px 0 rgba(255,255,255,.15) inset,0 1px 2px rgba(0,0,0,.35);cursor:default;vertical-align:middle}
+button.casaProeza{cursor:pointer}button.casaProeza:hover{transform:translateY(-1px);filter:brightness(1.12)}
+.casaProeza.c0{--c:#e9c58a}.casaProeza.c1{--c:#e0a458}.casaProeza.c2{--c:#c98b4a}.casaProeza.c3{--c:#b56f3c}.casaProeza.c4{--c:#9c5a34}
+.casaProeza.erro{--c:var(--erro);color:#fff}
+.casaProeza.vazia{background:transparent;border:1px dashed color-mix(in srgb,var(--cobre) 55%,transparent);box-shadow:none}
+button.casaProeza.vazia:hover{border-style:solid;background:color-mix(in srgb,var(--cobre) 15%,transparent)}
+.piramideProezas{display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0 2px}
+.linhaTier{display:grid;grid-template-columns:26px auto 26px;align-items:center;gap:6px}
+.linhaTier .rotTier{font-size:10.5px;color:var(--fraco);text-align:right;letter-spacing:.04em}
+.linhaTier .casasTier,.tierProeza .casasTier{display:inline-flex;gap:3px;justify-content:center}
+.linhaTier.falta .rotTier:first-child{color:var(--cobre)}
+.tiersProezas{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.tierProeza{border:1px solid var(--borda);border-radius:8px;background:var(--painel)}
+.tierProeza>summary{display:grid;grid-template-columns:70px 1fr 120px;align-items:center;gap:10px;padding:6px 10px;cursor:pointer;list-style:none}
+.tierProeza>summary::-webkit-details-marker{display:none}
+.tierProeza>summary .nomeTier{font-family:Georgia,"Times New Roman",serif;color:var(--cobreClaro)}
+.tierProeza>summary .nomeTier::before{content:'▸ ';color:var(--fraco);font-size:11px}.tierProeza[open]>summary .nomeTier::before{content:'▾ '}
+.tierProeza>summary small{text-align:right;color:var(--fraco)}
+.tierProeza.falta{border-color:color-mix(in srgb,var(--cobre) 45%,var(--borda))}.tierProeza.falta>summary small{color:var(--cobre)}
+.tierProeza .listaProezas{margin:0;padding:0 10px 10px}
+/* v238: making the light copies of the pictures (loading) */
+#telaLeves{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:rgba(15,16,19,.72);backdrop-filter:blur(2px)}
+.caixaLeves{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:460px;padding:22px 26px;border:1px solid var(--borda);border-radius:12px;background:var(--painel);box-shadow:var(--sombra);text-align:center}
+.caixaLeves b{font-family:Georgia,"Times New Roman",serif;color:var(--cobreClaro);font-weight:600}
+.caixaLeves small{color:var(--fraco)}
+.giroLeves{width:34px;height:34px;border-radius:50%;border:3px solid var(--borda);border-top-color:var(--cobre);animation:giroLeves 0.9s linear infinite}
+@keyframes giroLeves{to{transform:rotate(360deg)}}
+.barraLeves{width:100%;height:6px;border-radius:3px;background:var(--fundo);overflow:hidden}.barraLeves i{display:block;height:100%;width:0;background:var(--cobre);transition:width .2s}
+/* v239: long lists drawn only where they are on screen (the rest keeps its place, as a web page does) */
+#f_lista > .no, #esqH .no, .grade.importar > * { content-visibility: auto; contain-intrinsic-size: auto 46px; }
+img[data-leve][src^="data:image/gif"] { background: var(--painel2, #2a2d35); }
+/* v240: the end of a long list drawn in parts */
+.maisF { text-align: center; color: var(--fraco, #8c8173); padding: 6px; min-height: 24px; }
+.tag.receitaUsa{padding:2px 8px 2px 3px;text-decoration:none;color:inherit}.tag.receitaUsa .icoPeca{width:24px;height:24px}.tag.receitaUsa small{color:var(--fraco)}
+/* v251: the picture of an NPC in the scenes (the torso: the bottom cut off) */
+.previaCena{position:relative;overflow:hidden;width:min(260px,100%);border:1px solid var(--borda);border-radius:8px;background:repeating-conic-gradient(#20232a 0 25%,#191b20 0 50%) 0 0/16px 16px;aspect-ratio:3/4}.previaCena img{position:absolute;left:0;top:0;width:100%;height:auto;display:block}

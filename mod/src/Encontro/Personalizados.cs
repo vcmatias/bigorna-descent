@@ -19,6 +19,23 @@ namespace Bigorna.Encontro
     {
         static readonly HashSet<string> _registrados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         static readonly Dictionary<string, Texture2D> _retratos = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>v251: a imagem de um personagem nosso nos quadros narrativos (as cenas), ja cortada (o torso de uma figura de
+        /// corpo inteiro); sem ela, o quadro usa o retrato.</summary>
+        static readonly Dictionary<string, Texture2D> _cenas = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>Corta a parte de baixo de uma imagem (fracao da altura, de baixo para cima): fica o torso.</summary>
+        static Texture2D Cortada(Texture2D t, float corte)
+        {
+            if (t == null || corte <= 0.001f) return t;
+            try
+            {
+                int h = Mathf.Clamp(Mathf.RoundToInt(t.height * (1f - Mathf.Clamp(corte, 0f, 0.9f))), 1, t.height), y = t.height - h;
+                var c = new Texture2D(t.width, h, TextureFormat.RGBA32, false);
+                c.SetPixels(t.GetPixels(0, y, t.width, h)); c.Apply();
+                c.name = "Bigorna_cena"; c.hideFlags |= HideFlags.DontUnloadUnusedAsset;
+                return c;
+            }
+            catch (Exception ex) { Log.Info("corte da imagem da cena: " + ex.Message); return t; }
+        }
         static readonly Dictionary<string, string> _nomes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         static readonly HashSet<string> _personagens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         static readonly string[] TracosMec = { "Melee", "Ranged", "Striker", "Tank", "Support", "Debuffer", "Fast", "Slow", "Flying", "Huge", "Small" };
@@ -65,10 +82,10 @@ namespace Bigorna.Encontro
         static Texture2D Textura(string dataUrl)
         {
             if (string.IsNullOrEmpty(dataUrl)) return null;
-            int k = dataUrl.IndexOf("base64,", StringComparison.Ordinal); if (k < 0) return null;
+            if (dataUrl.IndexOf("base64,", StringComparison.Ordinal) < 0 && !Dados.ImagensDaObra.EhReferencia(dataUrl)) return null;
             try
             {
-                var bytes = Convert.FromBase64String(dataUrl.Substring(k + 7));
+                var bytes = Dados.ImagensDaObra.Bytes(dataUrl); if (bytes == null) return null;
                 var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
                 if (!tex.LoadImage(bytes)) return null;
                 tex.name = "Bigorna_retrato"; tex.hideFlags |= HideFlags.DontUnloadUnusedAsset; return tex;
@@ -132,12 +149,12 @@ namespace Bigorna.Encontro
             {
                 var tid = (string)t["id"]; if (string.IsNullOrEmpty(tid) || !_criadas.Contains(tid)) continue;
                 var tp = new LogicaPropria.TaticaPropria { Id = tid, Quando = (string)t["quando"] ?? "sempre" };
-                foreach (var f in (t["efeitos"] as JArray) ?? new JArray()) tp.Efeitos.Add(new LogicaPropria.EfeitoDeDefesa { Tipo = (string)f["tipo"], N = (int?)f["n"] ?? 1 });
+                foreach (var f in (t["efeitos"] as JArray) ?? new JArray()) tp.Efeitos.Add(new LogicaPropria.EfeitoDeDefesa { Tipo = (string)f["tipo"], N = (int?)f["n"] ?? 1, Modo = (string)f["modo"], Monstro = (string)f["monstro"] });
                 proprias.Add(tp);
             }
             LogicaPropria.DefinirTaticas(id, proprias);
             var efeitos = new List<LogicaPropria.EfeitoDeDefesa>();
-            foreach (var f in (j["defenseEffects"] as JArray) ?? new JArray()) efeitos.Add(new LogicaPropria.EfeitoDeDefesa { Tipo = (string)f["kind"], N = (int?)f["amount"] ?? 1 });
+            foreach (var f in (j["defenseEffects"] as JArray) ?? new JArray()) efeitos.Add(new LogicaPropria.EfeitoDeDefesa { Tipo = (string)f["kind"], N = (int?)f["amount"] ?? 1, Modo = (string)f["mode"], Monstro = (string)f["enemy"] });
             LogicaPropria.DefinirDefesa(id, (string)j["defenseEffect"], efeitos);
             foreach (var campo in new[] { "SpawnSound", "AttackSound", "DefendSound", "DefeatSound", "DefaultLoot" })
             { try { var f = typeof(EnemyModel).GetField(campo); f.SetValue(m, f.GetValue(basee)); } catch (Exception ex) { Log.Info("copiando " + campo + ": " + ex.Message); } }
@@ -222,7 +239,9 @@ namespace Bigorna.Encontro
             var bid = (string)j["base"];
             try { if (!string.IsNullOrEmpty(bid)) baseItem = UserCollectionManager.GetItem(bid, false); } catch { }
             var classe = tipo == "TableItem" ? typeof(TrinketModel) : typeof(UserCollectionManager).Assembly.GetType("FFG.D3." + tipo);
-            if (baseItem == null || !classe.IsInstanceOfType(baseItem)) baseItem = PrimeiroDaColecao(colecao, classe);
+            // (sem base, ou uma que nao existe: o molde e o primeiro item do tipo, so pela forma; o efeito dele fica de fora)
+            bool semBase = baseItem == null || !classe.IsInstanceOfType(baseItem);
+            if (semBase) baseItem = PrimeiroDaColecao(colecao, classe);
             if (baseItem == null) { Log.Info("  item «" + id + "»: nenhum item do jogo do tipo " + tipo + " para copiar"); return; }
             var m = UnityEngine.Object.Instantiate(baseItem); m.name = id;
             Reflexao.Por(m, "_id", id);
@@ -230,17 +249,26 @@ namespace Bigorna.Encontro
             m.KeyDescription = Jogo.Termo("BIGORNA_ITEM_" + id + "_DESC", (string)j["description"] ?? "");
             int r = (int?)j["rarity"] ?? 1; if (r >= 1 && r <= 3) m.Rarity = (ItemRarity)r;
             m.Value = Math.Max(0, (int?)j["value"] ?? m.Value);
-            m.IsUpgrade = false; m.BaseItemId = "";
+            // (a versao melhorada de um apetrecho do jogo da o efeito melhorado: o jogo o confere pela marca de melhoria)
+            m.IsUpgrade = m is TrinketModel && !semBase && baseItem.IsUpgrade && tipo != "TableItem"; m.BaseItemId = "";
             if (retrato != null)
             {
                 retrato.name = "@Bigorna-Item-" + id;
                 var caminho = PacoteVirtual.Registrar("D3/Bigorna/Items/" + id + ".png", retrato);
                 m.TextureAssetPath = caminho;
-                if (m is WeaponPartsModel pr) { pr.ArmoryAssetPath = caminho; pr.IsPromo = false; pr.NoTexture = false; }
+                if (m is WeaponPartsModel pr) { pr.ArmoryAssetPath = caminho; pr.IsPromo = false; pr.NoTexture = false; HeroisProprios.Forma(retrato.name, j["layout"]); }
             }
             if (m is ConsumableModel c) c.IsUnique = (bool?)j["unique"] ?? c.IsUnique;
             if (m is CraftingMaterialModel cmat) { cmat.MaterialType = (CraftingMaterialType)Mathf.Clamp((int?)j["materialType"] ?? (int)cmat.MaterialType, 0, 1); cmat.Value = Math.Max(1, (int?)j["value"] ?? cmat.Value); }
-            if (m is TrinketModel t && tipo == "TableItem") { t.AbilityType = TrinketModel.TrinketAbilityType.None; t.hasLogic = false; t.AbilityKey = ""; }
+            if (m is TrinketModel t && (tipo == "TableItem" || semBase)) { t.AbilityType = TrinketModel.TrinketAbilityType.None; t.hasLogic = false; t.isGlobal = false; t.AbilityKey = ""; t.LogicAssetPath = ""; }
+            // (os gatilhos do apetrecho: com algum, a logica dele passa a ser a nossa; sem, a do apetrecho do jogo copiado, se tiver)
+            if (m is TrinketModel ta && tipo == "TrinketModel")
+            {
+                var disparos = Apetrechos.Ler(j["triggers"] as JArray);
+                Apetrechos.Definir(id, disparos);
+                if (disparos.Count > 0) { ta.hasLogic = true; ta.isGlobal = true; ta.LogicAssetPath = ""; }
+                else if (!semBase && ta.hasLogic && !string.IsNullOrEmpty(ta.LogicAssetPath)) Apetrechos.LogicaDoOriginal(id, baseItem.Id);
+            }
             if (m is WeaponPartsModel p)
             {
                 if (Enum.TryParse<WeaponClasses>((string)j["weaponClass"] ?? "", true, out var wc)) p.Class = wc;
@@ -304,8 +332,9 @@ namespace Bigorna.Encontro
             m.hasProductSpecificArt = basee.hasProductSpecificArt;
             NaColecao("StoryCharacters", id, m);
             var retrato = Textura((string)j["portrait"]); if (retrato != null) _retratos[id] = retrato;
+            var cena = Cortada(Textura((string)j["sceneArt"]), (float?)j["sceneCrop"] ?? 0f); if (cena != null) _cenas[id] = cena;
             _registrados.Add(id);
-            Log.Info("personagem próprio «" + nome + "» (" + id + ")" + (retrato != null ? ", retrato próprio" : ", retrato de " + basee.Id));
+            Log.Info("personagem próprio «" + nome + "» (" + id + ")" + (retrato != null ? ", retrato próprio" : ", retrato de " + basee.Id) + (cena != null ? ", imagem própria nas cenas" : ""));
             return true;
         }
 
@@ -356,9 +385,29 @@ namespace Bigorna.Encontro
             if (_artesFonte.TryGetValue(id, out var f) && f == arte && _artes.ContainsKey(id)) return;
             var tex = Oficina.LerImagem(arte, "@Bigorna-Arte-" + id);
             if (tex == null) { Log.Info("arte de «" + id + "»: imagem ilegível"); return; }
+            tex = ComBordaTransparente(tex);
             tex.wrapMode = TextureWrapMode.Clamp;
             _artes[id] = tex; _artesFonte[id] = arte;
             Log.Info("arte animada própria para o monstro «" + id + "» (" + tex.width + "x" + tex.height + ")");
+        }
+
+        /// <summary>A imagem com uma moldura transparente de alguns pixels. A janela mostra a arte com um uvRect que passa das
+        /// bordas (escala, altura, lado); com Clamp, o pixel da beira se estica até o fim da janela: numa figura que encosta na
+        /// beira da imagem, uma faixa arrastada pela tela. Com a moldura, o que se estica é transparente.</summary>
+        static Texture2D ComBordaTransparente(Texture2D t)
+        {
+            const int B = 6;
+            try
+            {
+                int w = t.width, h = t.height; var px = t.GetPixels32();
+                var n = new Texture2D(w + 2 * B, h + 2 * B, TextureFormat.RGBA32, true) { name = t.name, filterMode = t.filterMode, anisoLevel = t.anisoLevel, hideFlags = HideFlags.DontUnloadUnusedAsset };
+                var todos = new Color32[(w + 2 * B) * (h + 2 * B)];   // (transparentes)
+                for (int y = 0; y < h; y++) Array.Copy(px, y * w, todos, (y + B) * (w + 2 * B) + B, w);
+                n.SetPixels32(todos); n.Apply(true);
+                UnityEngine.Object.Destroy(t);
+                return n;
+            }
+            catch (Exception ex) { Log.Info("moldura transparente da arte: " + ex.Message); return t; }
         }
 
         static (FieldInfo inimigo, FieldInfo imagem) CamposDe(Type t)
@@ -485,7 +534,7 @@ namespace Bigorna.Encontro
         /// <summary>Quadro narrativo aberto: os personagens nossos com retrato proprio recebem a sua textura.</summary>
         public static void AplicarRetratosDoQuadro()
         {
-            if (_retratos.Count == 0) return;
+            if (_retratos.Count == 0 && _cenas.Count == 0) return;
             try
             {
                 var quadro = Jogo.UI?.StoryMessageDialog; if (quadro == null) return;
@@ -494,7 +543,9 @@ namespace Bigorna.Encontro
                     if (c.ImageCharacter == null || c.NameCharacter == null) continue;
                     var nome = c.NameCharacter.text;
                     var id = _nomes.FirstOrDefault(kv => _personagens.Contains(kv.Key) && kv.Value == nome).Key;
-                    if (id == null || !_retratos.TryGetValue(id, out var tex) || c.ImageCharacter.texture == tex) continue;
+                    if (id == null) continue;
+                    if (!_cenas.TryGetValue(id, out var tex) && !_retratos.TryGetValue(id, out tex)) continue;   // (v251: a imagem das cenas, se houver)
+                    if (c.ImageCharacter.texture == tex) continue;
                     c.ImageCharacter.texture = tex;
                     var r = c.ImageCharacter.rectTransform; var alvo = r.sizeDelta; float alt = alvo.y > 0 ? alvo.y : 800f;
                     r.sizeDelta = new Vector2(alt * tex.width / Mathf.Max(1, tex.height), alt);

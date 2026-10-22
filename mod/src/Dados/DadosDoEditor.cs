@@ -26,7 +26,7 @@ namespace Bigorna.Dados
     public static class DadosDoEditor
     {
         /// <summary>Sobe quando o que se grava muda; um arquivo com outro carimbo e refeito.</summary>
-        public const int Formato = 4;   // 3: figuras (miniaturas por tipo de monstro das caixas do jogador); 4: textos na lingua do jogo, missoes originais
+        public const int Formato = 5;   // 5: a arte dos 6 heróis da caixa (diálogo) em 1024 px; 3: figuras (miniaturas por tipo de monstro das caixas do jogador); 4: textos na lingua do jogo, missoes originais
 
         public static string Pasta => Path.Combine(Application.persistentDataPath, "Editor");
         public static string ArquivoDados => Path.Combine(Pasta, "bigorna-game-data.js");
@@ -40,7 +40,7 @@ namespace Bigorna.Dados
         static bool _verificado;
         static readonly HashSet<string> _mapasVistos = new HashSet<string>();
         static string Carimbo => "formato " + Formato + "; jogo " + Application.version + "; lingua " + LinguaDoJogo();
-        static string PastaBundles => Path.Combine(Application.streamingAssetsPath, "bundles");
+        public static string PastaBundles => Path.Combine(Application.streamingAssetsPath, "bundles");
 
         /// <summary>A lingua em que o jogo esta (codigo do I2: en, pt, es…); os textos do editor saem nela, com o ingles de reserva.</summary>
         public static string LinguaDoJogo()
@@ -55,6 +55,7 @@ namespace Bigorna.Dados
         public static void NoTitulo()
         {
             try { InstalarEditor(); } catch (Exception ex) { Log.Erro("instalando o editor", ex); }
+            try { Directory.CreateDirectory(Pasta); InstalarApp(); } catch (Exception ex) { Log.Erro("instalando o aplicativo do editor", ex); }
             if (_verificado || Gerando) return;
             _verificado = true;
             if (EmDia())
@@ -70,10 +71,65 @@ namespace Bigorna.Dados
 
         public static bool EditorInstalado => File.Exists(ArquivoEditor);
 
+        /// <summary>O aplicativo Bigorna Editor (a janela do editor, que grava a Oficina e os mapas nos arquivos sem pedir), em
+        /// AppData\Local\Bigorna\App. Fora da LocalLow de proposito: tudo o que se grava na LocalLow leva a marca de
+        /// integridade baixa, e um .exe com essa marca roda com integridade baixa, onde o motor do Edge (WebView2) nao abre
+        /// (erro 0x800700AA). O editor (Bigorna-Salas.html e os dados) segue na pasta Editor; o aplicativo a recebe em --editor.</summary>
+        public static string PastaApp => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bigorna", "App");
+        public static string ArquivoApp => Path.Combine(PastaApp, "Bigorna Editor.exe");
+
+        /// <summary>Abre o editor: no aplicativo, se estiver la; senao, no navegador.</summary>
         public static void AbrirEditor()
         {
+            try
+            {
+                if (File.Exists(ArquivoApp)) { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(ArquivoApp, "--editor \"" + Pasta + "\"") { UseShellExecute = true, WorkingDirectory = PastaApp }); return; }
+            }
+            catch (Exception ex) { Log.Info("não abri o aplicativo do editor (" + ex.Message + "); vai o navegador"); }
             try { Application.OpenURL("file:///" + (File.Exists(ArquivoEditor) ? ArquivoEditor : Pasta).Replace('\\', '/')); }
             catch (Exception ex) { Log.Info("não abri o editor: " + ex.Message); }
+        }
+
+        /// <summary>Os arquivos do aplicativo, embutidos na DLL (Bigorna.App.*), em PastaApp: so os que mudaram. Com o aplicativo
+        /// aberto, o .exe fica preso: vai na proxima vez. A copia antiga, da pasta Editor (a 0.2.0 de teste), sai.</summary>
+        static void InstalarApp()
+        {
+            var asm = typeof(DadosDoEditor).Assembly;
+            Directory.CreateDirectory(PastaApp);
+            foreach (var velho in new[] { "Bigorna Editor.exe", "Microsoft.Web.WebView2.Core.dll", "Microsoft.Web.WebView2.WinForms.dll", "WebView2Loader.dll" })
+            {
+                var f = Path.Combine(Pasta, velho);
+                try { if (File.Exists(f)) { File.Delete(f); Log.Info("aplicativo do editor: " + velho + " saiu da pasta Editor (agora em " + PastaApp + ")"); } }
+                catch (Exception ex) { Log.Info("aplicativo do editor: " + velho + " ficou na pasta Editor (" + ex.Message + ")"); }
+            }
+            foreach (var r in asm.GetManifestResourceNames().Where(n => n.StartsWith("Bigorna.App.", StringComparison.Ordinal)))
+            {
+                try
+                {
+                    var nome = r.Substring("Bigorna.App.".Length).Replace('_', ' '); var destino = Path.Combine(PastaApp, nome);
+                    byte[] novo; using (var s = asm.GetManifestResourceStream(r)) { var ms = new MemoryStream(); s.CopyTo(ms); novo = ms.ToArray(); }
+                    if (File.Exists(destino)) { var velho = File.ReadAllBytes(destino); if (velho.Length == novo.Length && velho.SequenceEqual(novo)) { Desbloquear(destino); continue; } }
+                    File.WriteAllBytes(destino, novo); Desbloquear(destino);
+                    Log.Info("aplicativo do editor: " + nome + " instalado");
+                }
+                catch (Exception ex) { Log.Info("aplicativo do editor: " + r + " ficou para depois (" + ex.Message + ")"); }
+            }
+        }
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+        static extern bool DeleteFileW(string caminho);
+        /// <summary>Tira do arquivo a marca de "baixado da internet" (Zone.Identifier), como o Unblock-File do instalador: o
+        /// aplicativo instalado pelo mod abre sem o aviso do SmartScreen, mesmo quando o arquivo veio de um download.</summary>
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+        static extern uint GetFileAttributesW(string caminho);
+        static void Desbloquear(string f)
+        {
+            try
+            {
+                if (GetFileAttributesW(f + ":Zone.Identifier") == 0xFFFFFFFF) return;
+                Log.Info("aplicativo do editor: marca de download em " + Path.GetFileName(f) + (DeleteFileW(f + ":Zone.Identifier") ? " tirada" : " ficou (erro " + System.Runtime.InteropServices.Marshal.GetLastWin32Error() + ")"));
+            }
+            catch (Exception ex) { Log.Info("aplicativo do editor: marca de download (" + ex.Message + ")"); }
         }
 
         static bool EmDia()
@@ -222,7 +278,7 @@ namespace Bigorna.Dados
             if (erro == null)
             {
                 Log.Info("dados do editor gravados em " + dt.ToString("0.0") + " s: " + g.Resumo() + " → " + ArquivoDados);
-                Avisar(TemAlgumMapa() ? T("Bigorna: dados do editor prontos (", "Bigorna: editor data ready (") + g.Resumo(Idioma.Pt) + ")." : FaltaMapa, TemAlgumMapa() ? 10f : 16f);
+                Avisar(TemAlgumMapa() ? T("Bigorna: dados do editor prontos (", "Bigorna: editor data ready (") + g.Resumo(false) + ")." : FaltaMapa, TemAlgumMapa() ? 10f : 16f);
             }
             else Avisar(T("Bigorna: não consegui gravar os dados do editor: ", "Bigorna: could not write the editor data: ") + erro, 20f);
             Gerando = false;
@@ -387,12 +443,14 @@ namespace Bigorna.Dados
                     loots.Add(o);
                 }
                 var personagens = new JArray();
+                // (a arte de dialogo dos herois da caixa, em alta: o editor a mostra ao lado das artes dos herois novos)
+                var dosHerois = new HashSet<string>(Todos<HeroModel>("Heroes").Where(h => h != null && h.Id != null).Select(h => h.Id.Replace("HERO_", "").ToLowerInvariant()));
                 foreach (var p in Todos<StoryCharacterModel>("StoryCharacters"))
                 {
                     var j = Serial.Modelo(p, Fora);
                     var k = S(j, "KeyName"); j["name_en"] = !string.IsNullOrEmpty(k) ? L(k) : p.name;
                     personagens.Add(j);
-                    foreach (var c in new[] { "TextureAssetPathDefault", "TextureAssetPathActI", "TextureAssetPathActII" }) { var cp = S(j, c); Pedir("personagens", Chave(cp), cp, 256); }
+                    foreach (var c in new[] { "TextureAssetPathDefault", "TextureAssetPathActI", "TextureAssetPathActII" }) { var cp = S(j, c); var ch = Chave(cp); Pedir("personagens", ch, cp, ch != null && dosHerois.Contains(ch.Split('_')[0].ToLowerInvariant()) ? 1024 : 256); }
                 }
                 var herois = new JArray();
                 foreach (var h in Todos<HeroModel>("Heroes"))
@@ -403,7 +461,7 @@ namespace Bigorna.Dados
                     var kd = S(j, "KeyDescription") ?? S(j, "KeyDesc") ?? S(j, "DescriptionKey"); j["desc_en"] = !string.IsNullOrEmpty(kd) ? L(kd) : "";
                     j["_bundle"] = SemD3(h.DataAssetBundleName);
                     herois.Add(j);
-                    Pedir("herois", h.Id, h.TextureAssetPathActI, 256);
+                    Pedir("herois", h.Id, h.TextureAssetPathActI, 512);
                 }
                 var facanhas = new JArray();
                 foreach (var f in Todos<FeatModel>("Feats"))
@@ -411,7 +469,12 @@ namespace Bigorna.Dados
                     var j = Serial.Modelo(f);
                     var kd = S(j, "KeyDescription") ?? S(j, "KeyDesc") ?? S(j, "DescriptionKey"); j["desc_en"] = !string.IsNullOrEmpty(kd) ? L(kd) : "";
                     facanhas.Add(Serial.So(j, "_id", "_act", "desc_en", "Goal", "HeroSource", "AmountCompletedRequired", "PrerequisiteFeats", "Rewards", "Timing", "WeaponClasses", "EnemyTypes", "ItemType",
-                        "HeroInjured", "InteractableType", "EnemyConditions", "GoalIsTotalDamage", "WeaknessDamage", "IsVictory", "MinimumDamage", "SameEnemy"));
+                        "HeroInjured", "InteractableType", "EnemyConditions", "GoalIsTotalDamage", "WeaknessDamage", "IsVictory", "MinimumDamage", "SameEnemy",
+                        // (as condicoes finas: o editor monta a facanha com todas as que o jogo confere)
+                        "ExcessWeaknessDamage", "RequireObjectRemove", "AttackWithBothWeapons", "DamagedEnemy", "AnyHero", "AnyHeroInjured", "AnyOtherHeroInjured", "EnemyHasTactic",
+                        "FirstAttackOfRound", "FirstInteractionOfRound", "FirstTimeInteracted", "FirstTimeAttackedByHero", "HeroAttackedThisRound", "EnemyWasAttackedThisRound",
+                        "OtherHeroDidDamage", "AllOtherHeroesDidDamageThisRound", "AllHeroesDidDamageThisRound", "DiedFromAffliction", "AmountOfTimeDuringRound", "ForAmountOfRounds",
+                        "StatusCount", "EnemiesOnMap"));
                 }
                 var habilidades = new JArray();
                 foreach (var s in Todos<SkillModel>("Skills"))
@@ -601,16 +664,16 @@ namespace Bigorna.Dados
             }
 
             /// <summary>As contagens; em portugues para o registro, na lingua do mod para o aviso na tela.</summary>
-            public string Resumo(bool pt = true)
+            public string Resumo(bool registro = true)
             {
                 int N(string k) => (_cat[k] as JArray)?.Count ?? (_cat[k] as JObject)?.Count ?? 0;
-                if (!pt)
-                    return _pecas.Count + " tiles, " + N("monstros") + " enemies, " + N("ativacoes") + " activations, " + N("itens") + " items, " + N("personagens") + " characters, "
-                        + N("herois") + " heroes, " + N("facanhas") + " feats, " + N("receitas") + " recipes, " + Imagens + " pictures" + (Falhas > 0 ? " (" + Falhas + " failed)" : "")
-                        + (SemBundle > 0 ? ", " + SemBundle + " without bundle" : "") + ", " + _en.Count + " texts";
+                if (!registro)
+                    return Idioma.TF("{0} peças, {1} monstros, {2} ativações, {3} itens, {4} personagens, {5} heróis, {6} façanhas, {7} receitas, {8} imagens", "{0} tiles, {1} enemies, {2} activations, {3} items, {4} characters, {5} heroes, {6} feats, {7} recipes, {8} pictures",
+                            _pecas.Count, N("monstros"), N("ativacoes"), N("itens"), N("personagens"), N("herois"), N("facanhas"), N("receitas"), Imagens)
+                        + (Falhas > 0 ? Idioma.TF(" ({0} falharam)", " ({0} failed)", Falhas) : "") + (SemBundle > 0 ? Idioma.TF(", {0} sem pacote de dados", ", {0} without bundle", SemBundle) : "") + Idioma.TF(", {0} textos", ", {0} texts", _en.Count);
                 return _pecas.Count + " peças, " + N("monstros") + " monstros, " + N("ativacoes") + " ativações, " + N("itens") + " itens, " + N("personagens") + " personagens, "
                     + N("herois") + " heróis, " + N("facanhas") + " façanhas, " + N("receitas") + " receitas, " + Imagens + " imagens" + (Falhas > 0 ? " (" + Falhas + " falharam)" : "")
-                    + (SemBundle > 0 ? ", " + SemBundle + " sem bundle" : "") + ", " + _en.Count + " textos";
+                    + (SemBundle > 0 ? ", " + SemBundle + " sem pacote de dados" : "") + ", " + _en.Count + " textos";
             }
 
             /// <summary>CSV com aspas (campos com virgula, aspas dobradas e quebras de linha).</summary>

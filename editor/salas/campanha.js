@@ -89,6 +89,17 @@ function normalizarCampanha(c) {
   c.dialogos.forEach(d => { if (!d.fluxo) d.fluxo = [0, 0]; });
   arrumarFluxo(false);
 }
+/* the boxes of a scene laid out left to right: each column one step further from the first box along the arrows (the
+   plain ones and the answers of a question), the branches one under the other; boxes no arrow reaches go last */
+function arrumarCaixas(n) {
+  const cx = caixasDaCena(n); if (!cx.length) return; const ids = new Set(cx.map(d => d.id));
+  const saidas = d => [...cx.filter(x => (x.depois || []).includes(d.id)).map(x => x.id), ...(d.type === 'choice' ? d.options.map(o => o.next).filter(id => ids.has(id)) : [])];
+  const prof = {}; const fila = [n.dialogo && ids.has(n.dialogo) ? n.dialogo : cx[0].id]; prof[fila[0]] = 0;
+  // (longest path, guarded: a box is pushed further only up to the number of boxes)
+  for (let k = 0; k < fila.length && k < cx.length * cx.length; k++) { const d = caixaPorId(fila[k]); saidas(d).forEach(id => { if (prof[id] === undefined || (prof[id] < prof[d.id] + 1 && prof[d.id] + 1 < cx.length)) { prof[id] = prof[d.id] + 1; fila.push(id); } }); }
+  const fim = Math.max(0, ...Object.values(prof)) + 1; const linhas = {};
+  cx.forEach(d => { const c = prof[d.id] ?? fim; const y = linhas[c] || 0; d.fluxo = [c * 240, y]; linhas[c] = y + (typeof alturaCaixa === 'function' ? alturaCaixa(d) : 90) + 30; });
+}
 function arrumarFluxo(forcar) {
   const nos = campanha.nos; const prof = {};
   const calc = (n, vistos) => { if (prof[n.id] !== undefined) return prof[n.id]; if (vistos.has(n.id)) return 0; vistos.add(n.id); const ants = (n.depois || []).map(noPorId).filter(Boolean); prof[n.id] = ants.length ? 1 + Math.max(...ants.map(a => calc(a, vistos))) : 0; return prof[n.id]; };
@@ -126,11 +137,13 @@ function abrirCampanha(aba) {
   normalizarCampanha(campanha);
   $('#telaCampanha').hidden = false;
   $('#c_nome').value = campanha.meta.name || '';
+  campanha.meta.lingua = campanha.meta.lingua || linguaPadrao(); $('#c_lingua').innerHTML = opcoesDeLingua(campanha.meta.lingua); $('#c_painelLingua').hidden = true;
+  pintarLinguasDaCampanha();
   const no = noDaMissao(missaoAtual); if (no && !noSel) noSel = no.id;
   mudarAba(aba || (abaC === 'caixas' ? 'fluxo' : abaC));
 }
 function telaCampanhaAberta() { const t = document.getElementById('telaCampanha'); return !!t && !t.hidden; }
-function fecharCampanha() { antesDeSairDaCena(() => { esconderPainel('janelaVariaveis'); esconderPainel('janelaInventario'); if (abaC === 'caixas') trocarAba('fluxo'); fecharPopup(); $('#telaCampanha').hidden = true; camposDaMissao(); tudo(); }); }
+function fecharCampanha() { antesDeSairDaCena(() => { esconderPainel('janelaVariaveis'); esconderPainel('janelaInventario'); if (abaC === 'caixas') trocarAba('fluxo'); fecharPopup(); $('#telaCampanha').hidden = true; descarregarImagens(); camposDaMissao(); tudo(); }); }
 /* the boxes of a scene that have nothing to show yet */
 function caixasVazias(n) {
   return caixasDaCena(n).filter(d => d.type === 'video' ? !d.video
@@ -158,6 +171,7 @@ function mudarAba(aba) {
   trocarAba(aba);
 }
 function trocarAba(aba) {
+  if (aba !== abaC) descarregarImagens();   // (v239)
   abaC = aba; fecharPopup(); estradaNova = null; colocandoCidade = false;
   if (aba !== 'caixas') cenaAberta = null;
   $$('#abasC button').forEach(b => b.classList.toggle('ativo', b.dataset.aba === aba));
@@ -175,6 +189,15 @@ $('#cInv').onclick = () => abrirInventario();
 $('#dicaC').onclick = () => avisoLongo($('#dicaC').title);
 $('#cCaixas').onclick = () => mudarAba('fluxo');
 $('#c_nome').oninput = e => { campanha.meta.name = e.target.value; renderEsqC(); };
+$('#c_lingua').onchange = e => { campanha.meta.lingua = e.target.value; pintarLinguasDaCampanha(); renderCabecalho(); };
+/* the languages of the campaign: only its flags (the original first) beside the name; a click on them opens the options
+   (the language of the campaign, the other languages added by the author, the Translations window) */
+function pintarLinguasDaCampanha() {
+  $('#c_bandeira').innerHTML = imgsBandeira(linguasDaObra().join(','), 16) + ' <span class="seta">▾</span>';
+  const d = $('#c_linguas'); if (!d) return; d.innerHTML = htmlLinguasDaObra(); ligarLinguasDaObra(d, pintarLinguasDaCampanha);
+}
+$('#c_bandeira').onclick = e => { e.stopPropagation(); $('#c_painelLingua').hidden = !$('#c_painelLingua').hidden; };
+document.addEventListener('mousedown', e => { const p = $('#c_painelLingua'); if (p && !p.hidden && !e.target.closest('.linguaCampanha') && !e.target.closest('.modal')) p.hidden = true; });
 $('#cExportar').onclick = () => exportarCampanha();
 $('#cApagar').onclick = () => apagarCampanha();
 /* Delete campaign: everything goes (campaign, maps, scenes, workshop, variables); the editor starts over with an empty map */
@@ -223,14 +246,16 @@ function renderEsqC() {
   const el = $('#esqC');
   if (abaC === 'caixas') { $('#cBotoes').innerHTML = '';
     const n = noPorId(cenaAberta); const caixas = caixasDaCena(n);
-    el.innerHTML = `<div class="bloco"><h2>${esc(rotuloDoNo(n))}${n.nome ? ' · ' + esc(n.nome) : ''}</h2><div class="botoes"><button class="sm" id="cAddCaixa">+ Box</button><button class="sm" id="cAddVideo" title="A box that plays your own film (a cutscene)">+ Video (cutscene)</button><button class="sm primario" id="cSimular">▶ Simulate</button></div><div id="cListaCaixas"></div><p class="ajuda">Boxes play in the order of the arrows, starting at the first. A question box branches: each answer leads to its own next box. A video box plays your own film (MP4 or WebM) between the other boxes.</p></div>`;
+    el.innerHTML = `<div class="bloco"><h2>${esc(rotuloDoNo(n))}${n.nome ? ' · ' + esc(n.nome) : ''}</h2><div class="botoes"><button class="sm" id="cAddCaixa">+ Box</button><button class="sm" id="cAddOpcoes" title="A box with answers: each one leads to its own next box">+ Box with options</button><button class="sm" id="cAddVideo" title="A box that plays your own film (a cutscene)">+ Video (cutscene)</button><button class="sm" id="cArrumarCaixas" title="Lay the boxes out left to right, in the order of the arrows">Auto-arrange</button><button class="sm primario" id="cSimular">▶ Simulate</button></div><div id="cListaCaixas"></div><p class="ajuda">Boxes play in the order of the arrows, starting at the first. A question box branches: each answer leads to its own next box. A video box plays your own film (MP4 or WebM) between the other boxes.</p></div>`;
     const l = $('#cListaCaixas');
     caixas.forEach((d, i) => { const dv = document.createElement('div'); dv.className = 'no' + (caixaSel === d.id ? ' ativo' : ''); const r = rostoDe(d.speaker);
-      dv.innerHTML = `${r ? `<img class="face" src="${r}" alt="">` : '<span class="face"></span>'}<div><div>${d.id === n.dialogo ? '▶ ' : ''}${esc(d.type === 'video' ? '▶ ' + (d.video?.nome || 'video') : d.title || (d.text || '').slice(0, 26) || 'Box ' + (i + 1))}</div><small>${esc(d.type === 'video' ? 'video' : d.speaker ? nomePersonagem(d.speaker) : 'narrator')}${d.type === 'choice' ? ' · question' : ''}${d.acoes.length ? ' · ' + d.acoes.length + ' action(s)' : ''}</small></div>`;
+      dv.innerHTML = `${r ? `<img class="face" loading="lazy" decoding="async" ${imgTardia(r)} alt="">` : '<span class="face"></span>'}<div><div>${d.id === n.dialogo ? '▶ ' : ''}${esc(d.type === 'video' ? '▶ ' + (d.video?.nome || 'video') : d.title || (d.text || '').slice(0, 26) || 'Box ' + (i + 1))}</div><small>${esc(d.type === 'video' ? 'video' : d.speaker ? nomePersonagem(d.speaker) : 'narrator')}${d.type === 'choice' ? ' · question' : ''}${d.acoes.length ? ' · ' + d.acoes.length + ' action(s)' : ''}</small></div>`;
       dv.onclick = () => { caixaSel = d.id; renderC(); }; l.appendChild(dv); });
-    const addCaixa = video => { const d = novaCaixa(n); if (video) d.type = 'video'; const s = caixaSel && caixaPorId(caixaSel); if (s && s.type !== 'choice' && !campanha.dialogos.some(x => (x.depois || []).includes(s.id))) d.depois = [s.id]; d.fluxo = [(s ? s.fluxo[0] : 0) + 240, s ? s.fluxo[1] : 0]; caixaSel = d.id; renderC(); };
-    $('#cAddCaixa').onclick = () => addCaixa(false);
-    $('#cAddVideo').onclick = () => addCaixa(true);
+    const addCaixa = tipo => { const d = novaCaixa(n); if (tipo === 'video') d.type = 'video'; if (tipo === 'choice') { d.type = 'choice'; d.options = [{ text: '', next: '', acoes: [] }, { text: '', next: '', acoes: [] }]; } const s = caixaSel && caixaPorId(caixaSel); if (s && s.type !== 'choice' && !campanha.dialogos.some(x => (x.depois || []).includes(s.id))) d.depois = [s.id]; d.fluxo = [(s ? s.fluxo[0] : 0) + 240, s ? s.fluxo[1] : 0]; caixaSel = d.id; renderC(); };
+    $('#cAddCaixa').onclick = () => addCaixa('normal');
+    $('#cAddOpcoes').onclick = () => addCaixa('choice');
+    $('#cAddVideo').onclick = () => addCaixa('video');
+    $('#cArrumarCaixas').onclick = () => { arrumarCaixas(n); renderC(); enquadrarC(); };
     $('#cSimular').onclick = () => simular(n);
     return;
   }
@@ -246,7 +271,7 @@ function renderEsqC() {
     if (abaC === 'mundo' && !noMapaMundi(n)) return;
     const dv = document.createElement('div'); dv.className = 'no' + (noSel === n.id ? ' ativo' : '');
     const cab = ehDialogo(n) ? caixaPorId(n.dialogo) : null; const r = cab ? rostoDe(cab.speaker) : '';
-    dv.innerHTML = `${r ? `<img class="face" src="${r}" alt="">` : `<span class="ponto ${n.tipo}"></span>`}<div style="flex:1;min-width:0"><div>${esc(rotuloDoNo(n))}${nomeDoNo(n) !== rotuloDoNo(n) ? ' · ' + esc(nomeDoNo(n)) : ''}</div><small>${n.missao !== null && n.missao !== undefined ? (campanha.missoes[n.missao]?.salas.length || 0) + ((campanha.missoes[n.missao]?.salas.length || 0) === 1 ? ' room' : ' rooms') + ' · progression ' + progressoDoMapa(campanha.missoes[n.missao]) : ehDialogo(n) ? caixasDaCena(n).length + ' box(es)' : MARCADORES.find(m => m[0] === n.marcador)?.[1] || ''}${(n.depois || []).length ? ' · after ' + n.depois.map(noPorId).filter(Boolean).map(rotuloDoNo).join(', ') : ' · from the start'}</small></div><button class="sm editar" title="${esc(DESTINO_EDICAO[n.tipo])}">✎</button>`;
+    dv.innerHTML = `${r ? `<img class="face" loading="lazy" decoding="async" ${imgTardia(r)} alt="">` : `<span class="ponto ${n.tipo}"></span>`}<div style="flex:1;min-width:0"><div>${esc(rotuloDoNo(n))}${nomeDoNo(n) !== rotuloDoNo(n) ? ' · ' + esc(nomeDoNo(n)) : ''}</div><small>${n.missao !== null && n.missao !== undefined ? (campanha.missoes[n.missao]?.salas.length || 0) + ((campanha.missoes[n.missao]?.salas.length || 0) === 1 ? ' room' : ' rooms') + ' · progression ' + progressoDoMapa(campanha.missoes[n.missao]) : ehDialogo(n) ? caixasDaCena(n).length + ' box(es)' : MARCADORES.find(m => m[0] === n.marcador)?.[1] || ''}${(n.depois || []).length ? ' · after ' + n.depois.map(noPorId).filter(Boolean).map(rotuloDoNo).join(', ') : ' · from the start'}</small></div><button class="sm editar" title="${esc(DESTINO_EDICAO[n.tipo])}">✎</button>`;
     dv.onclick = () => { noSel = n.id; renderC(); };
     dv.querySelector('.editar').onclick = ev => { ev.stopPropagation(); editarNo(n); };
     l.appendChild(dv);
@@ -440,11 +465,11 @@ function simular(n) {
       if (!atual || vistos.has(atual.id + (atual.type === 'choice' ? '' : ''))) { el.innerHTML = '<div class="simFim">End of the scene.</div><div class="rodape"><button id="sim_fechar">Close</button></div>'; el.querySelector('#sim_fechar').onclick = fechar; return; }
       const d = atual; const fundoN = FUNDOS.find(f => f.id === (d.background ?? FUNDO_PADRAO));
       const seguinte = campanha.dialogos.find(x => (x.depois || []).includes(d.id));
-      if (d.type === 'video') { vistos.add(d.id); el.innerHTML = `<div class="quadro"><div class="texto">▶ Video: <b>${esc(d.video?.nome || '(no video yet)')}</b>${d.video && AUDIOS[d.video.arquivo] ? `<video controls src="${URL.createObjectURL(AUDIOS[d.video.arquivo])}" style="width:100%;max-height:300px;margin-top:8px;background:#000"></video>` : ''}<br><small>In the game the film plays full screen here.</small></div><div class="opcoes"><button data-next>${seguinte ? 'Continue ▸' : 'Close'}</button></div></div>`; el.querySelector('[data-next]').onclick = () => { if (!seguinte) return fechar(); atual = seguinte; mostrar(); }; return; }
+      if (d.type === 'video') { vistos.add(d.id); el.innerHTML = `<div class="quadro"><div class="texto">▶ Video: <b>${esc(d.video?.nome || '(no video yet)')}</b>${d.video && AUDIOS[d.video.arquivo] ? `<video controls loading="lazy" decoding="async" ${imgTardia(URL.createObjectURL(AUDIOS[d.video.arquivo]))} style="width:100%;max-height:300px;margin-top:8px;background:#000"></video>` : ''}<br><small>In the game the film plays full screen here.</small></div><div class="opcoes"><button data-next>${seguinte ? 'Continue ▸' : 'Close'}</button></div></div>`; el.querySelector('[data-next]').onclick = () => { if (!seguinte) return fechar(); atual = seguinte; mostrar(); }; return; }
       el.innerHTML = `<div class="quadro bg-${d.background ?? FUNDO_PADRAO}"><div class="fundoNome">${esc(fundoN?.name_en || '')}</div>
-        <div class="cabeca">${rostoDe(d.speaker) ? `<img src="${rostoDe(d.speaker)}" alt="">` : ''}<div><div class="nome">${esc(d.speaker ? nomePersonagem(d.speaker) : 'Narrator')}</div><div class="titulo">${esc(d.title || '')}</div></div></div>
+        <div class="cabeca">${rostoDe(d.speaker) ? `<img loading="lazy" decoding="async" ${imgTardia(rostoDe(d.speaker))} alt="">` : ''}<div><div class="nome">${esc(d.speaker ? nomePersonagem(d.speaker) : 'Narrator')}</div><div class="titulo">${esc(d.title || '')}</div></div></div>
         <div class="texto">${esc(d.text || '(no text yet)')}</div>
-        ${d.cast.length ? `<div class="elenco">${d.cast.map(id => rostoDe(id) ? `<img src="${rostoDe(id)}" title="${esc(nomePersonagem(id))}" alt="">` : '').join('')}</div>` : ''}
+        ${d.cast.length ? `<div class="elenco">${d.cast.map(id => rostoDe(id) ? `<img loading="lazy" decoding="async" ${imgTardia(rostoDe(id))} title="${esc(nomePersonagem(id))}" alt="">` : '').join('')}</div>` : ''}
         ${d.acoes.length ? `<div class="simAcoes">${d.acoes.map(a => '✦ ' + esc(ACOES_CAIXA.find(x => x[0] === a.action)?.[1] || a.action)).join('<br>')}</div>` : ''}
         ${d.type === 'choice' ? `<div class="opcoes">${d.options.map((o, i) => `<button data-op="${i}">${esc(o.text || 'Answer ' + (i + 1))}</button>`).join('')}</div>` : `<div class="opcoes"><button data-next>${seguinte ? 'Continue ▸' : 'Close'}</button></div>`}</div>`;
       el.querySelectorAll('[data-op]').forEach(b => b.onclick = () => { const o = d.options[+b.dataset.op]; atual = o.next ? caixaPorId(o.next) : null; if (!atual) { el.innerHTML = '<div class="simFim">End of the scene.</div><div class="rodape"><button id="sim_fechar">Close</button></div>'; el.querySelector('#sim_fechar').onclick = fechar; } else mostrar(); });
@@ -552,7 +577,7 @@ function desenharFluxo() {
       ctxC.fillStyle = '#eef0f4'; ctxC.font = `bold 13px system-ui`; ctxC.fillText((nomeDoNo(n) === rotuloDoNo(n) ? '' : nomeDoNo(n)).slice(0, face ? 17 : 22), tx, y + 34);
       ctxC.fillStyle = COR.texto; ctxC.font = `10px system-ui`;
       const m = n.missao !== null && n.missao !== undefined ? campanha.missoes[n.missao] : null;
-      const linha3 = m ? (n.missao === missaoAtual ? '▸ ' : '') + m.salas.length + (m.salas.length === 1 ? ' room' : ' rooms') + ' · progression ' + progressoDoMapa(m) : n.tipo === 'travel' ? 'world map: ' + n.coords[0] + ', ' + n.coords[1] : caixasDaCena(n).length + ' box(es)' + (cab && cab.speaker ? ' · ' + nomePersonagem(cab.speaker) : '');
+      const linha3 = m ? (n.missao === missaoAtual ? '▸ ' : '') + m.salas.length + (m.salas.length === 1 ? L2(' room', ' sala') : L2(' rooms', ' salas')) + L2(' · progression ', ' · progressão ') + progressoDoMapa(m) : n.tipo === 'travel' ? L2('world map: ', 'mapa-múndi: ') + n.coords[0] + ', ' + n.coords[1] : caixasDaCena(n).length + L2(' box(es)', ' caixa(s)') + (cab && cab.speaker ? ' · ' + nomePersonagem(cab.speaker) : '');
       ctxC.fillText(linha3.slice(0, face ? 20 : 26), tx, y + 52);
     }
     ctxC.fillStyle = COR.cobreClaro; ctxC.beginPath(); ctxC.arc(x + CARTAO[0], y + CARTAO[1] / 2, 7, 0, Math.PI * 2); ctxC.fill(); ctxC.strokeStyle = '#1b1d22'; ctxC.lineWidth = 1.5 / vistaC.zoom; ctxC.stroke();
@@ -758,6 +783,40 @@ telaC.addEventListener('dblclick', ev => { if (estradaNova && abaC === 'mundo') 
   if (abaC === 'caixas') { if (!n) { const d = novaCaixa(noPorId(cenaAberta)); d.fluxo = [Math.round(px / 10) * 10, Math.round(py / 10) * 10]; caixaSel = d.id; renderC(); } return; }
   if (!n) return; if (n.missao !== null && n.missao !== undefined) { trocarMissao(n.missao); fecharCampanha(); } else if (ehDialogo(n)) abrirCaixas(n); });
 telaC.addEventListener('wheel', ev => { ev.preventDefault(); const r = telaC.getBoundingClientRect(); const mx = ev.clientX - r.left, my = ev.clientY - r.top; const f = ev.deltaY < 0 ? 1.15 : 1 / 1.15; const z = Math.min(3, Math.max(0.15, vistaC.zoom * f)); const k = z / vistaC.zoom; vistaC.px = mx - (mx - vistaC.px) * k; vistaC.py = my - (my - vistaC.py) * k; vistaC.zoom = z; desenharC(); }, { passive: false });
+/* Ctrl+C / Ctrl+V: a card of the story flow (with its boxes, or a copy of its map) or a box of a scene */
+let areaC = null;
+function copiarC(n) {
+  if (!n) return aviso(tr(abaC === 'caixas' ? 'Pick a box to copy.' : 'Pick a card to copy.'));
+  if (abaC === 'caixas') { areaC = { tipo: 'caixa', d: clone(n) }; aviso(tr('Box copied: Ctrl+V pastes it (here or in another scene).')); return; }
+  if (abaC === 'mundo' && !noMapaMundi(n)) return;
+  areaC = { tipo: 'no', n: clone(n), caixas: ehDialogo(n) ? clone(caixasDaCena(n)) : [], missao: (n.tipo === 'map' || n.tipo === 'side') && campanha.missoes[n.missao] ? clone(campanha.missoes[n.missao]) : null };
+  aviso(tr('Card copied: Ctrl+V pastes a copy (unlinked).'));
+}
+function colarC() {
+  if (!areaC) return aviso(tr('Nothing copied yet (Ctrl+C on a card or a box).'));
+  if (areaC.tipo === 'caixa') {
+    if (abaC !== 'caixas' || !cenaAberta) return aviso(tr('A box is pasted into a scene: open the scene’s boxes.'));
+    const cena = noPorId(cenaAberta); const d = clone(areaC.d); const k = caixasDaCena(cena).length;
+    d.id = idUnico('box-' + slug(cena.id) + '-' + (k + 1), campanha.dialogos.map(x => x.id)); d.cena = cena.id; d.depois = []; (d.options || []).forEach(o => { o.next = ''; });
+    d.fluxo = [(d.fluxo || [0, 0])[0] + 40, (d.fluxo || [0, 0])[1] + 40]; areaC.d.fluxo = d.fluxo.slice();
+    campanha.dialogos.push(d); caixaSel = d.id; renderC(); aviso(tr('Box pasted (unlinked: link it in the flow).')); return;
+  }
+  if (abaC === 'caixas') return aviso(tr('A card is pasted in the story flow.'));
+  const o = areaC.n; const n = clone(o); const tipo = n.tipo;
+  n.id = idUnico(tipo + '-' + proximoNum(tipo), campanha.nos.map(x => x.id)); n.num = proximoNum(tipo); n.depois = [];
+  if (n.nome) n.nome = n.nome + ' ' + tr('(copy)');
+  n.fluxo = n.fluxo ? [n.fluxo[0] + 40, n.fluxo[1] + 40] : null; n.coords = [(n.coords || [0, 0])[0] + 40, (n.coords || [0, 0])[1] - 40];
+  areaC.n.fluxo = n.fluxo && n.fluxo.slice(); areaC.n.coords = n.coords.slice();
+  if (areaC.missao) { const p = clone(areaC.missao); if (p.meta && p.meta.name) p.meta.name = p.meta.name + ' ' + tr('(copy)'); campanha.missoes.push(p); n.missao = campanha.missoes.length - 1; }
+  campanha.nos.push(n);
+  if (ehDialogo(o)) {   // the boxes of the scene, with new names and the links among them kept
+    const novos = new Map(); const usados = campanha.dialogos.map(x => x.id);
+    areaC.caixas.forEach((d, k) => { const id = idUnico('box-' + slug(n.id) + '-' + (k + 1), usados); usados.push(id); novos.set(d.id, id); });
+    areaC.caixas.forEach(d0 => { const d = clone(d0); d.id = novos.get(d0.id); d.cena = n.id; d.depois = (d.depois || []).map(x => novos.get(x)).filter(Boolean); (d.options || []).forEach(op => { op.next = novos.get(op.next) || ''; }); campanha.dialogos.push(d); });
+    n.dialogo = novos.get(o.dialogo) || (caixasDaCena(n)[0] || {}).id || null; if (!n.dialogo) { const d = novaCaixa(n); n.dialogo = d.id; }
+  }
+  noSel = n.id; renderC(); renderCabecalho(); aviso(tr('Card pasted (unlinked: link it in the flow).'));
+}
 window.addEventListener('keydown', ev => {
   if ($('#telaCampanha').hidden || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || $('.modal')) return;
   if (abaC === 'mundo' && (estradaNova || colocandoCidade)) {
@@ -767,6 +826,8 @@ window.addEventListener('keydown', ev => {
   }
   if (ev.key === 'Escape') { if (ligando) { ligando = null; desenharC(); } else if (document.getElementById('popupLigacoes')) fecharPopup(); else if (abaC === 'caixas') mudarAba('fluxo'); else fecharCampanha(); return; }
   const n = abaC === 'caixas' ? (caixaSel && caixaPorId(caixaSel)) : (noSel && noPorId(noSel));
+  if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && (ev.key === 'c' || ev.key === 'C')) { ev.preventDefault(); copiarC(n); return; }
+  if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && (ev.key === 'v' || ev.key === 'V')) { ev.preventDefault(); colarC(); return; }
   if (ev.key.startsWith('Arrow')) {
     ev.preventDefault();
     const dx = ev.key === 'ArrowLeft' ? -1 : ev.key === 'ArrowRight' ? 1 : 0, dy = ev.key === 'ArrowUp' ? -1 : ev.key === 'ArrowDown' ? 1 : 0;
@@ -845,7 +906,7 @@ function abrirInventario() {
   const letra = n => esc(((n || '?').trim()[0] || '?').toUpperCase());
   const ficha = (g, it) => { const tem = qtdDe(it.id); const img = iconeDoItemInicial(it.id); const pilha = empilha(g.cls, it.id);
     return `<div class="invItem${tem ? ' tem' : ''}" data-inv="${esc(it.id)}" data-nome="${esc((it.nome || '').toLowerCase())}">
-      ${img ? `<img src="${img}" alt="" loading="lazy">` : `<span class="invLetra">${letra(it.nome)}</span>`}
+      ${img ? `<img loading="lazy" decoding="async" ${imgTardia(img)} alt="" loading="lazy">` : `<span class="invLetra">${letra(it.nome)}</span>`}
       <span class="invNome" data-sem-traducao title="${esc(it.nome)}">${esc(it.nome)}</span>
       ${pilha ? `<span class="invQtd"><button class="sm" data-menos>−</button><input type="number" min="0" max="9999" value="${tem ? Math.max(1, +tem.qtd || 1) : 0}" data-qtd><button class="sm" data-mais>+</button></span>` : `<input type="checkbox" ${tem ? 'checked' : ''} data-marca>`}</div>`; };
   const skills = HEROIS_IDS.map(h => ({ h, nome: nomeDoHeroi(h), img: retratoDoHeroi(h), l: periciasParaPremio(h) })).filter(x => x.l.length);
@@ -862,7 +923,7 @@ function abrirInventario() {
     ${grupos.map(g => `<details class="invGrupo" open data-cls="${g.cls}"><summary><span>${esc(tr(g.nome))}</span> <small class="etq">${g.itens.filter(i => qtdDe(i.id)).length} / ${g.itens.length}</small></summary><div class="invGrade">${g.itens.map(it => ficha(g, it)).join('')}</div></details>`).join('')}
     ${ITENS_B().length || (CAT.itens || []).length ? '' : '<p class="ajuda aviso">The Workshop has no items yet: import them in the Items tab.</p>'}
     <details class="invGrupo" open><summary><span>${tr('Skills (unlocked)')}</span> <small class="etq">${v.pericias.length}</small></summary>
-      ${skills.map(x => `<div class="invHeroi">${x.img ? `<img class="redondo grande" src="${x.img}" alt="">` : ''}<b data-sem-traducao>${esc(x.nome)}</b></div><div class="invGrade">${x.l.map(sk => `<label class="invItem pericia${v.pericias.includes(sk.id) ? ' tem' : ''}"><input type="checkbox" data-per="${esc(sk.id)}" ${v.pericias.includes(sk.id) ? 'checked' : ''}><span class="invNome" data-sem-traducao>${esc(sk.nome)}</span></label>`).join('')}</div>`).join('') || '<span class="ajuda">None.</span>'}
+      ${skills.map(x => `<div class="invHeroi">${x.img ? `<img class="redondo grande" loading="lazy" decoding="async" ${imgTardia(x.img)} alt="">` : ''}<b data-sem-traducao>${esc(x.nome)}</b></div><div class="invGrade">${x.l.map(sk => `<label class="invItem pericia${v.pericias.includes(sk.id) ? ' tem' : ''}"><input type="checkbox" data-per="${esc(sk.id)}" ${v.pericias.includes(sk.id) ? 'checked' : ''}><span class="invNome" data-sem-traducao>${esc(sk.nome)}</span></label>`).join('')}</div>`).join('') || '<span class="ajuda">None.</span>'}
     </details>`, (el) => {
     const volta = () => abrirInventario();
     const atualizar = () => { el.querySelector('#inv_total').textContent = total(); el.querySelectorAll('.invGrupo[data-cls]').forEach(d => { const e = d.querySelector('summary .etq'); const its = [...d.querySelectorAll('[data-inv]')]; if (e) e.textContent = its.filter(x => qtdDe(x.dataset.inv)).length + ' / ' + its.length; }); };

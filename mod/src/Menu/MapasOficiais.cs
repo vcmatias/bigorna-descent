@@ -72,7 +72,7 @@ namespace Bigorna.Menu
                 foreach (var h in herois)
                 {
                     var p = partida.GetPlayer(h, false);
-                    if (p == null) return T("O herói " + NomeHeroi(h) + " não está na coleção.", "The hero " + NomeHeroi(h) + " is not in your collection.");
+                    if (p == null) return TF("O herói {0} não está na coleção.", "The hero {0} is not in your collection.", NomeHeroi(h));
                     partida.ActivePlayers.Add(p);
                 }
                 partida.QuestId = q.Id;
@@ -182,7 +182,7 @@ namespace Bigorna.Menu
         static readonly HashSet<string> _grupo = new HashSet<string>();
         static int _dificuldade = 1;
         static readonly string[] DificuldadesPt = { "Fácil", "Normal", "Difícil", "Brutal" }, DificuldadesEn = { "Easy", "Normal", "Hard", "Brutal" };
-        static string[] Dificuldades => Pt ? DificuldadesPt : DificuldadesEn;
+        static string[] Dificuldades => DificuldadesPt.Select((p, i) => T(p, DificuldadesEn[i])).ToArray();
         static readonly DifficultySetting[] Valores = { DifficultySetting.Journey, DifficultySetting.Standard, DifficultySetting.Heroic, DifficultySetting.Warfare };
         static List<QuestModel> _lista;
         static List<HeroModel> _herois;

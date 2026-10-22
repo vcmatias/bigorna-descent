@@ -177,12 +177,12 @@ function Get-ModVersion {
 # ------------------------------------------------------------------ editor
 
 # o editor do pacote (o mesmo que vai dentro da DLL) na pasta Editor, para o atalho funcionar desde ja
-# a lingua escolhida aqui vale para o mod (bigorna-idioma.txt, lido no jogo) e para o editor (bigorna-idioma.js, ao lado dele)
+# a lingua escolhida aqui vale para o instalador e, ate o jogo abrir, para o editor (bigorna-idioma.js, ao lado dele); o mod
+# segue sempre a lingua do jogo (e passa a dele ao editor)
 function Save-Language {
     try {
         $utf8 = New-Object System.Text.UTF8Encoding($false)
         New-Item -ItemType Directory -Force -Path (Get-EditorFolder) | Out-Null
-        [IO.File]::WriteAllText((Join-Path (Get-DataFolder) 'bigorna-idioma.txt'), $Lang, $utf8)
         [IO.File]::WriteAllText((Join-Path (Get-EditorFolder) 'bigorna-idioma.js'), "window.BIGORNA_IDIOMA = `"$Lang`";`n", $utf8)
         Log ('idioma do mod e do editor: ' + $Lang)
     } catch { Log ('ERRO gravando o idioma: ' + $_.Exception.Message) }
@@ -196,8 +196,16 @@ function Install-Editor {
     Copy-Item -LiteralPath $src (Get-EditorFile) -Force
     try { Unblock-File -LiteralPath (Get-EditorFile) -ErrorAction SilentlyContinue } catch { }
     Log ('Bigorna-Salas.html -> ' + (Get-EditorFile))
+    # o aplicativo Bigorna Editor (a janela do editor, que grava a Oficina e os mapas nos arquivos sem pedir) vem dentro da
+    # DLL: o mod o instala em AppData\Local\Bigorna\App na tela de titulo, no mesmo passo em que le o jogo para o editor.
+    # Sai so a copia de teste da 0.2.0, que ficava na pasta Editor
+    foreach ($n in @('Bigorna Editor.exe', 'Microsoft.Web.WebView2.Core.dll', 'Microsoft.Web.WebView2.WinForms.dll', 'WebView2Loader.dll')) {
+        $v = Join-Path (Get-EditorFolder) $n; if (Test-Path -LiteralPath $v) { try { Remove-Item -LiteralPath $v -Force } catch { } }
+    }
     return $true
 }
+function Get-AppFolder { return (Join-Path (Join-Path $env:LOCALAPPDATA 'Bigorna') 'App') }
+function Get-AppFile { return (Join-Path (Get-AppFolder) 'Bigorna Editor.exe') }
 
 function Get-EditorReady {
     $ed = Get-EditorFolder
@@ -240,20 +248,28 @@ function Start-Game([string]$game) {
 function Get-ShortcutPath {
     $desk = [Environment]::GetFolderPath('Desktop')
     if (-not $desk) { return $null }
+    if (Test-Path -LiteralPath (Get-AppFile)) { return (Join-Path $desk 'Bigorna Editor.lnk') }
     return (Join-Path $desk 'Bigorna Rooms.url')
 }
 
-# um atalho de internet (arquivo de texto) para o editor, que abre no navegador padrao
+# o atalho do editor: o aplicativo Bigorna Editor (ou, sem ele, um atalho de internet que abre o editor no navegador padrao)
 function New-Shortcut {
     $p = Get-ShortcutPath; if (-not $p) { return }
-    $url = 'file:///' + ((Get-EditorFile) -replace '\\', '/')
-    [IO.File]::WriteAllText($p, "[InternetShortcut]`r`nURL=$url`r`n")
+    $velho = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Bigorna Rooms.url'
+    if ($p -like '*.lnk') {
+        $w = New-Object -ComObject WScript.Shell; $l = $w.CreateShortcut($p)
+        $l.TargetPath = (Get-AppFile); $l.Arguments = '--editor "' + (Get-EditorFolder) + '"'; $l.WorkingDirectory = (Get-AppFolder); $l.IconLocation = (Get-AppFile) + ',0'; $l.Description = 'Bigorna Editor'; $l.Save()
+        if (Test-Path -LiteralPath $velho) { Remove-Item -LiteralPath $velho -Force }
+    } else {
+        $url = 'file:///' + ((Get-EditorFile) -replace '\\', '/')
+        [IO.File]::WriteAllText($p, "[InternetShortcut]`r`nURL=$url`r`n")
+    }
     Log (L "Atalho criado: $p" "Shortcut created: $p")
 }
 
 function Remove-Shortcut {
-    $p = Get-ShortcutPath
-    if ($p -and (Test-Path -LiteralPath $p)) { Remove-Item -LiteralPath $p -Force; Log (L 'Atalho removido.' 'Shortcut removed.') }
+    $desk = [Environment]::GetFolderPath('Desktop'); if (-not $desk) { return }
+    foreach ($n in @('Bigorna Editor.lnk', 'Bigorna Rooms.url')) { $p = Join-Path $desk $n; if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force; Log (L 'Atalho removido.' 'Shortcut removed.') } }
 }
 
 function Restart-AsAdmin([string[]]$extra) {

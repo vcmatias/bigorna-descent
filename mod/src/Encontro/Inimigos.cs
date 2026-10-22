@@ -161,7 +161,7 @@ namespace Bigorna.Encontro
             if (Balanceado.FigurasLivres(modelo.Type, new Dictionary<EnemyTypes, int>()) + 1 <= 0)
             {
                 Log.Info("  " + e.Id + ": sem miniatura livre de " + modelo.Type + "; não entra");
-                Dialogos.Mensagem(Idioma.T("Todas as miniaturas de <b>" + NomeDe(modelo) + "</b> já estão no tabuleiro: este não entra.", "All the <b>" + NomeDe(modelo) + "</b> miniatures are already on the board: this one does not enter."), null, Idioma.T("Inimigo", "Enemy"));
+                Dialogos.Mensagem(Idioma.TF("Todas as miniaturas de <b>{0}</b> já estão no tabuleiro: este não entra.", "All the <b>{0}</b> miniatures are already on the board: this one does not enter.", NomeDe(modelo)), null, Idioma.T("Inimigo", "Enemy"));
                 yield break;
             }
             if (e.Pos != null && e.Pos.Length >= 2 && Tabuleiro.CasaSemChao(e.Pos[0], e.Pos[1])) { Log.Info("  " + e.Id + ": a casa " + e.Pos[0] + "," + e.Pos[1] + " saiu da mesa com a sala dela; não entra"); yield break; }
@@ -179,6 +179,7 @@ namespace Bigorna.Encontro
             SerializedEnemy inimigo;
             try
             {
+                try { TextosDeMissao.Repor(modelo); } catch { }      // o nome e a defesa de um monstro de missão oficial
                 inimigo = gc.CreateEnemy(modelo, tier);
                 inimigo.SpawnPositions.AddUniqueItem(pos);
                 inimigo.PlasticId = CorLivre(modelo.Type);
@@ -221,11 +222,11 @@ namespace Bigorna.Encontro
             catch (Exception ex) { Log.Info("  figura de " + e.Id + ": " + ex.Message); }
 
             var nome = NomeDe(modelo);
-            var cor = NomeCor(inimigo.PlasticId);
-            Log.Info("  entra " + e.Id + " (" + modelo.Type + ") em " + Jogo.Casa(pos) + (string.IsNullOrEmpty(e.Grupo) ? "" : " [grupo " + e.Grupo + "]") + " · base " + cor);
+            var cor = NomeCor(inimigo.PlasticId); var corLog = NomeCor(inimigo.PlasticId, true);
+            Log.Info("  entra " + e.Id + " (" + modelo.Type + ") em " + Jogo.Casa(pos) + (string.IsNullOrEmpty(e.Grupo) ? "" : " [grupo " + e.Grupo + "]") + " · base " + corLog);
             bool fechou = false;
-            Dialogos.Mensagem((grandes != null ? (Idioma.Pt ? "Coloquem <b>" + nome + "</b>, um monstro grande, nas quatro casas marcadas, base " + cor + "." : "Place <b>" + nome + "</b>, a large monster, on the four marked spaces, " + NomeCor(inimigo.PlasticId, false) + " base.")
-                : Idioma.Pt ? "Coloquem <b>" + nome + "</b> na casa marcada (" + Jogo.Casa(pos) + "), base " + cor + "." : "Place <b>" + nome + "</b> on the marked space (" + Jogo.Casa(pos) + "), " + NomeCor(inimigo.PlasticId, false) + " base.") + (string.IsNullOrEmpty(e.Texto) ? "" : "\n\n" + e.Texto), () => fechou = true, Idioma.T("Inimigo", "Enemy"));
+            Dialogos.Mensagem((grandes != null ? Idioma.TF("Coloquem <b>{0}</b>, um monstro grande, nas quatro casas marcadas, base {1}.", "Place <b>{0}</b>, a large monster, on the four marked spaces, {1} base.", nome, cor)
+                : Idioma.TF("Coloquem <b>{0}</b> na casa marcada ({1}), base {2}.", "Place <b>{0}</b> on the marked space ({1}), {2} base.", nome, Jogo.Casa(pos), cor)) + (string.IsNullOrEmpty(e.Texto) ? "" : "\n\n" + e.Texto), () => fechou = true, Idioma.T("Inimigo", "Enemy"));
             limite = Time.unscaledTime + 180f;
             while (!fechou && Time.unscaledTime < limite) yield return null;
             while (Jogo.Salvando) yield return null;
@@ -329,23 +330,17 @@ namespace Bigorna.Encontro
             catch (Exception ex) { Log.Info("  pintando a figura: " + ex.Message); }
         }
 
-        static string NomeCor(PlasticIds id, bool pt = true)
+        /// <summary>A cor da base, na lingua do mod (para o registro, em portugues).</summary>
+        static string NomeCor(PlasticIds id, bool registro = false)
         {
-            if (!pt)
-                switch (id)
-                {
-                    case PlasticIds.Orange: return "orange";
-                    case PlasticIds.Green: return "green";
-                    case PlasticIds.Yellow: return "yellow";
-                    case PlasticIds.Purple: return "purple";
-                    default: return id.ToString().ToLowerInvariant();
-                }
+            Func<string, string, string> t = registro ? (Func<string, string, string>)((pt, en) => pt) : Idioma.T;
             switch (id)
             {
-                case PlasticIds.Orange: return "laranja";
-                case PlasticIds.Green: return "verde";
-                case PlasticIds.Yellow: return "amarela";
-                case PlasticIds.Purple: return "roxa";
+                case PlasticIds.Orange: return t("laranja", "orange");
+                case PlasticIds.Green: return t("verde", "green");
+                case PlasticIds.Yellow: return t("amarela", "yellow");
+                case PlasticIds.Purple: return t("roxa", "purple");
+                case PlasticIds.Unique: return t("única", "unique");
                 default: return id.ToString().ToLowerInvariant();
             }
         }

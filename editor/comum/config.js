@@ -3,6 +3,47 @@
    of Descent). Uses the File System Access API (Chrome/Edge); the chosen folder handle
    is kept in the browser's IndexedDB. Without a folder, or in a browser without the
    API, the file is downloaded as usual. */
+/* Bigorna Editor (the Windows app, app/): the editor runs at https://bigorna.app/ and the app gives it the files of the game's
+   data folder (CustomMaps, Pacotes, Editor), with nothing to allow: GET /api/ler, POST /api/gravar, GET /api/lista, POST
+   /api/apagar (paths relative to that folder). In a plain browser, Arquivos.ativo is false and nothing here is used. */
+const Arquivos = (() => {
+  const ativo = typeof location !== 'undefined' && location.protocol === 'https:' && location.host === 'bigorna.app';
+  const url = (acao, c) => '/api/' + acao + (c != null ? '?c=' + encodeURIComponent(c) : '');
+  async function ler(c, como = 'text') {
+    const r = await fetch(url('ler', c), { cache: 'no-store' }); if (r.status === 404) return null;
+    if (!r.ok) throw new Error(await r.text());
+    return como === 'blob' ? r.blob() : como === 'json' ? r.json() : r.text();
+  }
+  /* (the body goes as bytes in memory: a Blob or a stream may reach the app without its contents; the app answers the size it
+     wrote, checked here) */
+  async function gravar(c, dados) {
+    const corpo = dados instanceof Blob ? new Uint8Array(await dados.arrayBuffer()) : typeof dados === 'string' ? new TextEncoder().encode(dados) : dados instanceof ArrayBuffer ? new Uint8Array(dados) : dados;
+    const r = await fetch(url('gravar', c), { method: 'POST', body: corpo }); if (!r.ok) throw new Error(await r.text());
+    const j = await r.json(); if (corpo && corpo.byteLength !== undefined && j.tam !== corpo.byteLength) throw new Error('the app wrote ' + j.tam + ' of ' + corpo.byteLength + ' bytes of ' + c);
+    return j;
+  }
+  async function lista(c) { try { const r = await fetch(url('lista', c), { cache: 'no-store' }); return r.ok ? await r.json() : []; } catch { return []; } }
+  async function apagar(c) { const r = await fetch(url('apagar', c), { method: 'POST' }); if (!r.ok) throw new Error(await r.text()); }
+  return { ativo, ler, gravar, lista, apagar };
+})();
+/* a folder of the app looking like a folder the browser gave (FileSystemDirectoryHandle): what the export, the autosave
+   and "Files in the folder" do with the CustomMaps folder works the same, with no permission to ask */
+class PastaApp {
+  constructor(rel, nome) { this.rel = rel; this.name = nome; this.kind = 'directory'; }
+  async queryPermission() { return 'granted'; }
+  async requestPermission() { return 'granted'; }
+  async _tem(n, pasta) { return (await Arquivos.lista(this.rel)).some(x => x.nome === n && !!x.pasta === pasta); }
+  async getDirectoryHandle(n, o = {}) { if (!o.create && !(await this._tem(n, true))) throw new DOMException(n, 'NotFoundError'); return new PastaApp(this.rel + '/' + n, n); }
+  async getFileHandle(n, o = {}) { if (!o.create && !(await this._tem(n, false))) throw new DOMException(n, 'NotFoundError'); return new ArquivoApp(this.rel + '/' + n, n); }
+  async removeEntry(n) { await Arquivos.apagar(this.rel + '/' + n); }
+  async *entries() { for (const x of await Arquivos.lista(this.rel)) yield [x.nome, x.pasta ? new PastaApp(this.rel + '/' + x.nome, x.nome) : new ArquivoApp(this.rel + '/' + x.nome, x.nome, x)]; }
+}
+class ArquivoApp {
+  constructor(rel, nome, info) { this.rel = rel; this.name = nome; this.kind = 'file'; this.info = info; }
+  async getFile() { const b = (await Arquivos.ler(this.rel, 'blob')) || new Blob([]); return new File([b], this.name, { lastModified: this.info?.quando || Date.now() }); }
+  async createWritable() { const partes = []; const rel = this.rel; return { write: async d => { partes.push(d); }, close: async () => { await Arquivos.gravar(rel, new Blob(partes)); } }; }
+}
+
 const Config = (() => {
   const BD = 'bigorna-config', LOJA = 'chaves';
   let pasta = null;        // FileSystemDirectoryHandle
@@ -24,21 +65,22 @@ const Config = (() => {
     catch (e) { console.warn('config: could not save', e); }
   }
 
-  const suportado = () => typeof window.showDirectoryPicker === 'function';
+  const suportado = () => Arquivos.ativo || typeof window.showDirectoryPicker === 'function';
 
   async function carregar() {
-    if (!pronto) pronto = (async () => { const h = await ler('pastaExport'); if (h && typeof h.queryPermission === 'function') pasta = h; })();
+    if (!pronto) pronto = (async () => { if (Arquivos.ativo) { pasta = new PastaApp('CustomMaps', 'CustomMaps'); return; } const h = await ler('pastaExport'); if (h && typeof h.queryPermission === 'function') pasta = h; })();
     return pronto;
   }
 
   async function escolherPasta() {
+    if (Arquivos.ativo) { pasta = new PastaApp('CustomMaps', 'CustomMaps'); return pasta.name; }   // (the app: always the game's CustomMaps)
     if (!suportado()) throw new Error('This browser does not let the page write into a folder. Use Chrome or Edge.');
     const h = await window.showDirectoryPicker({ mode: 'readwrite', id: 'bigorna-custommaps', startIn: 'documents' });
     pasta = h; await gravar('pastaExport', h);
     return h.name;
   }
 
-  async function limparPasta() { pasta = null; await gravar('pastaExport', undefined); }
+  async function limparPasta() { if (Arquivos.ativo) return; pasta = null; await gravar('pastaExport', undefined); }
 
   async function temPermissao(pedir) {
     if (!pasta) return false;
@@ -55,18 +97,20 @@ const Config = (() => {
     a.href = URL.createObjectURL(b); a.download = nome; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
 
-  /* Exporta: grava na pasta escolhida, ou baixa. Devolve {onde:'pasta'|'download', nome, pasta}. */
+  /* Exporta: grava na pasta escolhida, ou baixa. Devolve {onde:'pasta'|'download', nome, pasta}. O texto pode ser uma funcao
+     (async) do destino ('pasta' ou 'download'): o arquivo baixado sozinho leva as imagens dentro (v240) */
   async function exportar(nome, texto, subpasta) {
     await carregar();
+    const de = async onde => typeof texto === 'function' ? texto(onde) : texto;
     if (pasta && await temPermissao(true)) {
       try {
         const alvo = subpasta ? await pasta.getDirectoryHandle(subpasta, { create: true }) : pasta;
         const arq = await alvo.getFileHandle(nome, { create: true });
-        const w = await arq.createWritable(); await w.write(texto); await w.close();
+        const w = await arq.createWritable(); await w.write(await de('pasta')); await w.close();
         return { onde: 'pasta', nome, pasta: pasta.name + (subpasta ? '\\' + subpasta : '') };
       } catch (e) { console.warn('config: could not write into the folder, downloading instead', e); }
     }
-    baixar(nome, texto);
+    baixar(nome, await de('download'));
     return { onde: 'download', nome };
   }
 
@@ -118,10 +162,13 @@ const Config = (() => {
       const secoes = extras ? [...new Set(extras.filter(x => !x.campo && !x.opcoes).map(x => x.secao || 'Work in progress'))] : [];
       const botoesDe = sec => `<div style="display:flex;gap:8px;flex-wrap:wrap">${extras.map((x, i) => x.campo || x.opcoes || (x.secao || 'Work in progress') !== sec ? '' : `<button data-extra="${i}" style="${b}">${x.rotulo}</button>`).join('')}</div>
         <p style="margin:6px 0 0;color:#a89b88;font-size:12px">${extras.filter(x => !x.campo && !x.opcoes && (x.secao || 'Work in progress') === sec).map(x => x.ajuda || '').filter(Boolean).join(' ')}</p>`;
-      const pastaCorpo = `
+      const pastaCorpo = Arquivos.ativo ? `
+        <p style="margin:0 0 8px">In the Bigorna Editor app, exported files go straight into the game's <b>CustomMaps</b> folder, and the Workshop is kept in the <b>Pacotes</b> folder, next to it.</p>
+        <label style="display:flex;gap:8px;align-items:center;margin:0 0 8px;cursor:pointer"><input type="checkbox" id="cfgAuto" ${autoSalvar() ? 'checked' : ''}> Autosave: keep the files in <b>CustomMaps</b> up to date as you work (no need to export)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="cfgArquivos" style="${b}" title="Everything in the folder (maps, campaigns and their folders), with the option to delete">Files in the folder…</button><button id="cfgEscolher" hidden></button></div>` : `
         <p style="margin:0 0 8px">${pasta ? 'Exported files go straight into <b>' + pasta.name + '</b>.' : 'No folder chosen: exported files are downloaded, and the game (with the mod) brings them from Downloads into its maps list by itself. Choosing the folder is only needed for autosave and the list of files.'}</p>
         ${pasta ? `<label style="display:flex;gap:8px;align-items:center;margin:0 0 8px;cursor:pointer"><input type="checkbox" id="cfgAuto" ${autoSalvar() ? 'checked' : ''}> Autosave: keep the files in <b>${pasta.name}</b> up to date as you work (no need to export)</label>` : ''}
-        <p style="margin:0 0 12px;color:#a89b88;font-size:12px">The maps folder of Descent is <code>C:\\Users\\&lt;you&gt;\\AppData\\LocalLow\\Fantasy Flight Games\\Descent - Legends of the Dark\\CustomMaps</code>. The AppData folder is hidden: paste that path into the address bar of the folder picker.${suportado() ? '' : '<br><b>This browser cannot write into folders; use Chrome or Edge.</b>'}</p>
+        <p style="margin:0 0 12px;color:#a89b88;font-size:12px">The maps folder of Descent is <code>C:\\Users\\&lt;${typeof L2 === 'function' ? L2('you', 'você') : 'you'}&gt;\\AppData\\LocalLow\\Fantasy Flight Games\\Descent - Legends of the Dark\\CustomMaps</code>. The AppData folder is hidden: paste that path into the address bar of the folder picker.${suportado() ? '' : '<br><b>This browser cannot write into folders; use Chrome or Edge.</b>'}</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button id="cfgEscolher" style="${b};background:#d98a2b;color:#1d1a17;font-weight:600" ${suportado() ? '' : 'disabled'}>${pasta ? 'Change folder…' : 'Choose folder…'}</button>
           ${pasta ? `<button id="cfgArquivos" style="${b}" title="Everything in the folder (maps, campaigns and their folders), with the option to delete">Files in the folder…</button><button id="cfgLimpar" style="${b}">Download instead</button>` : ''}
@@ -149,7 +196,7 @@ const Config = (() => {
       const ca = cx.querySelector('#cfgAuto'); if (ca) ca.onchange = async () => { porAutoSalvar(ca.checked); if (ca.checked) await temPermissao(true); aoMudar && aoMudar(); };
       const l = cx.querySelector('#cfgLimpar'); if (l) l.onclick = async () => { await limparPasta(); pintar(); aoMudar && aoMudar(); };
       const ar = cx.querySelector('#cfgArquivos'); if (ar) ar.onclick = () => arquivos();
-      cx.querySelector('#cfgCopiar').onclick = async () => {
+      const cc = cx.querySelector('#cfgCopiar'); if (cc) cc.onclick = async () => {
         const caminho = '%USERPROFILE%\\AppData\\LocalLow\\Fantasy Flight Games\\Descent - Legends of the Dark\\CustomMaps';
         try { await navigator.clipboard.writeText(caminho); cx.querySelector('#cfgErro').style.color = '#6cbf6c'; cx.querySelector('#cfgErro').textContent = 'Copied: ' + caminho + ' (paste it in the Explorer address bar).'; }
         catch (e) { cx.querySelector('#cfgErro').textContent = 'Could not copy: ' + (e.message || e); }
@@ -213,5 +260,25 @@ const Config = (() => {
 
   /* binary files the editor keeps for the work (the custom music): kept in IndexedDB, like the folder handle */
   const guardarBlob = (chave, blob) => gravar(chave, blob), lerBlob = chave => ler(chave);
-  return { guardarBlob, lerBlob, carregar, escolherPasta, limparPasta, exportar, gravarQuieto, apagarQuieto, autoSalvar, porAutoSalvar, permissao, nomePasta, pastaAtual, abrirDialogo, suportado };
+  /* several keys in one transaction: read (key -> value), the keys that start with a prefix, delete several */
+  async function lerVarios(chaves) {
+    const r = new Map(); if (!chaves.length) return r;
+    try { const bd = await abrirBD(); await new Promise((ok, erro) => { const t = bd.transaction(LOJA, 'readonly'); const o = t.objectStore(LOJA); chaves.forEach(k => { const q = o.get(k); q.onsuccess = () => { if (q.result !== undefined) r.set(k, q.result); }; }); t.oncomplete = () => ok(); t.onerror = () => erro(t.error); }); }
+    catch { } return r;
+  }
+  async function chavesCom(prefixo) {
+    try { const bd = await abrirBD(); return await new Promise((ok, erro) => { const q = bd.transaction(LOJA, 'readonly').objectStore(LOJA).getAllKeys(IDBKeyRange.bound(prefixo, prefixo + '\uffff')); q.onsuccess = () => ok(q.result || []); q.onerror = () => erro(q.error); }); }
+    catch { return []; }
+  }
+  async function gravarVarios(pares) {
+    if (!pares.length) return;
+    try { const bd = await abrirBD(); await new Promise((ok, erro) => { const t = bd.transaction(LOJA, 'readwrite'); const o = t.objectStore(LOJA); pares.forEach(([k, v]) => o.put(v, k)); t.oncomplete = () => ok(); t.onerror = () => erro(t.error); }); }
+    catch (e) { console.warn('config: could not save', e); throw e; }
+  }
+  async function apagarVarios(chaves) {
+    if (!chaves.length) return;
+    try { const bd = await abrirBD(); await new Promise((ok, erro) => { const t = bd.transaction(LOJA, 'readwrite'); const o = t.objectStore(LOJA); chaves.forEach(k => o.delete(k)); t.oncomplete = () => ok(); t.onerror = () => erro(t.error); }); }
+    catch { }
+  }
+  return { guardarBlob, lerBlob, lerVarios, gravarVarios, chavesCom, apagarVarios, carregar, escolherPasta, limparPasta, exportar, gravarQuieto, apagarQuieto, autoSalvar, porAutoSalvar, permissao, nomePasta, pastaAtual, abrirDialogo, suportado };
 })();

@@ -28,7 +28,7 @@ const FERRAMENTAS = [
 ];
 function renderFaixa() {
   const el = $('#faixa'); const semSala = salaAtual < 0 || !!escolha || vista3d.on;
-  el.innerHTML = `<div class="grupo"><div class="botoes">${FERRAMENTAS.map(([id, nome, letra, ajuda]) => { const off = id === 'heroi' && salaAtual !== 0; return `<button data-f="${id}" class="fer ${ferramenta === id ? 'ativo' : ''}" ${semSala || off ? 'disabled' : ''} title="${esc(ajuda)} (${letra})"><span class="ico"><img src="${icone(id === 'peca' ? 'Tile' : id === 'heroi' ? 'Hero' : id === 'objeto' ? 'Chest' : id === 'inimigo' ? 'Enemy' : id === 'pilar' ? 'PillarObj' : 'Delete', '#f3cf8f', null)}" alt=""></span><span class="rot"><u>${letra}</u>${nome.slice(1)}</span></button>` + (id === 'pilar' ? `<button id="fxContas" class="fer" ${vista3d.on ? 'disabled' : ''} title="Every counter of the map (keys found, levers pulled…): create them, set where they start, see what adds to them and what waits for them"><span class="ico"><img src="${icone('Counter', '#f3cf8f', null)}" alt=""></span><span class="rot">Counts${contadoresDoMapa().length ? ' <span class="etq">' + contadoresDoMapa().length + '</span>' : ''}</span></button>` : ''); }).join('')}</div><div class="legenda">Place · Esc selects</div></div>
+  el.innerHTML = `<div class="grupo"><div class="botoes">${FERRAMENTAS.map(([id, nome, letra, ajuda]) => { const off = id === 'heroi' && salaAtual !== 0; return `<button data-f="${id}" class="fer ${ferramenta === id ? 'ativo' : ''}" ${semSala || off ? 'disabled' : ''} title="${esc(ajuda)} (${letra})"><span class="ico"><img loading="lazy" decoding="async" ${imgTardia(icone(id === 'peca' ? 'Tile' : id === 'heroi' ? 'Hero' : id === 'objeto' ? 'Chest' : id === 'inimigo' ? 'Enemy' : id === 'pilar' ? 'PillarObj' : 'Delete', '#f3cf8f', null))} alt=""></span><span class="rot"><u>${letra}</u>${nome.slice(1)}</span></button>` + (id === 'pilar' ? `<button id="fxContas" class="fer" ${vista3d.on ? 'disabled' : ''} title="Every counter of the map (keys found, levers pulled…): create them, set where they start, see what adds to them and what waits for them"><span class="ico"><img loading="lazy" decoding="async" ${imgTardia(icone('Counter', '#f3cf8f', null))} alt=""></span><span class="rot">Counts${contadoresDoMapa().length ? ' <span class="etq">' + contadoresDoMapa().length + '</span>' : ''}</span></button>` : ''); }).join('')}</div><div class="legenda">Place · Esc selects</div></div>
     <div class="grupo"><div class="botoes"><button id="fxRot" title="Rotate the selection or the piece in hand (R)" ${semSala ? 'disabled' : ''}>↻ Rotate</button><button id="fxCopiar" title="Copy the selection (Ctrl+C), then paste it with Ctrl+V: a click places each copy" ${!sel || !['objeto', 'inimigo'].includes(sel.tipo) ? 'disabled' : ''}>⧉ Copy</button><button id="fxColar" title="Paste the copied piece (Ctrl+V): click where it goes" ${!areaCopia || semSala ? 'disabled' : ''}>📋 Paste</button></div><div class="legenda">Edit</div></div>
     <div class="grupo"><div class="botoes niveis">${[0, 1, 2, 3, 4, 5, 6].map(l => `<button data-nv="${l}" class="${nivel === l ? 'ativo' : ''}" ${l > nivelMaximoLiberado() ? 'disabled' : ''} title="${l > 3 && l > nivelMaximoLiberado() ? 'Levels 4 to 6 open once something stands at level 3 (the game box of Act I, a tile at level 3)' : 'Level you work on (PageUp / PageDown): new pieces go there and only what is on it can be picked'}">${l}</button>`).join('')}</div><div class="legenda">Level ${nivel > 0 ? '· only level ' + nivel + ' is editable' : '· floor'}</div></div>
     <div class="grupo"><div class="botoes"><button id="fxMenos" title="Zoom out (−)">−</button><button id="fxMais" title="Zoom in (+)">+</button><button id="fxEnq" title="Fit the map in view">⤢ Fit</button><button id="fx3d" class="${vista3d.on ? 'ativo' : ''}" title="Turn the map in three dimensions to see the layers (3). Looking only: go back to the plan to edit.">◈ 3D</button></div><div class="legenda">${vista3d.on ? 'View · drag moves · right-drag turns' : 'View · drag to pan · wheel zooms'}</div></div>
@@ -145,7 +145,7 @@ function renderSalas() {
     const d = document.createElement('div'); d.className = 'sala' + (i === salaAtual ? ' ativa' : '') + (s._previa ? ' previa' : '');
     const probs = problemasDaSala(i); const abre = abridoresDe(i);
     d.innerHTML = `<span class="n">${i + 1}</span><div><div><span data-sem-traducao>${esc(s.nome)}</span>${s._previa ? ' <span class="etq">preview · not added yet</span>' : ''}</div><small>${s.pecas.length} tiles · ${s.objetos.length} objects · ${inimigosDaSala(s).length} monsters${abre.length ? ' · opened by ' + abre.map(x => '“' + esc(rotulo(x.o)) + '”').join(', ') : ''}</small></div><span class="${probs.length ? 'falta' : 'ok'}" title="${esc(probs.join('; '))}">${probs.length ? '!' : '✓'}</span>`;
-    d.onclick = () => { if (vista3d.on) return focar3d(i); salaAtual = i; sel = null; ferramenta = null; tudo(); enquadrarSala(i); };
+    d.onclick = () => { if (vista3d.on) return focar3d(i); salaAtual = i; sel = null; ferramenta = null; destaqueSala = s._previa ? null : i; modoMoverSala = null; tudo(); enquadrarSala(i); };
     el.appendChild(d);
   });
   const b = $('#btnNovaSala'); b.hidden = projeto.salas.length > 0;
@@ -163,7 +163,7 @@ const DICAS = [
   { id: 'pecaUnica', texto: 'A room is one set of tiles: the same physical tile appears only once in it (sides A and B are the same piece). Reusing a tile in a later room takes the earlier room off the table.', feita: () => projeto.salas.length >= 3 },
   { id: 'niveis', texto: 'Tiles can stand at levels 1, 2 and 3 (the level buttons) on <b>pillars (P)</b>; the app counts the pillars your boxes have.', feita: () => projeto.salas.some(s => s.pecas.some(p => (p.level || 0) > 0)) },
   { id: 'contagem', texto: '<b>Counts</b> keep a number during the map (keys found, seals broken): triggers add to it, and a map objective can wait for the total.', feita: () => (projeto.contadores || []).length > 0 },
-  { id: 'exportar', texto: '<b>Export map</b> writes the .dmap: into the folder chosen in ⚙, or into Downloads, from where the game (with the mod) brings it by itself; in the game, “Mapas da comunidade” lists it.', feita: () => jaVisto('dica:exportar') },
+  { id: 'exportar', texto: '<b>Export map</b> writes the .dmap: into the folder chosen in ⚙, or into Downloads, from where the game (with the mod) brings it by itself; in the game, “Community maps” lists it.', feita: () => jaVisto('dica:exportar') },
   { id: 'campanha', texto: '<b>Start a campaign</b> to chain maps on the world map, with scenes, choices and rewards between them.', feita: () => !!campanha },
   // (the tour of the whole editor: one hint per part, gone once the part is opened)
   { id: 'gerarSala', texto: '<b>✦ Generate room</b> builds a room for you from an archetype: click the object that will open it, pick among the candidates, place it and use it.', feita: () => jaVisto('dica:gerarSala') },
@@ -210,6 +210,7 @@ const DICAS = [
   { id: 'gat-sound', texto: 'Trigger <b>Play a sound</b>: a sound effect of the game or your own file: a scream, a bell, the rumble of the collapse.', feita: () => usouGatilho('sound') },
   { id: 'gat-item_pool', texto: 'Trigger <b>Change the item pool</b>: adds an item to (or removes one from) the pool the random loot comes from, for the rest of the map.', feita: () => usouGatilho('item_pool') },
   { id: 'gat-reserve', texto: 'Trigger <b>Change the spawn pool</b>: adds a monster to (or removes one from) the spawn pool, for the rest of the map: the villain calls new allies.', feita: () => usouGatilho('reserve') },
+  { id: 'gat-shop', texto: 'Trigger <b>Shop / Armory / Crafting</b>: the party visits a shop, an armory or the crafting workshop in the middle of the map, as in the city, then goes on: a merchant in the camp, a smith at the outpost.', feita: () => usouGatilho('shop') || usouGatilho('armory') || usouGatilho('craft') },
   { id: 'gat-end_map', texto: 'Trigger <b>End the map</b>: ends the map on the spot, in victory or in defeat: the villain escaped, the time ran out.', feita: () => usouGatilho('end_map') },
 ];
 /* a trigger kind the map already uses (kept once seen, so its hint stays gone) */
@@ -238,7 +239,7 @@ function renderConferencia() {
   if ((projeto.meta.notasImportacao || []).length) itens.push(['ok', 'Converted from an original map: ' + projeto.meta.notasImportacao.length + ' import note(s) in Map setup (warning).']);
   (projeto.contadores || []).forEach(c => {
     if (c.conta === 'monstros' && c.monstro && !monstro(c.monstro)) itens.push(['falta', 'Counter “' + c.nome + '” counts a monster that is no longer in the workshop (Counts button).']);
-    if (c.conta && !(+c.total > 0) && !totalAutomatico(c.nome) && ((c.gatilhos || []).length || c.missao)) itens.push(['falta', 'Counter “' + c.nome + '” counts ' + (c.conta === 'rodadas' ? 'rounds' : 'monsters') + ' by itself: set its Total (Counts button).']);
+    if (c.conta && !(+c.meta > 0) && !totalAutomatico(c.nome) && ((c.gatilhos || []).length || c.missao)) itens.push(['falta', 'Counter “' + c.nome + '” counts ' + (c.conta === 'rodadas' ? 'rounds' : 'monsters') + ' by itself: pick the number its objective waits for (Counts button).']);
   });
   pecasSemApoio().forEach(({ p, si }) => itens.push(['falta', 'Room ' + (si + 1) + ': tile ' + nomePeca(p.tile) + ' is elevated (level ' + p.level + ') with no pillars.']));
   const n = contagemPilares(); Object.keys(SUPORTES).forEach(k => { if (n[k] > caixaDoPilar(k)) itens.push(['falta', n[k] + ' ' + SUPORTES[k].nome.toLowerCase() + 's; the boxes have ' + caixaDoPilar(k) + ' (' + SUPORTES[k].porAto + ').']); });
@@ -312,26 +313,26 @@ function renderPaleta() {
       const noutra = !usada && projeto.salas.some((sl, si) => si !== salaAtual && sl.pecas.some(p => numeroDaPeca(p.tile) === numeroDaPeca(t.id)));
       if (usada) dv.classList.add('usada'); if (noutra) dv.classList.add('noutra');
       dv.title = usada ? 'Tile ' + numeroDaPeca(t.id) + ' is already in this room (side A or B)' : noutra ? 'Tile ' + numeroDaPeca(t.id) + ' is in another room: reusing it here needs that room removed first' : t.w + '×' + t.h;
-      dv.innerHTML = `<img src="${miniatura(t)}" alt=""><div>${t.id.toUpperCase()} <small>${t.w}×${t.h}${t.act === 2 ? ' · II' : ''}</small></div>`;
+      dv.innerHTML = `<img loading="lazy" decoding="async" ${imgTardia(miniatura(t))} alt=""><div>${t.id.toUpperCase()} <small>${t.w}×${t.h}${t.act === 2 ? ' · II' : ''}</small></div>`;
       dv.onclick = () => { if (usada && typeof Tutorial !== 'undefined' && Tutorial.ativo() && Tutorial.explicar('pecas-mesma-sala')) return; if (usada) aviso('Tile ' + numeroDaPeca(t.id) + ' is already in this room: laid again, it can only mark where that tile moves to (“Move the tile”).'); pecaEscolhida = t.id; renderPaleta(); }; g.appendChild(dv);
     });
     const vs = oficina().pecas.filter(v => !v.underlay); if (vs.length) { const st = document.createElement('div'); st.className = 'subtitulo'; st.textContent = 'Workshop tiles (made in the Workshop)'; g.after(st); const gv = document.createElement('div'); gv.className = 'grade'; st.after(gv);
-      vs.forEach(v => { const t = defPeca(v.id); if (!t) return; const dv = document.createElement('div'); dv.className = 'item' + (v.id === pecaEscolhida ? ' ativo' : '');
-        const usada = projeto.salas[salaAtual].pecas.some(p => numeroDaPeca(p.tile) === numeroDaPeca(v.id)); if (usada) dv.classList.add('usada');
-        dv.innerHTML = `<img src="${miniatura(t, v)}" alt=""><div>${esc(v.nome)} <small>${t.w}×${t.h} · ${t.cells.length} sq.</small></div>`;
+      aosPoucos(gv, vs, v => { const t = defPeca(v.id); if (!t) return; const dv = document.createElement('div'); dv.className = 'item' + (v.id === pecaEscolhida ? ' ativo' : '');
+        const nEsta = projeto.salas[salaAtual].pecas.filter(p => numeroDaPeca(p.tile) === numeroDaPeca(v.id)).length, cx = caixaDaPeca(numeroDaPeca(v.id)); const usada = nEsta >= cx; if (usada) dv.classList.add('usada');
+        dv.innerHTML = `<img loading="lazy" decoding="async" ${imgTardia(miniatura(t, v))} alt=""><div>${esc(v.nome)} <small>${t.w}×${t.h} · ${t.cells.length} sq.${cx > 1 || nEsta ? ` · <b class="${usada ? 'esgotado' : ''}">${nEsta}/${cx}</b>` : ''}</small></div>`;
         const noutra = !usada && projeto.salas.some((sl, si) => si !== salaAtual && sl.pecas.some(p => p.tile === v.id)); if (noutra) dv.classList.add('noutra');
-        dv.onclick = () => { if (usada) return aviso(v.nome + ' is already in this room.'); pecaEscolhida = v.id; renderPaleta(); }; gv.appendChild(dv); }); }
+        dv.onclick = () => { if (usada) return aviso(v.nome + ': ' + tr('all the copies you have are already in this room') + ' (' + cx + ').'); pecaEscolhida = v.id; renderPaleta(); }; return dv; }, vs.findIndex(v => v.id === pecaEscolhida)); }
     const ga = $('#gradeAlfombras');
     [...ALFOMBRAS, ...oficina().pecas.filter(v => v.underlay).map(v => defPeca(v.id)).filter(Boolean)].forEach(t => {
       const dv = document.createElement('div'); dv.className = 'item' + (t.id === pecaEscolhida ? ' ativo' : '');
       const v = varPeca(t.id); const n = usoAlfombra(t.id); const verso = VERSO_ALFOMBRA[t.id]; const cx = caixaAlfombra(t.id);
       if (n >= cx) dv.classList.add('usada');
       dv.title = verso ? 'Same cards as ' + nomeAlfombra(verso) + ' (the other face)' : v ? 'Workshop underlay' : '';
-      dv.innerHTML = `<img src="${miniatura(t, v)}" alt=""><div>${esc(nomeAlfombra(t.id))} <small>${n}/${cx} ${v ? 'cop' + (cx > 1 ? 'ies' : 'y') : 'cards'} used${verso ? ' · back: ' + esc(nomeAlfombra(verso)) : v ? ' · workshop' : ''}</small></div>`;
+      dv.innerHTML = `<img loading="lazy" decoding="async" ${imgTardia(miniatura(t, v))} alt=""><div>${esc(nomeAlfombra(t.id))} <small>${n}/${cx} ${v ? 'cop' + (cx > 1 ? 'ies' : 'y') : 'cards'} used${verso ? ' · back: ' + esc(nomeAlfombra(verso)) : v ? ' · workshop' : ''}</small></div>`;
       dv.onclick = () => { pecaEscolhida = t.id; renderPaleta(); }; ga.appendChild(dv);
     });
   } else if (ferramenta === 'objeto') {
-    el.innerHTML = `<p class="ajuda">${ehTerreno({ type: objetoEscolhido }) ? 'Staircases and bridges are floor: they climb from the ribbon level to the next one and may sit off the tiles. The arrow on a staircase shows the way up; R turns it.' : 'Rotation ' + rot + '° (R). Pillar (object): a column placed on a square like any object, with texts and triggers; it holds nothing up.'}</p><div class="grade objetos" id="gradeObj"></div>`;
+    el.innerHTML = `<p class="ajuda">${ehTerreno({ type: tipoDoObjeto(objetoEscolhido) }) ? 'Staircases and bridges are floor: they climb from the ribbon level to the next one and may sit off the tiles. The arrow on a staircase shows the way up; R turns it.' : 'Rotation ' + rot + '° (R). Pillar (object): a column placed on a square like any object, with texts and triggers; it holds nothing up.'}</p><div class="grade objetos" id="gradeObj"></div>`;
     // the default version or an empty one (the choice stays for the next objects)
     const pd = document.createElement('label'); pd.className = 'campo'; pd.title = tr('Default: the object comes with the programming it has in the game (a chest opens once and holds things, a tree has three answers, a door opens a room…), or the one the Workshop gave it. Unticked: an empty object.');
     pd.innerHTML = `<span><input type="checkbox" id="objPadrao" ${usarPadraoObjeto() ? 'checked' : ''}> ${tr('Default script')}</span>`; el.insertBefore(pd, el.firstChild);
@@ -343,13 +344,13 @@ function renderPaleta() {
       const caixa = caixaDoTerreno(o.id); const uso = caixa === null ? 0 : terrenoEmUso(o.id);
       if (caixa !== null && uso >= caixa) dv.classList.add('usada');
       if (caixa !== null) dv.title = uso + ' ' + tr('on the table') + ' / ' + caixa + ' ' + tr('in your boxes') + (grupoDoTerreno(o.id) === 'Fichas' ? ' (' + tr('points of interest and interaction tokens share the same tokens') + ')' : '') + partilhaDe(grupoDoTerreno(o.id));
-      dv.innerHTML = `<img src="${iconeObj(o.id)}" alt=""><div>${esc(nomeObj(o.id))}<small>${o.w}×${o.h}${TERRENO.has(o.id) ? ' · floor' : ''}${o.act === 2 ? ' · II' : ''}${caixa !== null ? ` · <b class="${uso >= caixa ? 'esgotado' : ''}">${uso}/${caixa}</b>` : ''}</small></div>`;
+      dv.innerHTML = `<img loading="lazy" decoding="async" ${imgTardia(iconeObj(o.id))} alt=""><div>${esc(nomeObj(o.id))}<small>${o.w}×${o.h}${TERRENO.has(o.id) ? ' · ' + L2('floor', 'chão') : ''}${o.act === 2 ? ' · II' : ''}${caixa !== null ? ` · <b class="${uso >= caixa ? 'esgotado' : ''}">${uso}/${caixa}</b>` : ''}</small></div>`;
       dv.onclick = () => { objetoEscolhido = o.id; renderPaleta(); desenhar(); }; g.appendChild(dv);
     });
     const vs = oficina().objetos; if (vs.length) { const st = document.createElement('div'); st.className = 'subtitulo'; st.textContent = 'Workshop objects (made in the Workshop)'; el.appendChild(st); const gv = document.createElement('div'); gv.className = 'grade objetos'; el.appendChild(gv);
-      vs.forEach(v => { const o = defObj(v.id); if (!o) return; const dv = document.createElement('div'); dv.className = 'item' + (v.id === objetoEscolhido ? ' ativo' : '');
-        dv.innerHTML = `<img src="${iconeObj(v.id)}" alt=""><div>${esc(v.nome)}<small>${o.w}×${o.h} · ${o.cells.length} sq.</small></div>`;
-        dv.onclick = () => { objetoEscolhido = v.id; renderPaleta(); desenhar(); }; gv.appendChild(dv); }); }
+      aosPoucos(gv, vs, v => { const o = defObj(v.id); if (!o) return; const dv = document.createElement('div'); dv.className = 'item' + (v.id === objetoEscolhido ? ' ativo' : '');
+        dv.innerHTML = `<img loading="lazy" decoding="async" ${imgTardia(iconeObj(v.id))} alt=""><div>${esc(v.nome)}<small>${o.w}×${o.h} · ${o.cells.length} sq.</small></div>`;
+        dv.onclick = () => { objetoEscolhido = v.id; renderPaleta(); desenhar(); }; return dv; }, vs.findIndex(v => v.id === objetoEscolhido)); }
   } else if (ferramenta === 'inimigo') {
     if (!MONSTROS().length) { el.innerHTML = '<p class="ajuda">The workshop has no monsters. Open the <b>Workshop</b> (top bar) and import monsters from the game, or create your own; only those can be placed.</p><button class="primario largo" id="pl_monstros">Open the Workshop</button>'; $('#pl_monstros').onclick = () => abrirFichas('monstros'); return; }
     el.innerHTML = `<input id="filtroIni" placeholder="filter…"><div class="grade monstros" id="gradeIni"></div>`;
@@ -363,7 +364,7 @@ function renderPaleta() {
 /* a "balanced from enemy pool" space: the room's pool, its intensity and what the game would do for 1 to 4 heroes */
 function fichaVagaPool(el, s, q, lista, e) {
   const si = q.sala; const r = regraDoBalanceio(); const pool = poolDaSala(si).map(monstro).filter(Boolean); const vagas = vagasPoolDaSala(s);
-  el.innerHTML = `<div class="linha"><img class="redondo grande" src="${iconePool()}" alt=""><p class="ajuda">Room ${si + 1} · space ${e.pos[0]},${e.pos[1]}${(e.level || 0) > 0 ? ' · level ' + e.level : ''} · ${vagas} balanced space${vagas > 1 ? 's' : ''} in this room</p></div>
+  el.innerHTML = `<div class="linha"><img class="redondo grande" loading="lazy" decoding="async" ${imgTardia(iconePool())} alt=""><p class="ajuda">Room ${si + 1} · space ${e.pos[0]},${e.pos[1]}${(e.level || 0) > 0 ? ' · level ' + e.level : ''} · ${vagas} balanced space${vagas > 1 ? 's' : ''} in this room</p></div>
     <p class="ajuda">When the room ${si === 0 ? 'starts' : 'opens'}, the game fills these spaces with its own rule for random spawns: points = intensity ÷ 10 × heroes × 1.5 × progression; it takes the highest tier of the map’s range the points pay for (costs 10, 15, 20, 30, 40, 55…), and monsters of the pool that have that tier enter, one per space (up to 5), while the points last. Leftover points go to the next balanced room. All may enter, or just one strong monster.</p>
     <label class="campo">Intensity of this room <select id="vp_int">${Array.from({ length: 10 }, (_, k) => k + 1).map(n => `<option value="${n}" ${intensidadeDaSala(s) === n ? 'selected' : ''}>${n}${n === vagas && !s.intensidade ? ' (= spaces, default)' : ''}</option>`).join('')}</select></label>
     <div class="sub">Spawn pool of this room</div>
@@ -389,17 +390,19 @@ function fichaVagaPool(el, s, q, lista, e) {
 function paletaMonstros(g, filtro, atual, cb, comPool) {
   const pinta = f => { g.innerHTML = '';
     if (comPool && (!f || 'balanced from enemy pool'.includes(f))) { const dv = document.createElement('div'); dv.className = 'item poolIni' + (atual === POOL_ID ? ' ativo' : '');
-      dv.innerHTML = `<img class="redondo" src="${iconePool()}" alt=""><div>Balanced from enemy pool<small>the game decides: how many, which and how strong</small></div>`; dv.title = 'Place one or more of these spaces in a room: when the room opens, the game fills them from the room\u2019s spawn pool with its own rule (points from the number of heroes, the map\u2019s tier range). All may enter, or just one strong monster.';
-      dv.onclick = () => cb(POOL_ID); g.appendChild(dv); } MONSTROS().filter(m => !f || (m.nome || '').toLowerCase().includes(f)).forEach(m => {
+      dv.innerHTML = `<img class="redondo" loading="lazy" decoding="async" ${imgTardia(iconePool())} alt=""><div>Balanced from enemy pool<small>the game decides: how many, which and how strong</small></div>`; dv.title = 'Place one or more of these spaces in a room: when the room opens, the game fills them from the room\u2019s spawn pool with its own rule (points from the number of heroes, the map\u2019s tier range). All may enter, or just one strong monster.';
+      dv.onclick = () => cb(POOL_ID); g.appendChild(dv); } const ms = MONSTROS().filter(m => !f || (m.nome || '').toLowerCase().includes(f)); aosPoucos(g, ms, m => {
     const dv = document.createElement('div'); dv.className = 'item' + (m.id === atual ? ' ativo' : '');
     const r = retratoDoMonstro(m);
-    dv.innerHTML = `${r ? `<img class="redondo" src="${r}" alt="">` : '<span class="redondo vazio"></span>'}<div>${esc(m.nome)}<small>${esc(m.tipo)} · ${(m.tiers || [])[0]?.hp ?? '?'} hp${m.custom ? ' · custom' : ''}</small></div>`;
-    dv.onclick = () => cb(m.id); g.appendChild(dv); }); };
+    dv.innerHTML = `${r ? `<img class="redondo" loading="lazy" decoding="async" ${imgTardia(r)} alt="">` : '<span class="redondo vazio"></span>'}<div>${esc(m.nome)}<small>${esc(m.tipo)} · ${(m.tiers || [])[0]?.hp ?? '?'} hp${m.custom ? ' · custom' : ''}</small></div>`;
+    dv.onclick = () => cb(m.id); return dv; }, ms.findIndex(m => m.id === atual)); };
   pinta(''); if (filtro) filtro.oninput = e => pinta(e.target.value.toLowerCase());
 }
 
 // ------------------------------------------------------------ properties (floating): selection or room
 function renderPropriedades() {
+  // (the default of a copy, in the Workshop: the panel of its piece goes into the copy's sheet)
+  if (EDITANDO_PADRAO) { const el = EDITANDO_PADRAO.alvo; if (el && document.body.contains(el) && projeto.salas[0]?.objetos[0]) { sel = { tipo: 'objeto', sala: 0, i: 0 }; salaAtual = 0; renderObjeto(el, projeto.salas[0], 0); guardarPadraoDaOficina(); } return; }
   if (salaAtual < 0 || escolha) { esconderPainel('props'); return; }
   if (!sel || !projeto.salas[sel.sala]) { renderSalaProps(); return; }
   const s = projeto.salas[sel.sala];
@@ -409,7 +412,7 @@ function renderPropriedades() {
     const d = painelFlutuante('props', (alf ? 'Underlay ' : 'Tile ') + nomePeca(p.tile)); d.hidden = false; const el = d.querySelector('.corpo');
     const desc = descricaoDosAnexos(sel.sala, sel.i);
     el.innerHTML = `<p class="ajuda">Room ${sel.sala + 1} · ${p.rot || 0}°${desc ? ' · carries ' + esc(desc) : ''}</p>
-      ${ehCaixa(p.tile) ? `<p class="ajuda"><b>A box</b>: ${p.tile === 'gamebox' ? 'the game box of Act I used as a platform: it stands on the floor with its top at level 3. The platform and the vault of Act II may stand on it.' : p.level > CAIXAS.platform ? 'it stands on the game box, with its top at level ' + p.level + '.' : 'it stands on the floor with its top at level ' + p.level + '.'} It takes no pillars; nothing fits under it, and over it only a tile above its top, on pillars.</p>` : alf ? '' : `<label class="campo">Level <select id="p_nivel">${[0, 1, 2, 3].map(l => `<option value="${l}" ${(p.level || 0) === l ? 'selected' : ''}>${l}${l ? ' (elevated)' : ' (floor)'}</option>`).join('')}</select></label>
+      ${p.tile === 'vault' ? `<p class="ajuda"><b>${esc(tr('Vault'))}</b>: ${esc(tr(p.level > 0 ? 'it stands on the game box of Act I, with its floor at level 3 and its walls 2 above. It takes no pillars.' : 'it stands on the floor, with its walls 2 above it. It takes no pillars; it may stand on the game box (all its squares over the box).'))}</p>` : ehCaixa(p.tile) ? `<p class="ajuda"><b>A box</b>: ${p.tile === 'gamebox' ? 'the game box of Act I used as a platform: it stands on the floor with its top at level 3. The platform and the vault of Act II may stand on it.' : p.level > CAIXAS.platform ? 'it stands on the game box, with its top at level ' + p.level + '.' : 'it stands on the floor with its top at level ' + p.level + '.'} It takes no pillars; nothing fits under it, and over it only a tile above its top, on pillars.</p>` : alf ? '' : `<label class="campo">Level <select id="p_nivel">${[0, 1, 2, 3].map(l => `<option value="${l}" ${(p.level || 0) === l ? 'selected' : ''}>${l}${l ? ' (elevated)' : ' (floor)'}</option>`).join('')}</select></label>
       <div class="sub">Pillars of this tile ${p.level > 0 ? '<span class="etq">' + (p.pilares || []).length + '</span>' : ''}</div>
       ${p.level > 0 ? ((p.pilares || []).length ? '<div class="lista">' + p.pilares.map((q, qi) => `<div class="linha"><span class="pil n${SUPORTES[q.type].nivel}">${SUPORTES[q.type].nivel}</span><select data-pil="${qi}">${pilaresPermitidos(p.level).map(k => `<option value="${k}" ${q.type === k ? 'selected' : ''}>${SUPORTES[k].nome}</option>`).join('')}</select><small>socket ${q.pos.join(',')}</small><button class="sm" data-pildel="${qi}">✕</button></div>`).join('') + '</div>' : '<p class="ajuda">None yet: use the Pillar tool on its sockets (level ${p.level} on the ribbon). Allowed here: ' + pilaresPermitidos(p.level).map(k => SUPORTES[k].nome.toLowerCase()).join(', ') + '.</p>') : '<p class="ajuda">A floor tile needs no pillars.</p>'}`}
       <div class="linha acoes"><button id="p_gira">↻ Rotate</button><button id="p_mover">Move to another room…</button><button id="p_apaga" class="perigo">Remove</button></div>`;
@@ -431,7 +434,7 @@ function renderPropriedades() {
     const e = lista[sel.i]; const m = monstro(e.enemy);
     const d = painelFlutuante('props', nomeIni(e.enemy)); d.hidden = false; const el = d.querySelector('.corpo');
     if (ehPool(e.enemy)) return fichaVagaPool(el, s, sel, lista, e);
-    el.innerHTML = `<div class="linha">${iconeIni(e.enemy) ? `<img class="redondo grande" src="${iconeIni(e.enemy)}" alt="">` : ''}<p class="ajuda">Room ${sel.sala + 1} · space ${e.pos[0]},${e.pos[1]}${(e.level || 0) > 0 ? ' · level ' + e.level : ''}${sel.g !== undefined ? (typeof sel.obj === 'string' ? ' · enters when “' + esc(rotulo(donoDe(s, sel.obj) || {})) + '” is defeated' : ' · enters with “' + esc(rotulo(s.objetos[sel.obj])) + '”') : sel.sala === 0 ? ' · present from the start' : ' · enters automatically when this room opens'}${m ? '' : ' · <b>not in the workshop</b>'}</p></div>
+    el.innerHTML = `<div class="linha">${iconeIni(e.enemy) ? `<img class="redondo grande" loading="lazy" decoding="async" ${imgTardia(iconeIni(e.enemy))} alt="">` : ''}<p class="ajuda">Room ${sel.sala + 1} · space ${e.pos[0]},${e.pos[1]}${(e.level || 0) > 0 ? ' · level ' + e.level : ''}${sel.g !== undefined ? (typeof sel.obj === 'string' ? ' · enters when “' + esc(rotulo(donoDe(s, sel.obj) || {})) + '” is defeated' : ' · enters with “' + esc(rotulo(s.objetos[sel.obj])) + '”') : sel.sala === 0 ? ' · present from the start' : ' · enters automatically when this room opens'}${m ? '' : ' · <b>not in the workshop</b>'}</p></div>
       ${e.tierPorHerois ? '' : `<label class="campo">Tier <select id="e_tier">${(m?.tiers || [{ tier: e.tier || 1 }]).map(t => `<option value="${t.tier}" ${(e.tier || 0) === t.tier ? 'selected' : ''}>${t.tier} · ${t.hp} hp · def ${t.def} · atk ${t.atk}</option>`).join('')}</select></label>`}
       <div class="linha porHerois"><label class="chk"><input type="checkbox" id="e_porHerois" ${e.tierPorHerois ? 'checked' : ''}> Tier by the number of heroes</label><button class="sm" id="e_balTier" title="Balance: sets the tiers for 1–2, 3 and 4 heroes by the game's points (room intensity ÷ 10 × heroes × 1.5 × progression, shared by the monsters placed in this room), each one above the other">⚖ Balance</button></div>
       ${e.tierPorHerois ? `<label class="campo">Room intensity <select id="e_int">${Array.from({ length: 10 }, (_, k) => k + 1).map(n => `<option value="${n}" ${intensidadeParaMonstros(s, lista) === n ? 'selected' : ''}>${n}${!s.intensidade && n === monstrosComuns(lista) ? ' (= monsters here, default)' : ''}</option>`).join('')}</select></label>` : ''}
@@ -583,7 +586,7 @@ function modal(titulo, html, aoMontar, largo) {
   const cx = document.createElement('div'); cx.className = 'cx' + (largo ? ' larga' : '');
   cx.innerHTML = `<div class="cabecalho"><h2>${esc(titulo)}</h2><button class="sm fechar">✕</button></div><div class="conteudo">${html}</div>`;
   fundo.appendChild(cx); document.body.appendChild(fundo);
-  const fechar = () => fundo.remove();
+  const fechar = () => { fundo.remove(); if (fundo.querySelector('img[data-leve]')) descarregarImagens(); };
   fundo.onclick = e => { if (e.target === fundo) fechar(); }; cx.querySelector('.fechar').onclick = fechar;
   aoMontar && aoMontar(cx.querySelector('.conteudo'), fechar);
   return { fundo, cx, fechar };
@@ -598,6 +601,7 @@ function abrirMapa() {
     <label class="campo">Introduction (before the map starts) <textarea id="mp_intro" rows="3">${esc(m.intro || '')}</textarea></label>
     <label class="campo">Special rule (a box of its own, after the introduction: rules of this map only) <textarea id="mp_regra" rows="2">${esc(m.regra || '')}</textarea></label>
     <label class="campo">Description (in the map list) <textarea id="mp_desc" rows="2">${esc(m.description || '')}</textarea></label>
+    ${campanha ? '' : `<label class="campo">Language of the map (its flag shows in the community library) <span id="mp_bandeira">${imgBandeira(m.lingua || linguaPadrao(), 16)}</span> <select id="mp_lingua" data-sem-traducao>${opcoesDeLingua(m.lingua || linguaPadrao())}</select></label><div id="mp_linguas">${htmlLinguasDaObra()}</div>`}
     <div class="sub">Custom music</div>
     <div id="mp_musica"></div>
     <label class="campo">Background of the story boxes <select id="mp_bg"><option value="">Default</option>${FUNDOS.map(f => `<option value="${f.id}" ${String(m.background) === String(f.id) ? 'selected' : ''}>${esc(f.name_en)}</option>`).join('')}</select></label>
@@ -629,6 +633,9 @@ function abrirMapa() {
     el.querySelector('#mp_intro').oninput = e => { m.intro = e.target.value; };
     el.querySelector('#mp_regra').oninput = e => { m.regra = e.target.value; };
     el.querySelector('#mp_desc').oninput = e => { m.description = e.target.value; };
+    // (the other languages of the map: added one by one, by the author; without them, nothing changes)
+    const repintaLinguas = () => { const d = el.querySelector('#mp_linguas'); if (!d) return; d.innerHTML = htmlLinguasDaObra(); ligarLinguasDaObra(d, repintaLinguas); }; repintaLinguas();
+    if (el.querySelector('#mp_lingua')) el.querySelector('#mp_lingua').onchange = e => { m.lingua = e.target.value; el.querySelector('#mp_bandeira').innerHTML = imgBandeira(m.lingua, 16); repintaLinguas(); tudo(); };
     campoMusica(el.querySelector('#mp_musica'), m);
     el.querySelector('#mp_bg').onchange = e => { m.background = e.target.value; };
     el.querySelector('#mp_fmTexto').oninput = e => { fm.texto = e.target.value; };
@@ -698,7 +705,7 @@ function campoMusica(el, m) {
   el.innerHTML = `<p class="ajuda">Your own music for this map, played in a loop in place of the game’s. <b>OGG</b> (Ogg Vorbis) is the format that suits the game best; WAV and MP3 also work. The file is saved next to the map file in the CustomMaps folder (the same folder as the .dmap).</p>
     <div class="linha"><label class="sm botaoArquivo">${mu ? 'Replace the music…' : 'Add music (OGG, WAV, MP3)…'}<input type="file" accept=".ogg,.oga,.wav,.mp3,audio/ogg,audio/wav,audio/mpeg" id="mp_musArq" hidden></label>
     ${mu ? `<b>${esc(mu.nome || mu.arquivo)}</b> <small class="ajuda">(${esc(mu.arquivo)}${blob ? ', ' + Math.round(blob.size / 1024) + ' KB' : ', file not in this browser: add it again'})</small><button class="sm perigo" id="mp_musTira">Remove</button>` : '<span class="ajuda">No music: the game plays its own.</span>'}</div>
-    ${mu ? `<label class="chk"><input type="checkbox" id="mp_musLoop" ${mu.loop !== false ? 'checked' : ''}> Loop (starts again when it ends)</label>${blob ? `<audio controls src="${urlDoBlob(blob)}" style="width:100%;margin-top:6px"></audio>` : ''}` : ''}`;
+    ${mu ? `<label class="chk"><input type="checkbox" id="mp_musLoop" ${mu.loop !== false ? 'checked' : ''}> Loop (starts again when it ends)</label>${blob ? `<audio controls loading="lazy" decoding="async" ${imgTardia(urlDoBlob(blob))} style="width:100%;margin-top:6px"></audio>` : ''}` : ''}`;
   el.querySelector('#mp_musArq').onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
     const ext = (f.name.match(/\.(ogg|oga|wav|mp3)$/i) || [])[1]; if (!ext) return aviso('Use an OGG, WAV or MP3 file.');
@@ -714,7 +721,7 @@ function campoVideo(el, alvo, depois) {
   const v = alvo.video; const blob = v && AUDIOS[v.arquivo];
   el.innerHTML = `<div class="linha"><label class="sm botaoArquivo">${v ? 'Replace the video…' : 'Add a video (MP4, WebM)…'}<input type="file" accept=".mp4,.m4v,.webm,video/mp4,video/webm" hidden></label>
     ${v ? `<b>${esc(v.nome || v.arquivo)}</b> <small class="ajuda">(${blob ? Math.round(blob.size / 1024 / 1024 * 10) / 10 + ' MB' : 'file not in this browser: add it again'})</small>` : '<span class="ajuda">No video yet.</span>'}</div>
-    ${blob ? `<video controls src="${urlDoBlob(blob)}" style="width:100%;margin-top:6px;max-height:220px;background:#000"></video>` : ''}
+    ${blob ? `<video controls loading="lazy" decoding="async" ${imgTardia(urlDoBlob(blob))} style="width:100%;margin-top:6px;max-height:220px;background:#000"></video>` : ''}
     <p class="ajuda">It plays full screen; a click (or Space, Enter, Esc) skips it. <b>MP4 (H.264 video, AAC sound)</b> is the safest format; WebM (VP8) also works. The file is saved next to the campaign or map file.</p>`;
   el.querySelector('input[type=file]').onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
@@ -728,7 +735,8 @@ function campoVideo(el, alvo, depois) {
 function widgetPoolItens(el, lista) {
   const opcoes = ITENS_B().filter(i => !lista.includes(i.id)).map(i => `<option value="${esc(i.id)}">${esc(i.nome)}</option>`).join('') + (oficina().armas || []).filter(a => a.runa && !lista.includes('RUNA:' + a.id)).map(a => `<option value="RUNA:${esc(a.id)}">${esc(nomeItem('RUNA:' + a.id))}</option>`).join('');
   el.innerHTML = `<div class="linha"><select class="poolAdd"><option value="">+ add an item…</option>${opcoes}</select>${opcoes ? '<button class="sm" data-todos>All workshop items</button>' : ''}</div>
-    <div>${lista.map((id, i) => `<span class="tag">${esc(nomeItem(id))}${itemDaOficina(id) ? '' : ' (not in the workshop!)'} <a href="#" data-pooldel="${i}">✕</a></span>`).join('') || '<span class="ajuda">empty</span>'}</div>${ITENS_B().length ? '' : '<p class="ajuda">The workshop has no items: import or create them in the Items tab.</p>'}`;
+    <div class="iconesPool">${lista.map((id, i) => { const ok = itemDaOficina(id), x = ITENS_B().find(z => z.id === id); const img = x ? retratoDoItem(x) : ''; const nome = nomeItem(id) + (ok ? '' : ' (' + tr('not in the workshop!') + ')');
+      return `<span class="iconePool ${ok ? '' : 'falta'}" title="${esc(nome)}">${img ? `<img loading="lazy" decoding="async" ${imgTardia(img)} alt="">` : `<span class="sigla">${esc(String(nomeItem(id) || '?').slice(0, 2))}</span>`}<a href="#" data-pooldel="${i}" title="${esc(tr('Take it out of the pool'))}">✕</a></span>`; }).join('') || '<span class="ajuda">empty</span>'}</div>${ITENS_B().length ? '' : '<p class="ajuda">The workshop has no items: import or create them in the Items tab.</p>'}`;
   el.querySelector('.poolAdd').onchange = e => { if (e.target.value && !lista.includes(e.target.value)) lista.push(e.target.value); widgetPoolItens(el, lista); };
   const t = el.querySelector('[data-todos]'); if (t) t.onclick = () => { ITENS_B().forEach(i => { if (!lista.includes(i.id)) lista.push(i.id); }); widgetPoolItens(el, lista); };
   el.querySelectorAll('[data-pooldel]').forEach(a => a.onclick = ev => { ev.preventDefault(); lista.splice(+a.dataset.pooldel, 1); widgetPoolItens(el, lista); });
@@ -749,13 +757,13 @@ function gradeDoPool(el, dentro, alternar, nota, botoes, compacta) {
   const n = ms.filter(m => dentro(m.id)).length;
   el.innerHTML = `<div class="linha poolTopo"><small>${n} of ${ms.length} in the pool · click to put in or take out</small>${botoes || ''}</div>${ms.length > 8 ? `<input class="poolFiltro" placeholder="filter…" value="${esc(filtroAntes)}">` : ''}<div class="${compacta ? 'gradePool compacta' : 'grade monstros gradePool'}"></div>`;
   const g = el.querySelector('.gradePool');
-  const pinta = f => { g.innerHTML = ''; ms.filter(m => !f || (m.nome || '').toLowerCase().includes(f)).forEach(m => {
+  const pinta = f => { g.innerHTML = ''; aosPoucos(g, ms.filter(m => !f || (m.nome || '').toLowerCase().includes(f)), m => {
     const on = dentro(m.id); const r = retratoDoMonstro(m); const nt = nota(m.id);
     const dv = document.createElement('div'); dv.className = 'item' + (on ? ' ativo' : ' fora'); dv.title = on ? 'In the pool: click to take it out' : 'Click to put it in the pool';
     const f = figurasDoTipo(m.tipo); const tf = f === null ? '' : f ? ' · ' + f + ' miniature' + (f > 1 ? 's' : '') : ' · no miniature';
-    if (compacta) { dv.title = m.nome + ' (' + m.tipo + tf + (nt ? ' · ' + nt : '') + ')\n' + dv.title; dv.innerHTML = `${r ? `<img src="${r}" alt="">` : `<span class="vazio">${esc((m.nome || '?').slice(0, 2))}</span>`}${on ? '<b class="visto">✓</b>' : ''}`; }
-    else dv.innerHTML = `${r ? `<img class="redondo" src="${r}" alt="">` : '<span class="redondo vazio"></span>'}<div>${on ? '✓ ' : ''}${esc(m.nome)}<small>${esc(m.tipo)}${tf}${nt ? ' · ' + esc(nt) : ''}</small></div>`;
-    dv.onclick = () => alternar(m.id); g.appendChild(dv); }); };
+    if (compacta) { dv.title = m.nome + ' (' + m.tipo + tf + (nt ? ' · ' + nt : '') + ')\n' + dv.title; dv.innerHTML = `${r ? `<img loading="lazy" decoding="async" ${imgTardia(r)} alt="">` : `<span class="vazio">${esc((m.nome || '?').slice(0, 2))}</span>`}${on ? '<b class="visto">✓</b>' : ''}`; }
+    else dv.innerHTML = `${r ? `<img class="redondo" loading="lazy" decoding="async" ${imgTardia(r)} alt="">` : '<span class="redondo vazio"></span>'}<div>${on ? '✓ ' : ''}${esc(m.nome)}<small>${esc(m.tipo)}${tf}${nt ? ' · ' + esc(nt) : ''}</small></div>`;
+    dv.onclick = () => alternar(m.id); return dv; }); };
   pinta(filtroAntes.toLowerCase()); const fi = el.querySelector('.poolFiltro'); if (fi) fi.oninput = e => pinta(e.target.value.toLowerCase());
 }
 
@@ -778,12 +786,12 @@ window.addEventListener('keydown', ev => {
   if (ev.key === 'F5' || ev.key === 'F9') { ev.preventDefault(); if (ev.key === 'F5') salvarRapido(); else carregarRapido(); return; }
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
   if (!$('#telaCampanha').hidden || $('#telaFichas') && !$('#telaFichas').hidden || $('.modal')) return;
-  if (ev.key === 'Escape') { fecharPopupEscolha(); if (vista3d.on) { alternar3d(false); return; } if (escolha) { terminarClique(); return; } sel = null; ferramenta = null; tudo(); return; }
+  if (ev.key === 'Escape') { fecharPopupEscolha(); if (vista3d.on) { alternar3d(false); return; } if (escolha) { terminarClique(); return; } if (sairDoModoMover()) { destaqueSala = null; aviso(tr('Moving ended.')); desenhar(); return; } sel = null; ferramenta = null; tudo(); return; }
   if (ev.key === '3' && !ev.ctrlKey && !ev.metaKey) { alternar3d(); return; }
   if (vista3d.on) { const k = ev.key.toLowerCase();
     if (ev.key === '+' || ev.key === '=') zoom3d(1.2); else if (ev.key === '-' || ev.key === '_') zoom3d(1 / 1.2);
     else if (k === 'q') girar3d(-45); else if (k === 'e') girar3d(45); else if (k === 'w') inclinar3d(-12); else if (k === 's') inclinar3d(12);
-    else if (k === 't') vistaDeCima(); else if (ev.key === 'Home') vistaInicial(); else if (k === 'f') enquadrar3d();
+    else if (k === 'f') enquadrar3d();
     else if (ev.key.startsWith('Arrow')) { ev.preventDefault(); const dx = ev.key === 'ArrowLeft' ? 1 : ev.key === 'ArrowRight' ? -1 : 0, dy = ev.key === 'ArrowUp' ? 1 : ev.key === 'ArrowDown' ? -1 : 0; vista3d.px += dx * 60; vista3d.py += dy * 60; pedirDesenho(); }
     return; }
   // a generated room on the board, before it is used: the arrows move it and R turns it
@@ -846,4 +854,84 @@ const Desfazer = (() => {
     if (alvo) { alvo.focus(); const fim = alvo.value.length; try { alvo.setSelectionRange(fim, fim); } catch { } }
   }, true);
   return { historicos };
+})();
+
+// ------------------------------------------------------------ Ctrl+Z / Ctrl+Y for the work (maps, story flow, scene boxes, workshop, forge)
+/* Outside a text box, Ctrl+Z undoes the last change to the work and Ctrl+Y (or Ctrl+Shift+Z) redoes it. A picture of the work
+   (the map or the campaign with its workshop, the map and the room open, and the pieces on the forge) is taken a moment after
+   each change (a click, a drag, a key, a field); undo puts the one before back and redraws the screen that is open. Long texts
+   (pictures, sounds) are kept once and shared by every picture. */
+const Historico = (() => {
+  const GRANDE = 1500, MAX = 120;
+  const indice = new Map(), longos = [];
+  const guardar = v => { let i = indice.get(v); if (i === undefined) { i = longos.length; longos.push(v); indice.set(v, i); } return '\u0000' + i; };
+  /* (v237: an entry of another package goes in as a reference: it is read, not changed (a change makes it one's own), and the
+     Workshop with big packages made each picture megabytes long, taken after every click) */
+  const refs = [], refIndice = new Map();
+  const guardarRef = o => { let i = refIndice.get(o); if (i === undefined) { i = refs.length; refs.push(o); refIndice.set(o, i); } return '\u0001' + i; };
+  const ler = (k, v) => typeof v === 'string' ? (v.charCodeAt(0) === 0 ? longos[+v.slice(1)] : v.charCodeAt(0) === 1 ? refs[+v.slice(1)] : v) : v;
+  let pilha = [], i = -1, aplicando = false, timer = null;
+  function estadoDaForja() {
+    if (typeof forja === 'undefined' || !forja || !document.querySelector('#mt_tela')) return null;
+    return { wid: forja.wid, nova: forja.nova, escolhidas: forja.escolhidas.slice(), camadas: forja.camadas.map(c => ({ x: c.x, y: c.y, k: c.k, r: c.r || 0, ex: c.ex || 1, ey: c.ey || 1, fx: c.fx || 1, fy: c.fy || 1, mexida: !!c.mexida })), moldes: forja.moldes.map(m => m && m.slice()),
+      mexida: !!forja.mexida };
+  }
+  function foto() {
+    // (the Workshop once: in a campaign, the campaign's; its maps point to the same one)
+    // (the room open is not the work: it goes apart, so that a change of room is not a step of the history)
+    try { return { o: JSON.stringify({ c: campanha, p: campanha ? null : projeto, m: missaoAtual, f: estadoDaForja() }, function (k, v) { if (k === 'bestiario' && campanha && this !== campanha) return undefined;
+      if (v && typeof v === 'object' && v._doPacote && !Array.isArray(v)) return guardarRef(v); return typeof v === 'string' && v.length > GRANDE ? guardar(v) : v; }), s: salaAtual }; }
+    catch (e) { console.warn('history', e); return null; }
+  }
+  function conferir() {
+    clearTimeout(timer); timer = null; if (aplicando || EDITANDO_PADRAO) return;
+    const f = foto(); if (f === null) return;
+    // (the place where one looks and the room open are not changes of the work)
+    if (i >= 0 && pilha[i].o === f.o) { pilha[i] = f; return; }
+    pilha.splice(i + 1); pilha.push(f); if (pilha.length > MAX) pilha.shift(); i = pilha.length - 1;
+    if (typeof agendarExtracao === 'function') agendarExtracao();   // (v240: a picture that came in goes into the store)
+  }
+  const agendar = () => { if (aplicando) return; clearTimeout(timer); timer = setTimeout(conferir, 350); };
+  ['pointerup', 'keyup', 'change', 'input', 'drop'].forEach(t => document.addEventListener(t, agendar, true));
+  function redesenhar(e) {
+    sel = null; escolha = null; arrasto = null; try { camposDaMissao(); } catch { }
+    if (typeof movendo !== 'undefined') movendo = null;
+    const telaC = document.getElementById('telaCampanha'), telaF = document.getElementById('telaFichas');
+    if (telaC && !telaC.hidden) {
+      if (!campanha) { telaC.hidden = true; tudo(); return; }
+      if (noSel && !noPorId(noSel)) noSel = null; if (caixaSel && !caixaPorId(caixaSel)) caixaSel = null;
+      if (cenaAberta && !noPorId(cenaAberta)) { cenaAberta = null; if (abaC === 'caixas') abaC = 'fluxo'; }
+      renderC(); renderCabecalho(); return;
+    }
+    if (telaF && !telaF.hidden) {
+      if (e.f && typeof forja !== 'undefined' && forja && forja.wid === e.f.wid) {
+        Object.assign(forja, { nova: e.f.nova, escolhidas: e.f.escolhidas, moldes: e.f.moldes, mexida: e.f.mexida });
+        e.f.camadas.forEach((c, k) => { Object.assign(forja.camadas[k], c); forja.camadas[k]._posDesfeita = { ...c }; });
+      }
+      renderFichas(); return;
+    }
+    tudo();
+  }
+  function aplicar(f) {
+    const e = JSON.parse(f.o, ler); e.s = f.s; aplicando = true;
+    try {
+      if (e.c) { campanha = e.c; missaoAtual = Math.max(0, Math.min(e.m || 0, campanha.missoes.length - 1)); projeto = campanha.missoes[missaoAtual]; }
+      else { campanha = null; projeto = e.p; missaoAtual = 0; }
+      trocarOficina((e.c || e.p || {}).bestiario);   // (the Workshop of the picture: one for every map, it goes back too)
+      salaAtual = projeto.salas.length ? Math.max(0, Math.min(e.s ?? 0, projeto.salas.length - 1)) : -1;
+      redesenhar(e); guardarEstado();
+    } finally { setTimeout(() => { aplicando = false; }, 0); }
+  }
+  function desfazer() { if (EDITANDO_PADRAO) return false; conferir(); if (i <= 0) { aviso(tr('Nothing to undo.')); return false; } i--; aplicar(pilha[i]); aviso(tr('Undone (Ctrl+Y redoes it).')); return true; }
+  function refazer() { if (EDITANDO_PADRAO) return false; conferir(); if (i >= pilha.length - 1) { aviso(tr('Nothing to redo.')); return false; } i++; aplicar(pilha[i]); aviso(tr('Redone.')); return true; }
+  const ehCaixaDeTexto = el => el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && /^(text|search|email|url|)$/i.test(el.type || '')) || el.isContentEditable);
+  window.addEventListener('keydown', e => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    const k = e.key.toLowerCase(); if (k !== 'z' && k !== 'y') return;
+    if (ehCaixaDeTexto(document.activeElement) || document.querySelector('.modal')) return;   // (a text box: its own history; a window open: not under it)
+    e.preventDefault(); if (k === 'y' || e.shiftKey) refazer(); else desfazer();
+  });
+  // (the first picture: the work as it opened)
+  setTimeout(conferir, 1500);
+  return { conferir, desfazer, refazer, tamanho: () => pilha.length, posicao: () => i, zerar: () => { pilha = []; i = -1; conferir(); } };
 })();

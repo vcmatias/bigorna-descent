@@ -184,8 +184,7 @@ const RT = (x, v, extra) => x ? preencher(x, { ...(v || {}), ...(extra || {}) })
 function escolherRoupas(plano, o) {
   const atos = plano.atos; const carrega = s => temPortador(s, atos);
   const t = plano.truque?.id;
-  if (t === 'selos') { const modo = o.modoPecas === 'simples' || o.modoPecas === 'teste' ? o.modoPecas : null;
-    plano.roupaTruque = roupaDe(plano, 'pecas', s => carrega(s) && (!modo || s.modo === modo)) || roupaDe(plano, 'pecas', s => !modo || s.modo === modo); }
+  if (t === 'selos') plano.roupaTruque = roupaDe(plano, 'pecas', carrega) || roupaDe(plano, 'pecas');
   if (t === 'escolta') plano.roupaGuia = roupaDe(plano, 'escolta');
   if (t === 'resgate' || (!t && plano.premissa.id === 'resgate')) plano.roupaResgate = roupaDe(plano, 'resgate', carrega);
   // (the escape's collapse: a clock that fits running out of a place, a flood, a fire, a cave-in…)
@@ -562,7 +561,7 @@ function portaNaBorda(pm, si, rng, extra, tipo = 'Door') {
   s.objetos.push({ ...melhor, name: '', textClick: '', textUse: '', gatilhos: [], requisitos: [], senao: [], ...(extra || {}) }); return s.objetos.length - 1;
 }
 const abridorDe = (pm, si) => { for (let ri = 0; ri < pm.salas.length; ri++) { const oi = pm.salas[ri].objetos.findIndex(o => todosGatilhos(o).some(g => g.tipo === 'open_room' && g.sala === si)); if (oi >= 0) return { ri, oi, o: pm.salas[ri].objetos[oi], g: todosGatilhos(pm.salas[ri].objetos[oi]).find(g => g.tipo === 'open_room' && g.sala === si) }; } return null; };
-function novoContadorMapa(pm, nome, total, texto) { const c = { id: uid(), nome, inicio: 0, total, ehContador: true, gatilhos: [], missao: { uid: 'cm' + uid(), texto, quando: 'start' } }; pm.contadores = (pm.contadores || []).concat([c]); return c; }
+function novoContadorMapa(pm, nome, total, texto) { const c = { id: uid(), nome, meta: total, ehContador: true, gatilhos: [], missao: { uid: 'cm' + uid(), texto, quando: 'start' } }; pm.contadores = (pm.contadores || []).concat([c]); return c; }
 /* the last door stays shut until the count is full */
 function trancarPorContador(pm, si, nome, n, textoTrancado) { const ab = abridorDe(pm, si); if (!ab) return false;
   // the locked text shows how far the count is (a try at the door says what is missing)
@@ -612,9 +611,9 @@ function coletor(pm, rng, notas, hospedeiras, alvo, regra) {
       feitos++; }
     // nothing found a room: no counter and no lock (a lock with no pieces would never open)
     if (!feitos) { pm.contadores = (pm.contadores || []).filter(c => c !== cont); notas.push(L2('No room for the ' + nome + ': that lock was left out.', 'Nenhuma sala para: ' + nomePt + '; essa trava ficou de fora.')); return cont; }
-    if (feitos < n) { cont.total = Math.max(1, feitos); cont.missao.texto = typeof objetivo === 'function' ? missaoDe(cont.total) : cont.missao.texto.replace(/\b(three|três|two|duas|dois|3|2)\b/i, String(cont.total)); if (feitos < 2) notas.push(L2('Only ' + feitos + ' of ' + n + ' found a room.', 'Só ' + feitos + ' de ' + n + ' acharam sala.')); }
-    const tranca = typeof textoTrancado === 'function' ? textoTrancado(cont.total) : textoTrancado;
-    if (tranca && !trancarPorContador(pm, alvo, cont.nome, cont.total, tranca)) notas.push(L2('The room to lock has no opener.', 'A sala a trancar não tem abridor.'));
+    if (feitos < n) { cont.meta = Math.max(1, feitos); cont.missao.texto = typeof objetivo === 'function' ? missaoDe(cont.meta) : cont.missao.texto.replace(/\b(three|três|two|duas|dois|3|2)\b/i, String(cont.meta)); if (feitos < 2) notas.push(L2('Only ' + feitos + ' of ' + n + ' found a room.', 'Só ' + feitos + ' de ' + n + ' acharam sala.')); }
+    const tranca = typeof textoTrancado === 'function' ? textoTrancado(cont.meta) : textoTrancado;
+    if (tranca && !trancarPorContador(pm, alvo, cont.nome, cont.meta, tranca)) notas.push(L2('The room to lock has no opener.', 'A sala a trancar não tem abridor.'));
     return cont;
   };
 }
@@ -683,7 +682,7 @@ function aplicarComplicacoes(pm, plano, rng, notas, salasDe) {
       // the skin drawn with the plan (a key, a lever, a valve…: no test)
       const R = plano.roupasComp?.[ic] || HIST('pecas').find(x => x.modo === 'simples'); if (!R) continue;
       const cont = pecasQueDestravam(pm, plano, rng, notas, hosts, alvo, R, n);
-      plano.feitas.push({ id: 'pecas', n: cont.total, sala: alvo, roupa: R.id });
+      plano.feitas.push({ id: 'pecas', n: cont.meta, sala: alvo, roupa: R.id });
     } else if (c === 'ondas') {
       // a room along the way where something calls the waves (a skin of HISTORIAS.ondas: a bell, a horn, a beacon…, or a
       // possessed one who calls them until freed); the room after it opens only once the waves are over
@@ -727,7 +726,7 @@ function aplicarComplicacoes(pm, plano, rng, notas, salasDe) {
       if (possuido) {
         // possessed: from the moment its room is open it calls monsters (every two rounds; every round on Hard), until a hero
         // frees it (a long test); the way on opens once it is free and its room is clear
-        const ativo = novoContadorMapa(pm, nome + ' ' + L2('(active)', '(ativo)'), 1, ''); delete ativo.missao; ativo.inicio = 1;
+        const ativo = novoContadorMapa(pm, nome + ' ' + L2('(active)', '(ativo)'), 1, ''); delete ativo.missao; ativo.inicio = 1; ativo.interno = true;
         const solto = novoContadorMapa(pm, nome, 1, objetivoClaro(RT(R.objetivo, vv)));
         const T = R.teste || {}; const dup = x => { const t2 = RT(x, vv); return { en: t2, pt: t2 }; };
         const t = testeNoObjeto(o, { stat: T.stat || 'will', sucessos: 3, cumulativo: true, text: dup(T.texto), ok: dup(T.ok), fail: dup(T.falha) });
@@ -997,7 +996,7 @@ function aplicarTruque(pm, plano, rng, notas, salasDe) {
       const RN = plano.roupaRelogio?.ninho ? plano.roupaRelogio : null; if (RN) plano.relogioUsado = true; const N = RN ? RN.ninho : null;
       let k = 0;
       plano.contadorFinal = coletar('Nests', 'Ninhos', 3, ['InteractToken'], '', plano.premissa.final === 'counter' ? null : L2('Resin and bone seal the way ahead. It will not give while a nest still breeds.', 'Resina e ossos selam o caminho adiante. Não vão ceder enquanto algum ninho ainda gerar crias.'), L2('Destroy the nests', 'Destruam os ninhos'), (o, cont, si) => {
-        k++; const vivo = novoContadorMapa(pm, L2('Nest ' + k + ' alive', 'Ninho ' + k + ' vivo'), 1, ''); delete vivo.missao; vivo.inicio = 1;
+        k++; const vivo = novoContadorMapa(pm, L2('Nest ' + k + ' alive', 'Ninho ' + k + ' vivo'), 1, ''); delete vivo.missao; vivo.inicio = 1; vivo.interno = true;
         const t = testeNoObjeto(o, { stat: 'might', sucessos: 3, cumulativo: true, text: N ? N.teste : { en: 'A nest of resin, bone and something that breathes. Tear it down: it will take more than one blow.', pt: 'Um ninho de resina, ossos e algo que respira. Derrubem-no: vai precisar de mais de um golpe.' }, ok: N ? N.ok : { en: 'The nest splits open and goes still. Nothing more will crawl out of it.', pt: 'O ninho se abre e fica imóvel. Nada mais vai rastejar para fora dele.' }, fail: N ? N.falha : { en: 'The nest shrieks; ichor splashes the hero, who suffers 1 damage.', pt: 'O ninho guincha; o icor respinga no herói, que sofre 1 de dano.' } });
         o.gatilhos = [t]; o.usos = 'always';
         o['ok:' + t.uid].push({ uid: uid(), tipo: 'counter', contador: cont.nome, acao: 'add', n: 1, texto: L2('Nests destroyed: [n] of [total].', 'Ninhos destruídos: [n] de [total].'), requisitos: [] }, { uid: uid(), tipo: 'counter', contador: vivo.nome, acao: 'set', n: 0, texto: '', requisitos: [] });
@@ -1220,10 +1219,10 @@ const FERA_TEXTOS = {
     conceito: { en: '{vilao} hides deep in {lugar}. Only those who find the {n} trails spread over the rooms (footprints on the floor) will find the way there: examine each one.', pt: '{vilao} se esconde no fundo de {lugar}. Só quem achar os {n} rastros espalhados pelas salas (pegadas no chão) vai descobrir o caminho até lá: examinem cada um.' } } };
 function conceitoDoTruque(plano) {
   if (!plano.truque) return ''; const R = plano.roupaTruque;
-  if (plano.truque.id === 'fera') { const n = plano.contadorFera ? plano.contadorFera.total : 3; return RT(FERA_TEXTOS[plano.premissa.faccao === 'feras' ? 'fera' : 'gente'].conceito, plano.vocab, { n }); }
-  if (plano.truque.id === 'selos' && R) { const n = plano.contadorFinal && (plano.contadorFinal.total || 0) || 3; return RT(n === 1 ? R.objetivo1 : R.objetivoN, plano.vocab, { n }) + '.'; }
+  if (plano.truque.id === 'fera') { const n = plano.contadorFera ? plano.contadorFera.meta : 3; return RT(FERA_TEXTOS[plano.premissa.faccao === 'feras' ? 'fera' : 'gente'].conceito, plano.vocab, { n }); }
+  if (plano.truque.id === 'selos' && R) { const n = plano.contadorFinal && (plano.contadorFinal.meta || 0) || 3; return RT(n === 1 ? R.objetivo1 : R.objetivoN, plano.vocab, { n }) + '.'; }
   // (the captives of the story; the clock of the story is told in the start text)
-  if (plano.truque.id === 'resgate' && plano.roupaResgate) { const C = plano.roupaResgate; const n = plano.resgateContador ? plano.resgateContador.total : 3; return RT(n === 1 ? C.objetivo1 : C.objetivoN, plano.vocab, { n }) + '. ' + L2('Then the way out opens at the start.', 'Depois, a saída se abre no início.'); }
+  if (plano.truque.id === 'resgate' && plano.roupaResgate) { const C = plano.roupaResgate; const n = plano.resgateContador ? plano.resgateContador.meta : 3; return RT(n === 1 ? C.objetivo1 : C.objetivoN, plano.vocab, { n }) + '. ' + L2('Then the way out opens at the start.', 'Depois, a saída se abre no início.'); }
   if (plano.truque.id === 'desabamento' && plano.roupaRelogio) return L2('Reach the way out in time.', 'Alcancem a saída a tempo.');
   return TXT(plano.truque.resumo);
 }
@@ -1462,7 +1461,7 @@ function aplicarPremissa(pm, plano, rng, notas, salasDe, fim) {
       gs.forEach(g => { g.requisitos = clone(req); });
       o['senao:' + gs[0].uid] = [txtT('Not while they stand guard. Defeat the monsters of this room first.', 'Não enquanto eles montam guarda. Derrotem antes os monstros desta sala.')]; o.acaoExtra = { ...(o.acaoExtra || {}), ['senao:' + gs[0].uid]: true }; }); };
   // (fewer pieces than planned: the mission says how many, in the singular for one)
-  const missao = (c, um, varios) => { if (c && c.missao) c.missao.texto = c.total === 1 ? um : varios(c.total); };
+  const missao = (c, um, varios) => { if (c && c.missao) c.missao.texto = c.meta === 1 ? um : varios(c.meta); };
   switch (p.id) {
     case 'carga': {
       const c = coletor(pm, rng, notas, hosp(true), fim)('Crates', 'Caixotes', 3, ['InteractToken', 'Chest'], L2('A crate from the caravan, still sealed. You haul it out of the way of the raiders.', 'Um caixote da caravana, ainda lacrado. Vocês o tiram do alcance dos saqueadores.'), null, L2('Recover the 3 crates', 'Recuperem os 3 caixotes'), null,
@@ -1485,7 +1484,7 @@ function aplicarPremissa(pm, plano, rng, notas, salasDe, fim) {
           { uid: uid(), tipo: 'counter', contador: nas.nome, acao: 'add', n: 1, texto: '', requisitos: [] }, { uid: uid(), tipo: 'remove_object', proprio: true, requisitos: [] }]; },
         { todos: true, olhar: L2('Someone lies in the rubble, too hurt to walk.', 'Alguém está caído nos escombros, ferido demais para andar.'), revela: L2('A survivor lies in the rubble here.', 'Um sobrevivente está caído nos escombros aqui.') });
       if (!(pm.contadores || []).includes(c)) { pm.contadores = pm.contadores.filter(x => x !== nas); break; }
-      nas.total = c.total; missao(c, L2('Carry the survivor to the sanctuary', 'Levem o sobrevivente ao santuário'), n => L2('Carry the ' + n + ' survivors to the sanctuary', 'Levem os ' + n + ' sobreviventes ao santuário'));
+      nas.total = c.meta; missao(c, L2('Carry the survivor to the sanctuary', 'Levem o sobrevivente ao santuário'), n => L2('Carry the ' + n + ' survivors to the sanctuary', 'Levem os ' + n + ' sobreviventes ao santuário'));
       const oi = colocarNaSala(pm, fim, 'Lectern', rng, { name: L2('The sanctuary', 'O santuário') }) ?? colocarNaSala(pm, fim, 'InteractToken', rng, { name: L2('The sanctuary', 'O santuário') });
       if (oi == null) { notas.push(L2('No place for the sanctuary.', 'Sem lugar para o santuário.')); break; }
       const o = pm.salas[fim].objetos[oi]; const tem = [{ tipo: 'counter', contador: nas.nome, meta: 1 }];
@@ -3074,7 +3073,6 @@ function abrirGeradorMapa() {
     <div class="geradorOpcoes">
       <label class="campo" title="${esc(tr('The story: why the heroes go in.'))}">Premise ${sel('gm_pre', [['random', 'Random']].concat(PREMISSAS_MAPA.map(p => [p.id, TXT(p.nome)])), o.premissa)}</label>
       <label class="campo" title="${esc(tr('What the heroes must do to win.') + '\n' + TRUQUES_MAPA.map(t => TXT(t.nome) + ': ' + TXT(t.resumo)).join('\n'))}">Objective ${sel('gm_tru', [['auto', 'The premise\'s own'], ['nenhum', 'Simple']].concat(TRUQUES_MAPA.map(t => [t.id, TXT(t.nome)])), o.truque)}</label>
-      <label class="campo" title="${esc(tr('The pieces of \u201cPieces that unlock\u201d (the objective, or a lock along the way): found with no test (keys, levers, valves…), or broken with a test that calls monsters (seals, idols, wards…). Automatic: the story drawn decides.'))}">${tr('Pieces')} ${sel('gm_pec', [['auto', tr('Automatic')], ['simples', tr('No test')], ['teste', tr('Test and monsters')]], o.modoPecas || 'auto')}</label>
       <label class="campo" title="${esc(tr('What changes along the way.') + '\n' + [tr('Automatic') + ': ' + tr('the generator weighs the options (the classic, with no extra rule and one or two complications, is the likeliest)')].concat(MODALIDADES_MAPA.filter(m => !m.soAuto).map(m => TXT(m.nome) + ': ' + TXT(m.resumo))).join('\n'))}">Extra rule ${sel('gm_mod', [['auto', 'Auto']].concat(MODALIDADES_MAPA.filter(m => !m.soAuto).map(m => [m.id, TXT(m.nome)])), o.modalidade || 'auto')}</label>
       <label class="campo">Extra rule 2 ${sel('gm_cro', [['auto', 'Auto'], ['nao', 'None'], ['sorteadas', L2('Several, drawn', 'Várias, sorteadas')]].concat(MISSOES_DA_CRONICA.map(m => [m.id, TXT(m.nome)]), EVENTOS_RAROS.map(e => ['raro-' + e.id, TXT(e.nome)])), o.cronica === 'sim' ? 'sorteadas' : o.cronica || 'auto')}</label>
       <label class="campo">Length ${sel('gm_dur', [['curta', 'Short (3 rooms)'], ['media', 'Medium (6 rooms)'], ['longa', 'Long (8 rooms)']], o.duracao)}</label>
@@ -3093,7 +3091,6 @@ function abrirGeradorMapa() {
   const DICAS = {
     gm_pre: v => v === 'random' ? L2('Random: a premise is drawn.', 'Sorteada: uma premissa é sorteada.') : TXT(PREMISSAS_MAPA.find(p => p.id === v)?.resumo),
     gm_tru: v => v === 'auto' ? L2('The premise\'s own objective (most premises have a favourite).', 'O objetivo da própria premissa (a maioria tem um preferido).') : v === 'nenhum' ? L2('Simple: reach the end and do what the premise asks there.', 'Simples: chegar ao fim e cumprir lá o que a premissa pede.') : TXT(TRUQUES_MAPA.find(t => t.id === v)?.resumo),
-    gm_pec: v => v === 'simples' ? L2('The pieces are found with no test: keys, levers, valves.', 'As peças são achadas sem teste: chaves, alavancas, válvulas.') : v === 'teste' ? L2('The pieces are broken with a test, and breaking them calls monsters: seals, idols, wards.', 'As peças são quebradas com um teste, e quebrar chama monstros: selos, ídolos, proteções.') : L2('Automatic: the story drawn decides (pieces only matter for "Pieces that unlock").', 'Automático: a história sorteada decide (as peças só contam em "Peças que destravam").'),
     gm_mod: v => v === 'auto' ? L2('Automatic: the generator weighs the options (the classic, with no extra rule and one or two complications, is the likeliest; the hurries come often too).', 'Automático: o gerador pesa as opções (a clássica, sem regra extra e com uma ou duas complicações, é a mais provável; as pressas também saem bastante).') : TXT(MODALIDADES_MAPA.find(m => m.id === v)?.resumo),
     gm_cro: v => /^raro-/.test(v) ? TXT(EVENTOS_RAROS.find(e => 'raro-' + e.id === v)?.resumo) + L2(' Asked here, it comes whenever the map has room for it; the other rare events stay out.', ' Pedido aqui, vem sempre que o mapa tiver lugar para ele; os outros eventos raros ficam de fora.') : MISSOES_DA_CRONICA.some(m => m.id === v) ? TXT(MISSOES_DA_CRONICA.find(m => m.id === v).resumo) + L2(' It comes on top of the extra rule; the rare events stay out.', ' Vem além da regra extra; os eventos raros ficam de fora.') : v === 'sorteadas' || v === 'sim' ? TXT(CRONICA.resumo) : v === 'nao' ? L2('Nothing on top of the extra rule: no side quests and no rare events.', 'Nada além da regra extra: sem missões secundárias e sem eventos raros.') : L2('Automatic: now and then (about one map in three) the chronicle comes on top of the extra rule, and the rare events (a trap, a fragile bridge, a walk on the wall, a Workshop boss) keep their usual odds.', 'Automático: de vez em quando (cerca de um mapa em três) a crônica vem além da regra extra, e os eventos raros (armadilha, ponte frágil, caminhada no muro, chefe da Oficina) mantêm as chances de sempre.'),
     gm_dur: v => ({ curta: L2('About 3 rooms on the way: a short map.', 'Cerca de 3 salas no caminho: um mapa curto.'), media: L2('About 6 rooms, with a detour or two.', 'Cerca de 6 salas, com um ou dois desvios.'), longa: L2('About 8 rooms, with detours and more to find.', 'Cerca de 8 salas, com desvios e mais coisas para achar.') })[v],
@@ -3101,12 +3098,12 @@ function abrirGeradorMapa() {
     gm_tema: v => v === 'qualquer' ? L2('Any terrain: the generator mixes the tiles and objects of every place.', 'Qualquer terreno: o gerador mistura as peças e objetos de todos os lugares.') : L2('The tiles, objects and names of this kind of place: ', 'As peças, os objetos e os nomes deste tipo de lugar: ') + tr(TEMAS_SALA[v]?.nome || v) + '.',
     gm_atos: v => +v === 1 ? L2('Only the Act I box: tiles, objects and monsters of the first box.', 'Só a caixa do Ato I: peças, objetos e monstros da primeira caixa.') : L2('Both boxes (Act I and Act II): the map may use pieces and monsters of the second box, and the game menu shows it with the Act II box.', 'As duas caixas (Ato I e Ato II): o mapa pode usar peças e monstros da segunda caixa, e o menu do jogo o mostra com a caixa do Ato II.')
   };
-  const ROTULOS = { gm_pre: L2('Premise', 'Premissa'), gm_tru: L2('Objective', 'Objetivo'), gm_pec: L2('Pieces', 'Peças'), gm_mod: L2('Extra rule', 'Regra extra'), gm_cro: L2('Extra rule 2', 'Regra extra 2'), gm_dur: L2('Length', 'Duração'), gm_dif: L2('Difficulty', 'Dificuldade'), gm_tema: L2('Terrain and theme', 'Terreno e tema'), gm_atos: L2('Boxes', 'Caixas') };
+  const ROTULOS = { gm_pre: L2('Premise', 'Premissa'), gm_tru: L2('Objective', 'Objetivo'), gm_mod: L2('Extra rule', 'Regra extra'), gm_cro: L2('Extra rule 2', 'Regra extra 2'), gm_dur: L2('Length', 'Duração'), gm_dif: L2('Difficulty', 'Dificuldade'), gm_tema: L2('Terrain and theme', 'Terreno e tema'), gm_atos: L2('Boxes', 'Caixas') };
   const dica = id => { const el = $('#' + id); if (!el) return ''; const t = DICAS[id](el.value) || ''; const nome = el.selectedOptions && el.selectedOptions[0] ? el.selectedOptions[0].textContent : el.value; return t ? ROTULOS[id] + ' · ' + nome + ': ' + t : ''; };
   Object.keys(DICAS).forEach(id => { const el = $('#' + id); if (!el) return; const campo = el.closest('label') || el;
     const por = () => { const t = dica(id); campo.title = t; el.title = t; $('#gm_dica').textContent = t; };
     campo.title = dica(id); el.title = campo.title; el.addEventListener('change', por); campo.addEventListener('mouseenter', por); el.addEventListener('focus', por); });
-  const ler = () => { o.cronica = $('#gm_cro')?.value || 'auto'; o.modalidade = $('#gm_mod')?.value || 'auto'; o.modoPecas = $('#gm_pec')?.value || 'auto'; o.premissa = $('#gm_pre').value; o.truque = $('#gm_tru').value; o.duracao = $('#gm_dur').value; o.dificuldade = $('#gm_dif').value; o.tema = $('#gm_tema').value; o.semente = $('#gm_sem').value.trim() || novaSemente(); o.manterPool = $('#gm_pool').checked; o.manterItens = $('#gm_itens').checked; o.atos = +$('#gm_atos').value === 1 ? 1 : 2; ATOS.set(o.atos); };
+  const ler = () => { o.cronica = $('#gm_cro')?.value || 'auto'; o.modalidade = $('#gm_mod')?.value || 'auto'; o.premissa = $('#gm_pre').value; o.truque = $('#gm_tru').value; o.duracao = $('#gm_dur').value; o.dificuldade = $('#gm_dif').value; o.tema = $('#gm_tema').value; o.semente = $('#gm_sem').value.trim() || novaSemente(); o.manterPool = $('#gm_pool').checked; o.manterItens = $('#gm_itens').checked; o.atos = +$('#gm_atos').value === 1 ? 1 : 2; ATOS.set(o.atos); };
   const mostrar = () => {
     const r = GMAPA.resultado; const el = $('#gm_res'); if (!r) { el.innerHTML = ''; return; }
     if (r.erro) { el.innerHTML = `<p class="ajuda aviso">${esc(r.erro)}</p>`; return; }

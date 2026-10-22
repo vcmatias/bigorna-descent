@@ -26,6 +26,8 @@ namespace Bigorna.Menu
 
         /// <summary>O botao do jogo esta na tela (o painel nao precisa desenhar o seu).</summary>
         public static bool Pronto => _botao != null && _botao.gameObject != null;
+        /// <summary>O botao nao entrou no menu do jogo (todas as tentativas falharam): so entao o painel desenha o seu, embaixo.</summary>
+        public static bool Falhou => !Pronto && _tentativas > 20;
 
         public static void Batimento()
         {

@@ -23,7 +23,7 @@ function simularPartida(pm, cfg, H) {
     itens: 0, pontosEspolio: 0, ouro: 0, monstros: 0, monstrosPorSala: {}, efeitosVazios: [], testesImpossiveis: [], travado: false, usados: 0, log: [] };
   let vida = H * cfg.vida, fadiga = 0, ouro = 0, rodada = 1, local = 0, venceu = false, perdeu = false;
   const abertas = new Set([0]); const removidas = new Set(); const cont = {}; const contCheio = new Set(); const vigias = [];
-  (pm.contadores || []).forEach(c => { cont[c.nome] = c.inicio || 0; });
+  (pm.contadores || []).forEach(c => { cont[c.nome] = +c.inicio || 0; });   // (a new counter starts at 0; an older one, or a flag of the generator, at its start)
   const usos = new Map(); const gastos = new Set(); const escondidos = new Set(); const tirados = new Set(); const opcoesUsadas = new Map(); const acumulado = {};
   const timers = []; const vivos = []; const grupos = {};   // monsters in play; groups: uid → {sala, dono, lista, vivos}
   pm.salas.forEach((s, si) => s.objetos.forEach((o, oi) => { if (o.hidden) escondidos.add(si + ':' + oi); }));
@@ -60,7 +60,7 @@ function simularPartida(pm, cfg, H) {
     switch (g.tipo) {
       case 'text': efeitosDoTexto(g.text, 'room ' + (si + 1)); break;
       case 'counter': { const a = g.acao || 'add'; if (a === 'use') { vigias.push({ o, g, si, feito: false }); break; }
-        cont[g.contador] = a === 'set' ? (g.n ?? 0) : a === 'sub' ? (cont[g.contador] || 0) - (g.n ?? 1) : (cont[g.contador] || 0) + (g.n ?? 1); contadores(); break; }
+        cont[g.contador] = a === 'set' ? (g.n ?? 0) : a === 'sub' ? (cont[g.contador] || 0) - (g.n ?? 1) : (cont[g.contador] || 0) + (g.n ?? 1); { const cc = (pm.contadores || []).find(x => x.nome === g.contador); const l = cc ? limiteDoContador(cc) : 0; if (l && cont[g.contador] > l) cont[g.contador] = l; } contadores(); break; }
       case 'open_room': abrirSala(g.sala); break;
       case 'spawn': if (g.fonte === 'pool') porPool(si, (g.cells || []).length, intensidadeDoGatilho(g), g.uid, o); else (g.inimigos || []).forEach(e => { const m = entrar(si, statsDe(e.enemy, (e.tierPorHerois ? e.tierPorHerois[Math.min(3, H - 1)] : e.tier) || 1), g.uid, o); m.dono = e; if (e.bonusAtaque) m.atk += e.bonusAtaque; }); break;
       case 'rounds': timers.push({ o, g, si, desde: rodada, feitas: 0 }); break;
@@ -87,7 +87,7 @@ function simularPartida(pm, cfg, H) {
   };
   const salaDasCasas = cells => { if (!(cells || []).length) return null; const [x, y] = cells[0]; for (let si = 0; si < pm.salas.length; si++) if (chaoDaSala(si, pm).has(x + ',' + y)) return si; return null; };
   // counters full: their own triggers (once) and the watches waiting on them
-  const contadores = () => { (pm.contadores || []).forEach(c => { if (!contCheio.has(c.nome) && c.total && (cont[c.nome] || 0) >= c.total) { contCheio.add(c.nome); executar(c, 'gatilhos', 0, {}); } });
+  const contadores = () => { (pm.contadores || []).forEach(c => { if (!contCheio.has(c.nome) && metaDoContador(c) && (cont[c.nome] || 0) >= metaDoContador(c)) { contCheio.add(c.nome); executar(c, 'gatilhos', 0, {}); } });
     vigias.forEach(v => { if (!v.feito && (cont[v.g.contador] || 0) >= (v.g.n || 1)) { v.feito = true; executar(v.o, 'conta:' + v.g.uid, v.si, {}); } }); };
   // a monster falls: its own triggers, and its group's when the whole group is down
   const caidos = new Set();
@@ -128,7 +128,7 @@ function simularPartida(pm, cfg, H) {
   const ehObjetoFinal = (si, oi) => fm.tipo === 'use_object' && fm.sala === si && fm.objeto === oi;
   const venceuJa = () => { if (venceu) return true;
     if (fm.tipo === 'defeat_room') return abertas.has(fm.sala) && !vivosDaSala(fm.sala);
-    if (fm.tipo === 'trigger') { const c = (pm.contadores || []).find(x => x.missao && x.missao.uid === fm.uid); return c ? (cont[c.nome] || 0) >= c.total : false; }
+    if (fm.tipo === 'trigger') { const c = (pm.contadores || []).find(x => x.missao && x.missao.uid === fm.uid); return c ? (cont[c.nome] || 0) >= metaDoContador(c) : false; }
     if (fm.tipo === 'use_object') return !!R._finalOk;
     if (fm.tipo === 'defeat_all') return rodada > 1 && !vivos.some(m => m.hp > 0);
     return false; };

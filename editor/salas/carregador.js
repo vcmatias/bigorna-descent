@@ -19,13 +19,20 @@
   }
   const selo = j => j ? [j.formato, j.jogo, j.gerado].join('|') : '';
 
+  /* the loading screen (the editor's layout with no text): the editor takes it away when ready; the screen that asks for
+     the game files, or a stuck start, too */
+  const tirarEsqueleto = () => { const e = document.getElementById('esqueleto'); if (e) e.remove(); };
   function iniciar(jogo, mapa) {
+    setTimeout(tirarEsqueleto, 15000);
     window.BIGORNA_JOGO = jogo;
     window.BIGORNA_MAPA = mapa || {};
     const tela = document.getElementById('semDados'); if (tela) tela.remove();
     const s = document.createElement('script');
-    s.textContent = document.getElementById('bigorna-app').textContent;
+    const fonte = document.getElementById('bigorna-app');
+    s.textContent = fonte.textContent;
     document.body.appendChild(s);
+    // (v237: the app's text kept once: the copy it came in, 4 MB, leaves the page)
+    fonte.remove();
   }
 
   /* the text of one of the mod's files: "window.BIGORNA_JOGO = {...};" or "window.BIGORNA_MAPA = {...};" */
@@ -52,6 +59,7 @@
   function telaBloqueio(jogo, mapa) {
     const pt = emPortugues(jogo);
     const L = (a, b) => pt ? a : b;
+    tirarEsqueleto();
     const d = document.createElement('div');
     d.id = 'semDados';
     const passo = (feito, titulo, texto) => `<li class="${feito ? 'feito' : ''}"><span class="marca">${feito ? '\u2713' : '\u2022'}</span>
@@ -71,7 +79,7 @@
       </ol>
       <p><button type="button" class="semDadosDeNovo">${L('Verificar de novo', 'Check again')}</button></p>
       <p class="semDadosNota">${L('Depois, abra o editor pelo atalho <b>Bigorna Rooms</b> ou pelo botão «Abrir editor» no painel «Mapas da comunidade» da tela de título. Os arquivos ficam em',
-        'Then open the editor from the <b>Bigorna Rooms</b> shortcut or from the «Abrir editor» button in the «Mapas da comunidade» panel on the title screen. The files live in')} <code>${PASTA}</code>.</p>
+        'Then open the editor from the <b>Bigorna Rooms</b> shortcut or from the “Open editor” button in the “Community maps” panel on the title screen. The files live in')} <code>${PASTA}</code>.</p>
       <details class="semDadosOutra"><summary>${L('Abriu uma cópia do editor de outra pasta? Escolha os arquivos', 'Opened a copy of the editor from another folder? Pick the files')}</summary>
         <label class="semDadosEscolha">${L('Escolha bigorna-game-data.js e bigorna-worldmap.js, da pasta acima', 'Choose bigorna-game-data.js and bigorna-worldmap.js, from the folder above')}
           <input type="file" accept=".js,.json" multiple></label>

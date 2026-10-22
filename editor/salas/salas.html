@@ -10,6 +10,7 @@
 </style>
 </head>
 <body>
+<div id="esqueleto" aria-hidden="true"><div class="skTopo"><i class="sk skMarca"></i><i class="sk skCampo"></i><i class="sk skB" style="width:96px"></i><i class="sk skB" style="width:104px"></i><span class="skCresce"></span><i class="sk skB" style="width:112px"></i><i class="sk skB" style="width:96px"></i><i class="sk skB" style="width:34px"></i><i class="sk skB" style="width:88px"></i><i class="sk skB skCobre" style="width:110px"></i></div><div class="skFaixa"><span class="skG"><span class="skLin"><i class="sk skQ"></i><i class="sk skQ"></i><i class="sk skQ"></i><i class="sk skQ"></i><i class="sk skQ"></i><i class="sk skQ"></i></span><i class="sk skL"></i></span><span class="skG"><span class="skLin"><i class="sk skQ"></i><i class="sk skQ"></i><i class="sk skQ"></i></span><i class="sk skL"></i></span><span class="skG"><span class="skLin"><i class="sk skQ"></i><i class="sk skQ"></i><i class="sk skQ"></i><i class="sk skQ"></i><i class="sk skQ"></i><i class="sk skQ"></i><i class="sk skQ"></i></span><i class="sk skL"></i></span><span class="skG"><span class="skLin"><i class="sk skQ"></i><i class="sk skQ"></i><i class="sk skQ"></i><i class="sk skQ"></i></span><i class="sk skL"></i></span></div><div class="skMain"><div class="skEsq"><div class="skBloco"><i class="sk skH"></i><div class="skLinha"><i class="sk skBola"></i><span><i class="sk skT" style="width:62%"></i><i class="sk skT2" style="width:40%"></i></span></div><div class="skLinha"><i class="sk skBola"></i><span><i class="sk skT" style="width:48%"></i><i class="sk skT2" style="width:55%"></i></span></div><div class="skLinha"><i class="sk skBola"></i><span><i class="sk skT" style="width:70%"></i><i class="sk skT2" style="width:35%"></i></span></div><i class="sk skBt skCobre"></i><i class="sk skBt"></i><i class="sk skBt"></i></div><div class="skBloco"><i class="sk skH" style="width:46%"></i><i class="sk skT" style="width:88%"></i><i class="sk skT" style="width:72%"></i><i class="sk skT" style="width:80%"></i></div><div class="skBloco"><i class="sk skH" style="width:34%"></i><i class="sk skT" style="width:92%"></i><i class="sk skT" style="width:84%"></i><i class="sk skT" style="width:60%"></i></div></div><div class="skCentro"><div class="skSala"></div><div class="skPainel"><i class="sk skH"></i><i class="sk skCx"></i><i class="sk skCx"></i><i class="sk skT" style="width:70%"></i><i class="sk skCx skAlto"></i></div></div></div></div>
 <header id="topo">
   <div class="marca"><span class="bigorna">⚒</span><h1 data-sem-traducao>Bigorna <span>Rooms</span></h1></div>
   <div class="campos">
@@ -50,7 +51,7 @@
     <div id="controles3d" hidden>
       <div class="tit">3D view</div>
       <div class="linha3"><button data-c3="esq" title="Turn 45° to the left (Q)">⟲</button><button data-c3="sobe" title="Look more from above (W)">▲</button><button data-c3="dir" title="Turn 45° to the right (E)">⟳</button></div>
-      <div class="linha3"><button data-c3="topo" title="Straight from above (T)">⊤</button><button data-c3="desce" title="Look more from the side (S)">▼</button><button data-c3="inicio" title="Back to the first angle (Home)">◇</button></div>
+      <div class="linha3"><span></span><button data-c3="desce" title="Look more from the side (S)">▼</button><span></span></div>
       <div class="linha3"><button data-c3="enq" title="Fit the map (F)">⤢</button><button data-c3="sair" class="largo2" title="Back to the plan (Esc)">Plan</button></div>
       <small>Drag moves · right-drag turns</small>
       <div class="atalhos3d"><div class="sub">Keyboard</div>
@@ -58,8 +59,6 @@
         <div><kbd>W</kbd><kbd>S</kbd> <span>tilt</span></div>
         <div><kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> <span>move the map</span></div>
         <div><kbd>+</kbd><kbd>−</kbd> <span>zoom</span></div>
-        <div><kbd>T</kbd> <span>straight from above</span></div>
-        <div><kbd>Home</kbd> <span>first angle</span></div>
         <div><kbd>F</kbd> <span>fit the map</span></div>
         <div><kbd>Esc</kbd><kbd>3</kbd> <span>back to the plan</span></div>
       </div>
@@ -72,7 +71,8 @@
   <header id="topoC">
     <button id="cVoltar">◂ Rooms</button>
     <div class="marca"><span class="bigorna">⚒</span><h1>Bigorna <span>Campaign</span></h1></div>
-    <div class="campos"><label>Campaign <input id="c_nome" placeholder="Name of the campaign"></label></div>
+    <div class="campos"><label>Campaign <input id="c_nome" placeholder="Name of the campaign"></label> <span class="linguaCampanha"><button id="c_bandeira" class="sm" title="The languages of the campaign (click: its options)"></button>
+      <div id="c_painelLingua" hidden><label class="campo">Language of the campaign (its flag shows in the community library) <select id="c_lingua" data-sem-traducao></select></label><div id="c_linguas"></div></div></span></div>
     <div id="abasC">
       <button data-aba="fluxo" class="ativo">Story flow</button>
       <button data-aba="mundo">World map</button>
@@ -98,14 +98,14 @@
     <div id="abasF">
       <button data-aba="monstros" class="ativo">Monsters</button>
       <button data-aba="personagens">NPCs</button>
-      <button data-aba="itens">Items</button>
-      <button data-aba="receitas">Recipes</button>
+      <button data-aba="itens" data-tipo="ArmorModel">Armor</button>
+      <button data-aba="itens" data-tipo="ConsumableModel">Consumables</button>
+      <button data-aba="itens" data-tipo="TrinketModel">Trinkets</button>
+      <button data-aba="itens" data-tipo="CraftingMaterialModel">Materials</button>
       <button data-aba="pecas">Tiles</button>
       <button data-aba="objetos">Objects</button>
       <button data-aba="herois">Heroes</button>
       <button data-aba="armas">Weapons</button>
-      <button data-aba="facanhas">Feats</button>
-      <button data-aba="pericias">Skills</button>
       <button data-aba="historias">Stories</button>
     </div>
     <button id="fLote" title="Tick several entries of this tab and delete them at once">🗑 Delete several…</button>
@@ -121,8 +121,10 @@
 <script type="text/plain" id="bigorna-app">
 /*@@IDIOMA@@*/
 /*@@IDIOMA_PT@@*/
+/*@@LINGUAS@@*/
 /*@@JOGO@@*/
 /*@@CONFIG@@*/
+/*@@IMAGENS@@*/
 /*@@BASE@@*/
 /*@@DESENHO@@*/
 /*@@TEXTURAS@@*/
@@ -132,6 +134,7 @@
 /*@@GATILHOS@@*/
 /*@@FICHAS@@*/
 /*@@HEROIS@@*/
+/*@@FORJA_FUNDO@@*/
 /*@@ARMAS@@*/
 /*@@RECEITAS@@*/
 /*@@FACANHAS@@*/
@@ -146,6 +149,7 @@
 /*@@SIMULADOR@@*/
 /*@@EXPORTAR@@*/
 /*@@ACERVO@@*/
+/*@@TRADUCOES@@*/
 /*@@TUTORIAL@@*/
 </script>
 <script>

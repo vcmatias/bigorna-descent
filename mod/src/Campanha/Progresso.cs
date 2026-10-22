@@ -17,6 +17,15 @@ namespace Bigorna.Campanha
         [JsonProperty("unlocked")] public List<string> Liberados = new List<string>();
         [JsonProperty("completed")] public List<string> Completados = new List<string>();
         [JsonProperty("vars")] public Dictionary<string, int> Variaveis = new Dictionary<string, int>();
+        /// <summary>"Continuar herois": a partida gravada de onde veio o grupo (ranhura, identificador e nome); vazio: grupo novo.</summary>
+        [JsonProperty("partySlot", NullValueHandling = NullValueHandling.Ignore)] public int? OrigemSlot;
+        [JsonProperty("partySave", NullValueHandling = NullValueHandling.Ignore)] public string OrigemGuid;
+        [JsonProperty("partyName", NullValueHandling = NullValueHandling.Ignore)] public string OrigemNome;
+        /// <summary>A gravacao da partida de origem quando o grupo saiu dela (o carimbo de tempo do arquivo): no fim, o grupo so
+        /// volta a ela se ela continua nessa gravacao.</summary>
+        [JsonProperty("partyStamp", NullValueHandling = NullValueHandling.Ignore)] public long? OrigemCarimbo;
+        public Encontro.GrupoDoSave.Save Origem() => OrigemSlot.HasValue ? new Encontro.GrupoDoSave.Save { Slot = OrigemSlot.Value, Guid = OrigemGuid, Nome = OrigemNome, Carimbo = OrigemCarimbo ?? 0 } : null;
+        public void PorOrigem(Encontro.GrupoDoSave.Save s) { OrigemSlot = s?.Slot; OrigemGuid = s?.Guid; OrigemNome = s?.Nome; OrigemCarimbo = s != null && s.Carimbo != 0 ? s.Carimbo : (long?)null; Guardar(); }
         [JsonIgnore] string _caminho;
 
         public bool Liberado(string id) => Liberados.Contains(id);
@@ -52,7 +61,7 @@ namespace Bigorna.Campanha
             return true;
         }
 
-        public void Zerar() { Liberados.Clear(); Completados.Clear(); Variaveis.Clear(); Guardar(); }
+        public void Zerar() { Liberados.Clear(); Completados.Clear(); Variaveis.Clear(); OrigemSlot = null; OrigemGuid = null; OrigemNome = null; OrigemCarimbo = null; Guardar(); }
 
         static string CaminhoDe(Dcamp c) => Path.Combine(c.Pasta, "bigorna-progresso.json");
 

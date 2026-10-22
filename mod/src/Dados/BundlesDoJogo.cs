@@ -122,6 +122,63 @@ namespace Bigorna.Dados
             }
         }
 
+        /// <summary>Os termos das fontes de missao (qloc/...) e do bundle "localization" em todas as linguas de cada fonte
+        /// (chave -> codigo da lingua -> texto), so das chaves pedidas (sem filtro, todas). A primeira fonte que traz a chave vale.</summary>
+        public static Dictionary<string, Dictionary<string, string>> TermosDasFontes(BundlesDoJogo b, ICollection<string> chaves, Action<string> log = null)
+        {
+            var r = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+            foreach (var n in b.Nomes.Where(n => n.StartsWith("qloc/", StringComparison.OrdinalIgnoreCase) || n.Equals("localization", StringComparison.OrdinalIgnoreCase)).OrderBy(n => n, StringComparer.Ordinal).ToList())
+            {
+                try
+                {
+                    var p = b.Pacote(n); if (p == null) continue;
+                    foreach (var o in p.Objetos)
+                    {
+                        if (o.Tipo != "MonoBehaviour") continue;
+                        Dictionary<string, object> d;
+                        if (!o.TentarLer(out d) || !(d.TryGetValue("mSource", out var so) && so is Dictionary<string, object> src)) continue;
+                        var codigos = (src.TryGetValue("mLanguages", out var ml) ? ml as List<object> : null)?.Select(x => ((x as Dictionary<string, object>)?["Code"] as string ?? "").ToLowerInvariant()).ToList() ?? new List<string>();
+                        foreach (var x in (src.TryGetValue("mTerms", out var mt) ? mt as List<object> : null) ?? new List<object>())
+                        {
+                            if (!(x is Dictionary<string, object> term) || !(term["Term"] is string k) || k.Length == 0) continue;
+                            if ((chaves != null && !chaves.Contains(k)) || r.ContainsKey(k)) continue;
+                            var ls = term.TryGetValue("Languages", out var lv) ? lv as List<object> : null;
+                            if (ls == null) continue;
+                            var por = new Dictionary<string, string>(StringComparer.Ordinal);
+                            for (int i = 0; i < ls.Count && i < codigos.Count; i++)
+                                if (ls[i] is string t && t.Length > 0 && codigos[i].Length > 0 && !por.ContainsKey(codigos[i])) por[codigos[i]] = t;
+                            if (por.Count > 0) r[k] = por;
+                        }
+                    }
+                }
+                catch (Exception ex) { log?.Invoke("termos de " + n + ": " + ex.Message); }
+            }
+            return r;
+        }
+
+        /// <summary>A lingua da fonte (codigo do I2, "en", "pt-BR", "zh-CN"...) -> o texto certo; sem ele, o ingles.</summary>
+        public static string Escolher(string codigo, Dictionary<string, string> por)
+        {
+            if (por == null || por.Count == 0) return "";
+            var c = (codigo ?? "").ToLowerInvariant();
+            if (por.TryGetValue(c, out var t)) return t;
+            var raiz = c.Split('-')[0];
+            foreach (var kv in por) if (kv.Key.Split('-')[0] == raiz && (raiz != "zh" || kv.Key == c)) return kv.Value;
+            if (raiz == "zh") foreach (var kv in por) if (kv.Key.StartsWith("zh")) return kv.Value;
+            if (por.TryGetValue("en", out var en)) return en;
+            foreach (var kv in por) if (kv.Key.StartsWith("en")) return kv.Value;
+            return por.Values.First();
+        }
+
+        /// <summary>O nome interno de um modelo do jogo sem o prefixo da missao e o "Boss": "Q12 Ne'Krul 1" -> "Ne'Krul 1",
+        /// "Q4_Boss_Igor" -> "Igor", "S2_Deathspark Golem" -> "Deathspark Golem", "Q14 Final Boss Xenith" -> "Xenith".</summary>
+        public static string NomeSemMissao(string nome)
+        {
+            if (string.IsNullOrEmpty(nome)) return nome ?? "";
+            var r = System.Text.RegularExpressions.Regex.Replace(nome, @"^(?:A\d+)?(?:[QS]\d+)(?:[ _]+E\d+)?[ _]+(?:(?:Final[ _]+)?Boss[ _]+)?", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Replace('_', ' ').Trim();
+            return r.Length > 0 ? r : nome;
+        }
+
         /// <summary>CSV com aspas (campos com virgula, aspas dobradas e quebras de linha).</summary>
         public static IEnumerable<List<string>> Csv(string texto)
         {

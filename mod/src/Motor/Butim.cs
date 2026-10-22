@@ -82,7 +82,7 @@ namespace Bigorna.Motor
                 if (b.Ouro > 0) Ouro(d, b.Ouro, r);
                 if (b.Materiais > 0) MateriaisAleatorios(d, b.Materiais, r);
                 for (int k = 0; k < b.Equipamento; k++) ItemAleatorio(d, r);
-                if (b.Receitas > 0) r.Avisos.Add(T("Recebam " + b.Receitas + " receita(s) (na mesa).", "Take " + b.Receitas + " recipe(s) (on the table)."));
+                if (b.Receitas > 0) r.Avisos.Add(TF("Recebam {0} receita(s) (na mesa).", "Take {0} recipe(s) (on the table).", b.Receitas));
             }
             catch (Exception ex) { Log.Erro("entregando os espólios", ex); }
             Mostrar(r, origem);
@@ -113,7 +113,7 @@ namespace Bigorna.Motor
             var d = Jogo.DadosJogo?.Data; string texto;
             try
             {
-                if (d == null) texto = T("Percam " + v + " de ouro (na mesa).", "Lose " + v + " gold (on the table).");
+                if (d == null) texto = TF("Percam {0} de ouro (na mesa).", "Lose {0} gold (on the table).", v);
                 else
                 {
                     int tinha = d.Gold; d.ChangeGoldDuringQuest(-v); int foi = tinha - d.Gold;
@@ -133,7 +133,7 @@ namespace Bigorna.Motor
             var d = Jogo.DadosJogo?.Data; var perdidos = new Dictionary<string, int>(); string texto;
             try
             {
-                if (d == null) texto = T("Percam " + n + " material(is) de fabricação ao acaso (na mesa).", "Lose " + n + " random crafting material(s) (on the table).");
+                if (d == null) texto = TF("Percam {0} material(is) de fabricação ao acaso (na mesa).", "Lose {0} random crafting material(s) (on the table).", n);
                 else
                 {
                     for (int k = 0; k < n; k++)
@@ -172,14 +172,14 @@ namespace Bigorna.Motor
             ItemModel m = null; try { m = UserCollectionManager.GetItem(id, false); } catch { }
             if (d != null && m is RecipeModel rec)
             {
-                if (d.GetDiscoveredRecipe(rec.Id) != null) { r.Avisos.Add(T("O grupo já conhece a receita de «" + NomeItem(rec.CraftedItemId) + "».", "The party already knows the recipe for “" + NomeItem(rec.CraftedItemId) + "”.")); return; }
+                if (d.GetDiscoveredRecipe(rec.Id) != null) { r.Avisos.Add(TF("O grupo já conhece a receita de «{0}».", "The party already knows the recipe for “{0}”.", NomeItem(rec.CraftedItemId))); return; }
                 d.AddTreasureDuringQuest(new SerializedRecipe(rec));
                 r.Digitais.Add(Jogo.Texto("UI_RECIPE", T("Receita", "Recipe")) + ": " + NomeItem(rec.CraftedItemId));
                 r.Ganhos.Add(new InventoryChange(rec, 1));
                 Log.Info("  o grupo aprende a receita «" + rec.Id + "»");
                 return;
             }
-            if (d == null || m == null || m is RecipeModel) { r.Avisos.Add(T("Recebam «" + NomeItem(id) + "»" + (qtd > 1 ? " ×" + qtd : "") + " (peguem a carta).", "Take “" + NomeItem(id) + "”" + (qtd > 1 ? " ×" + qtd : "") + " (take the card).")); return; }
+            if (d == null || m == null || m is RecipeModel) { r.Avisos.Add(TF("Recebam «{0}»{1} (peguem a carta).", "Take “{0}”{1} (take the card).", NomeItem(id), (qtd > 1 ? " ×" + qtd : ""))); return; }
             var nome = NomeItem(id);
             if (m is ConsumableModel c)
             {
@@ -195,7 +195,7 @@ namespace Bigorna.Motor
             }
             else
             {
-                if (d.GetItem(id) != null) { r.Avisos.Add(T("O grupo já tem «" + nome + "».", "The party already has “" + nome + "”.")); return; }
+                if (d.GetItem(id) != null) { r.Avisos.Add(TF("O grupo já tem «{0}».", "The party already has “{0}”.", nome)); return; }
                 d.AddTreasureDuringQuest(new SerializedItem(m));
                 r.Digitais.Add(nome);
             }
@@ -225,7 +225,7 @@ namespace Bigorna.Motor
                 return;
             }
             var loots = UserCollectionManager.GetLoots(true)?.Where(x => x != null).ToList();
-            if (d == null || loots == null || loots.Count == 0) { r.Avisos.Add(T("Recebam espólios aleatórios de " + pontos + " ponto(s) (na mesa).", "Take " + pontos + " point(s) of random loot (on the table).")); return; }
+            if (d == null || loots == null || loots.Count == 0) { r.Avisos.Add(TF("Recebam espólios aleatórios de {0} ponto(s) (na mesa).", "Take {0} point(s) of random loot (on the table).", pontos)); return; }
             var loot = loots[UnityEngine.Random.Range(0, loots.Count)];
             var conta = new Dictionary<CraftingMaterialModel, int>();
             void Soma(CraftingMaterialModel x) { if (x == null) return; conta[x] = conta.TryGetValue(x, out var n) ? n + 1 : 1; pontos -= Math.Max(1, x.Value); }
@@ -246,7 +246,7 @@ namespace Bigorna.Motor
         static void MateriaisAleatorios(SerializedGame d, int n, Recebido r)
         {
             var mats = UserCollectionManager.GetCraftingMaterials(true)?.Where(x => x != null).ToList();
-            if (d == null || mats == null || mats.Count == 0) { r.Avisos.Add(T("Recebam " + n + " material(is) de fabricação (na mesa).", "Take " + n + " crafting material(s) (on the table).")); return; }
+            if (d == null || mats == null || mats.Count == 0) { r.Avisos.Add(TF("Recebam {0} material(is) de fabricação (na mesa).", "Take {0} crafting material(s) (on the table).", n)); return; }
             var m = mats[UnityEngine.Random.Range(0, mats.Count)];
             Item(d, m.Id, n, r);
         }
@@ -260,7 +260,7 @@ namespace Bigorna.Motor
             if (pool != null && pool.Count > 0 && d != null)
             {
                 var livres = pool.Where(id => { if (string.IsNullOrEmpty(id) || _doPool.Contains(id)) return false; bool tem; try { tem = d.GetDiscoveredItem(id) != null; } catch { tem = d.GetItem(id) != null; } if (tem) return false; try { return !(UserCollectionManager.GetItem(id, false) is CraftingMaterialModel); } catch { return true; } }).ToList();
-                if (livres.Count == 0) { r.Avisos.Add(T("Todos os itens do pool deste mapa já foram obtidos.", "All items in this map's item pool have already been obtained.")); return; }
+                if (livres.Count == 0) { r.Avisos.Add(T("Todos os itens da reserva de itens deste mapa já foram obtidos.", "All items in this map's item pool have already been obtained.")); return; }
                 var id = livres[UnityEngine.Random.Range(0, livres.Count)];
                 ItemModel m = null; try { m = UserCollectionManager.GetItem(id, false); } catch { }
                 if (!(m is ConsumableModel || m is CraftingMaterialModel)) _doPool.Add(id);   // os que acumulam podem vir de novo
@@ -273,7 +273,7 @@ namespace Bigorna.Motor
             foreach (var id in ids)
             {
                 ItemModel m = null; try { m = UserCollectionManager.GetItem(id, true); } catch { }
-                if (m != null && !m.IsUpgrade && d.GetDiscoveredItem(m) == null) novos.Add(id);
+                if (m != null && (!m.IsUpgrade || m.Id.StartsWith("B_")) && d.GetDiscoveredItem(m) == null) novos.Add(id);   // (um item da Oficina com efeito melhorado sai como os outros)
             }
             if (novos.Count == 0) { r.Avisos.Add(T("Todos os itens já foram descobertos.", "All items have already been discovered.")); return; }
             var escolhido = novos[UnityEngine.Random.Range(0, novos.Count)];
@@ -283,40 +283,65 @@ namespace Bigorna.Motor
 
         static void Ouro(SerializedGame d, int v, Recebido r)
         {
-            if (d == null) { r.Avisos.Add(T("Recebam " + v + " de ouro.", "Take " + v + " gold.")); return; }
+            if (d == null) { r.Avisos.Add(TF("Recebam {0} de ouro.", "Take {0} gold.", v)); return; }
             d.ChangeGoldDuringQuest(v);
             r.Ganhos.Add(new InventoryChange(new GoldDetails(v), v));
             r.Digitais.Add(v + " " + Jogo.Texto("UI_GOLD", T("ouro", "gold")));
         }
 
-        static void Mostrar(Recebido r, string origem)
+        static string TextoDe(Recebido r)
         {
-            if (r.Ganhos.Count == 0 && r.Avisos.Count == 0) return;
             string lista(List<string> l) => l.Count == 1 ? l[0] : string.Concat(l.Select(x => "\n  - " + x));
             var partes = new List<string>();
             if (r.Digitais.Count > 0) partes.Add(string.Format(Jogo.Texto("GAIN_DIGITAL_TREASURE", T("Recebido: {0}", "Received: {0}")), lista(r.Digitais)));
             if (r.Fisicos.Count > 0) partes.Add(string.Format(Jogo.Texto("GAIN_PHYSICAL_TREASURE", T("Peguem: {0}", "Take: {0}")), lista(r.Fisicos)));
             partes.AddRange(r.Avisos);
-            var texto = string.Join("\n\n", partes.ToArray());
+            return string.Join("\n\n", partes.ToArray());
+        }
+
+        /// <summary>O que entrou no inventario conta para as facanhas de itens ganhos, como no jogo.</summary>
+        static void ContarNasFacanhas(InventoryChange[] ganhos)
+        {
+            if (ganhos.Length == 0) return;
+            try { Jogo.Persistente?.Audio?.PostEvent("Reward_Generic"); } catch { }
+            try
+            {
+                var feitos = Jogo.Persistente?.FeatController;
+                if (feitos != null) foreach (var g in ganhos)
+                    {
+                        ItemType? t = g.Item is ArmorModel ? ItemType.Armor : g.Item is ConsumableModel ? ItemType.Consumable : g.Item is CraftingMaterialModel ? ItemType.Material : g.Item is TrinketModel ? ItemType.Trinket : g.Item is WeaponPartsModel ? ItemType.WeaponPart : (ItemType?)null;
+                        if (t.HasValue) feitos.ProgressItemGain(t.Value, null, g.Qty);
+                    }
+            }
+            catch (Exception ex) { Log.Info("  façanhas dos espólios: " + ex.Message); }
+        }
+
+        static void Mostrar(Recebido r, string origem)
+        {
+            if (r.Ganhos.Count == 0 && r.Avisos.Count == 0) return;
+            var texto = TextoDe(r);
             Log.Info("  espólios" + (origem != null ? " de «" + origem + "»" : "") + ": " + texto.Replace("\n", " "));
             var ganhos = r.Ganhos.ToArray();
-            if (ganhos.Length > 0)
-            {
-                try { Jogo.Persistente?.Audio?.PostEvent("Reward_Generic"); } catch { }
-                try
-                {
-                    var feitos = Jogo.Persistente?.FeatController;
-                    if (feitos != null) foreach (var g in ganhos)
-                        {
-                            ItemType? t = g.Item is ArmorModel ? ItemType.Armor : g.Item is ConsumableModel ? ItemType.Consumable : g.Item is CraftingMaterialModel ? ItemType.Material : g.Item is TrinketModel ? ItemType.Trinket : g.Item is WeaponPartsModel ? ItemType.WeaponPart : (ItemType?)null;
-                            if (t.HasValue) feitos.ProgressItemGain(t.Value, null, g.Qty);
-                        }
-                }
-                catch (Exception ex) { Log.Info("  façanhas dos espólios: " + ex.Message); }
-            }
+            ContarNasFacanhas(ganhos);
             Jogo.Sujo();
             Dialogos.Mensagem(texto, () => { try { if (ganhos.Length > 0) Jogo.UI?.InventoryChangedCallout?.CloseCallout(); } catch { } }, origem ?? Jogo.Texto("UI_TREASURE", T("Tesouro", "Treasure")),
                 () => { try { if (ganhos.Length > 0) { var c = Jogo.UI?.InventoryChangedCallout; if (c != null) { c.SyncTo(ganhos, null); c.gameObject.SetActive(true); } } } catch (Exception ex) { Log.Info("  faixa de itens: " + ex.Message); } });
+        }
+
+        /// <summary>Os itens do premio de uma facanha: entram no inventario como os do gatilho "Dar um item", com a faixa de
+        /// itens do jogo, mas sem quadro proprio (a janela de facanhas ja esta aberta: o texto volta para ela mostrar).</summary>
+        public static string EntregarNaJanela(IEnumerable<KeyValuePair<string, int>> itens, string origem)
+        {
+            var r = new Recebido(); var d = Jogo.DadosJogo?.Data;
+            foreach (var kv in itens) { try { Item(d, kv.Key, Math.Max(1, kv.Value), r); } catch (Exception ex) { Log.Erro("dando o item «" + kv.Key + "»", ex); } }
+            if (r.Ganhos.Count == 0 && r.Avisos.Count == 0) return "";
+            var texto = TextoDe(r);
+            Log.Info("  prêmio" + (origem != null ? " de «" + origem + "»" : "") + ": " + texto.Replace("\n", " "));
+            var ganhos = r.Ganhos.ToArray();
+            ContarNasFacanhas(ganhos);
+            Jogo.Sujo();
+            try { if (ganhos.Length > 0) { var c = Jogo.UI?.InventoryChangedCallout; if (c != null) { c.SyncTo(ganhos, null); c.gameObject.SetActive(true); } } } catch (Exception ex) { Log.Info("  faixa de itens: " + ex.Message); }
+            return texto;
         }
     }
 }

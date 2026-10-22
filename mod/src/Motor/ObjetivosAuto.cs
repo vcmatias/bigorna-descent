@@ -33,7 +33,7 @@ namespace Bigorna.Motor
             ["defeat_n"] = "Defeat N enemies", ["survive_rounds"] = "Survive N rounds", ["reach_cell"] = "Reach the marked space",
             ["use_object"] = "Use the object", ["open_chest"] = "Open the chest", ["use_n_objects"] = "Activate the mechanisms",
         };
-        static Dictionary<string, string> Genericos => Pt ? GenericosPt : GenericosEn;
+        static Dictionary<string, string> Genericos => Idioma.Dicionario(GenericosPt, GenericosEn);
 
         public static string NomeGenerico(string id) => id != null && Genericos.TryGetValue(id, out var n) ? n : T("Cumprir o objetivo", "Complete the objective");
 

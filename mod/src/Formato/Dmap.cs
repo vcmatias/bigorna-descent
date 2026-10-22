@@ -19,6 +19,8 @@ namespace Bigorna.Formato
             [JsonProperty("name")] public string Nome;
             [JsonProperty("author")] public string Autor;
             [JsonProperty("description")] public string Descricao;
+            /// <summary>A lingua em que o mapa foi feito (editor 0.1.6).</summary>
+            [JsonProperty("language")] public string Lingua;
             [JsonProperty("difficulty")] public string Dificuldade;
             [JsonProperty("heroCount")] public int[] Herois;
             [JsonProperty("estimatedMinutes")] public int Minutos;
@@ -173,7 +175,7 @@ namespace Bigorna.Formato
             [JsonProperty("recipes")] public List<JObject> Receitas = new List<JObject>();
             /// <summary>Pericias da Oficina: {id, game?, hero, name, cost} (as cartas ficam na mesa).</summary>
             [JsonProperty("skills")] public List<JObject> Pericias = new List<JObject>();
-            /// <summary>Facanhas da Oficina: {id, game?, hero, text, goal, timing, required, act, rewards?, params?}.</summary>
+            /// <summary>Facanhas da Oficina: {id, game?, hero, text, goal, timing, required, act, rewards?, rewardItems? [{item, qty}], params?}.</summary>
             [JsonProperty("feats")] public List<JObject> Facanhas = new List<JObject>();
             /// <summary>Pool de facanhas: para os herois com alguma aqui, so estas sao oferecidas.</summary>
             [JsonProperty("featPool")] public List<string> PoolFacanhas = new List<string>();
@@ -295,41 +297,60 @@ namespace Bigorna.Formato
         [JsonIgnore]
         public string NomeVisivel => !string.IsNullOrEmpty(Metadados?.Nome) ? Metadados.Nome : Path.GetFileNameWithoutExtension(Caminho ?? "mapa");
 
-        /// <summary>O resumo do mapa para a lista do painel, em portugues (pt) ou ingles (o formato nao depende do jogo:
-        /// quem chama diz a lingua).</summary>
-        public string Resumo(bool pt)
+        /// <summary>O resumo do mapa para a lista do painel, na lingua de quem chama (o formato nao depende do jogo: quem chama
+        /// traduz, com t(portugues, ingles)).</summary>
+        public string Resumo(Func<string, string, string> t)
         {
             {
                 var partes = new List<string>();
-                if (!string.IsNullOrEmpty(Metadados?.Autor)) partes.Add(L(pt, "por ", "by ") + Metadados.Autor);
-                partes.Add((Board?.Pecas?.Count ?? 0) + L(pt, " peças", " tiles"));
-                partes.Add((Spawns?.Inimigos?.Count ?? 0) + L(pt, " inimigos", " enemies"));
-                partes.Add((Gatilhos?.Count ?? 0) + L(pt, " gatilhos", " triggers"));
-                if (Metadados?.Herois != null && Metadados.Herois.Length == 2) partes.Add(Metadados.Herois[0] + L(pt, " a ", " to ") + Metadados.Herois[1] + L(pt, " heróis", " heroes"));
+                string F(string pt, string en, params object[] a) { try { return string.Format(t(pt, en), a); } catch { return string.Format(en, a); } }
+                if (!string.IsNullOrEmpty(Metadados?.Autor)) partes.Add(F("por {0}", "by {0}", Metadados.Autor));
+                partes.Add(F("{0} peças", "{0} tiles", Board?.Pecas?.Count ?? 0));
+                partes.Add(F("{0} inimigos", "{0} enemies", Spawns?.Inimigos?.Count ?? 0));
+                partes.Add(F("{0} gatilhos", "{0} triggers", Gatilhos?.Count ?? 0));
+                if (Metadados?.Herois != null && Metadados.Herois.Length == 2) partes.Add(F("{0} a {1} heróis", "{0} to {1} heroes", Metadados.Herois[0], Metadados.Herois[1]));
                 return string.Join(" · ", partes.ToArray());
             }
         }
 
-        static string L(bool pt, string textoPt, string textoEn) => pt ? textoPt : textoEn;
 
         /// <summary>A versao do formato que este mod conhece. Um mapa de versao maior (de um editor mais novo) e lido do mesmo
         /// jeito: o que este mod nao conhece fica de fora, sem erro (regras em compat/LEIAME.md).</summary>
         public const int VersaoAtual = 3;
 
+        /// <summary>As linguas do mapa (a original primeiro) e a que esta em uso (editor 0.1.7: mapas em varias linguas).</summary>
+        [JsonIgnore] public List<string> Linguas = new List<string>();
+        [JsonIgnore] public string LinguaEmUso;
+
         public static Dmap Carregar(string caminho)
         {
             // (um mapa do acervo diz quais pacotes exige: o conteudo deles entra no "custom" antes da leitura; o do mapa vence)
+            // (um mapa em varias linguas: os textos trocam pelos da lingua escolhida antes de tudo)
             var texto = File.ReadAllText(caminho);
-            var j = Acervo.Pacotes.ExigePacotes(texto) ? Acervo.Pacotes.LerJson(texto) : null;
-            var faltam = j != null ? Acervo.Pacotes.Juntar(j) : new List<Acervo.Requisito>();
+            bool exige = Acervo.Pacotes.ExigePacotes(texto), traduz = Traducao.TemTraducoes(texto);
+            var j = exige || traduz ? Acervo.Pacotes.LerJson(texto) : null;
+            var (linguas, lingua) = Traduzir(j, traduz, caminho);
+            var faltam = exige ? Acervo.Pacotes.Juntar(j) : new List<Acervo.Requisito>();
             var d = j != null ? j.ToObject<Dmap>(JsonSerializer.CreateDefault()) : JsonConvert.DeserializeObject<Dmap>(texto);
             if (d == null) throw new Exception("arquivo vazio");
-            d.Requer = j != null ? Acervo.Requisito.DoMapa(j["requires"]) : new List<Acervo.Requisito>(); d.PacotesFaltando = faltam;
+            d.Requer = exige ? Acervo.Requisito.DoMapa(j["requires"]) : new List<Acervo.Requisito>(); d.PacotesFaltando = faltam;
+            d.Linguas = linguas ?? (string.IsNullOrEmpty(d.Metadados?.Lingua) ? new List<string>() : new List<string> { Traducao.Codigo(d.Metadados.Lingua) });
+            d.LinguaEmUso = lingua ?? (d.Linguas.Count > 0 ? d.Linguas[0] : null);
             if (d.Formato != "dmap") throw new Exception("não é um .dmap (format=" + d.Formato + ")");
             if (d.Versao > VersaoAtual) Log.Info("«" + Path.GetFileName(caminho) + "» foi feito num editor mais novo (formato v" + d.Versao + "; este mod lê até v" + VersaoAtual + "): o que ele não conhece fica de fora. Atualize o Bigorna.");
             d.Caminho = caminho;
             d.Normalizar();
             return d;
+        }
+
+        /// <summary>As linguas do arquivo e a escolhida; com outra que nao a original, os textos ja trocados no JSON.</summary>
+        internal static (List<string>, string) Traduzir(JObject j, bool traduz, string caminho)
+        {
+            if (j == null || !traduz) return (null, null);
+            var linguas = Traducao.Linguas(j); if (linguas.Count == 0) return (null, null);
+            var lingua = Traducao.Escolher(Traducao.Chave(caminho), linguas);
+            if (lingua != linguas[0]) { var n = Traducao.Aplicar(j, lingua); Log.Info("«" + Path.GetFileName(caminho) + "» em " + lingua + " (" + n + " texto(s) traduzido(s); línguas: " + string.Join(", ", linguas.ToArray()) + ")"); }
+            return (linguas, lingua);
         }
 
         public void Normalizar()

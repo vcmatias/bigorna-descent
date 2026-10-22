@@ -33,7 +33,7 @@ namespace Bigorna.Encontro
             try
             {
                 var todas = UserCollectionManager.GetCutscenes(true);
-                if (todas == null) return "(o catálogo ainda não carregou)";
+                if (todas == null) return Idioma.T("(o catálogo ainda não carregou)", "(the catalog has not loaded yet)");
                 return string.Join("\n", todas.Where(c => c != null).Select(c => c.Id + "  ·  " + c.name + "  ·  " + c.SoundEventName).ToArray());
             }
             catch (Exception ex) { return ex.Message; }

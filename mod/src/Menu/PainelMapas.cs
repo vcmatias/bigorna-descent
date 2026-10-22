@@ -40,7 +40,7 @@ namespace Bigorna.Menu
         static string TextoAlterado(object chave)
         {
             if (!_alterados.TryGetValue(chave, out var d) || d == DateTime.MinValue) return "";
-            return T("alterado em " + d.ToString("dd/MM/yyyy HH:mm"), "last changed " + d.ToString("yyyy-MM-dd HH:mm"));
+            return TF("alterado em {0}", "last changed {0}", DataHora(d));
         }
 
         public static bool Aberto => _aberto;
@@ -77,7 +77,7 @@ namespace Bigorna.Menu
                 foreach (var m in _mapas) _alterados[m] = Alterado(m.Caminho);
                 _erro = null;
             }
-            catch (Exception ex) { _erro = ex.Message; }
+            catch (Exception ex) { _erro = T("Não li a pasta: ", "Could not read the folder: ") + ex.Message; }
             _proximaLeitura = Time.unscaledTime + 5f;
         }
 
@@ -95,12 +95,15 @@ namespace Bigorna.Menu
             _abaOn.normal.background = _abaOff.active.background; _abaOn.normal.textColor = new Color(1f, 0.85f, 0.4f);
         }
 
+        static Dmap _savesDe;
+        static List<Encontro.GrupoDoSave.Save> _saves;
+
         public static void Desenhar()
         {
             if (Jogo.CenaAtual() != Scene.Titlescene) { _aberto = false; return; }
             Estilos();
             // (o botao fica no menu do jogo, entre "Colecao" e "Sair": BotaoDoMenu; este, embaixo da tela, so se o menu nao o aceitou)
-            // (por enquanto os dois: o do menu ainda em teste)
+            if (BotaoDoMenu.Falhou)
             {
                 var botao = new Rect(Screen.width / 2f - 130f, Screen.height - 64f, 260f, 40f);
                 if (GUI.Button(botao, _aberto ? T("Fechar mapas", "Close maps") : T("Mapas da comunidade", "Community maps"), _botao)) Alternar();
@@ -115,7 +118,6 @@ namespace Bigorna.Menu
             GUILayout.BeginHorizontal();
             GUILayout.Label(T("Mapas da comunidade", "Community maps") + " · Bigorna " + Bootstrap.Versao, _titulo);
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button(Pt ? "English" : "Português", _botao, GUILayout.Width(100f))) Definir(!Pt);
             if (GUILayout.Button(T("Fechar", "Close"), _botao, GUILayout.Width(80f))) _aberto = false;   // (fecha no quadro seguinte: os grupos do layout fecham neste)
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
@@ -129,7 +131,7 @@ namespace Bigorna.Menu
             if (GUILayout.Button(T("Relatar um problema", "Report a problem"), _botao, GUILayout.Width(170f))) Relatos.Alternar();
             GUILayout.EndHorizontal();
             GUILayout.Label(Bootstrap.PastaMapas, _pequeno);
-            if (_erro != null) GUILayout.Label(T("Não li a pasta: ", "Could not read the folder: ") + _erro, _pequeno);
+            if (_erro != null) GUILayout.Label(_erro, _pequeno);   // (v241: a mensagem como veio; «Não li a pasta» so para o erro da pasta)
             GUILayout.Space(6f);
             GUILayout.BeginHorizontal();
             if (GUILayout.Button(T("Campanhas", "Campaigns") + " (" + _campanhas.Count + ")", _aba == 0 ? _abaOn : _abaOff, GUILayout.Width(180f))) _aba = 0;
@@ -145,7 +147,7 @@ namespace Bigorna.Menu
                     "The game's own quests, to replay any of them with the official rules: choose the quest, the party and the difficulty."), _pequeno);
             GUILayout.Space(4f);
             _rolagem = GUILayout.BeginScrollView(_rolagem);
-            if (_aba == 0 && _campanhas.Count == 0) GUILayout.Label(T("Nenhuma campanha (.dcamp) na pasta. No editor, «Create campaign» e depois «Export campaign».", "No campaigns (.dcamp) in the folder. In the editor, use \"Create campaign\" and then \"Export campaign\"."), _texto);
+            if (_aba == 0 && _campanhas.Count == 0) GUILayout.Label(T("Nenhuma campanha (.dcamp) na pasta. No editor, «Iniciar campanha» e depois «Exportar campanha».", "No campaigns (.dcamp) in the folder. In the editor, use “Start a campaign” and then “Export campaign”."), _texto);
             if (_aba == 1 && _mapas.Count == 0) GUILayout.Label(T("Nenhum .dmap avulso na pasta. Exporte um mapa no editor e copie para cá.", "No standalone .dmap in the folder. Export a map in the editor and copy it here."), _texto);
             if (_aba == 0) foreach (var c in _campanhas)
             {
@@ -155,13 +157,19 @@ namespace Bigorna.Menu
                 GUILayout.Label(c.NomeVisivel, _texto);
                 GUILayout.Label(c.Nos.Count(n => n.EhMapa) + T(" mapa(s), ", " map(s), ") + c.Nos.Count(n => !n.EhMapa) + T(" parada(s) narrativa(s)", " narrative stop(s)") + (prog.Completados.Count > 0 ? " · " + prog.Completados.Count + T(" nó(s) completado(s)", " node(s) completed") : "") + (TextoAlterado(c) == "" ? "" : " · " + TextoAlterado(c)) + (string.IsNullOrEmpty(c.Metadados.Descricao) ? "" : "\n" + c.Metadados.Descricao), _pequeno);
                 GUILayout.EndVertical();
-                if (GUILayout.Button(prog.Completados.Count > 0 ? T("Continuar", "Continue") : T("Jogar", "Play"), _botao, GUILayout.Width(100f), GUILayout.Height(40f)))
+                var andamento = Campanha.SavesDaComunidade.EmAndamento(c);
+                if (andamento != null && GUILayout.Button(T("Continuar campanha", "Continue campaign"), _botao, GUILayout.Width(170f), GUILayout.Height(40f)))
+                {
+                    var erro = Campanha.SavesDaComunidade.Continuar(andamento.Value.Key, c.NomeVisivel);
+                    if (erro != null) _erro = erro; else _aberto = false;
+                }
+                if (andamento == null && GUILayout.Button(prog.Completados.Count > 0 ? T("Continuar", "Continue") : T("Jogar", "Play"), _botao, GUILayout.Width(100f), GUILayout.Height(40f)))
                 {
                     Log.Info("«Jogar» campanha " + c.NomeVisivel + " (" + c.Caminho + ")");
                     var erro = Campanha.Campanha.Comecar(c, false);
                     if (erro != null) _erro = erro; else _aberto = false;
                 }
-                if (prog.Completados.Count > 0 && GUILayout.Button(T("Recomeçar", "Restart"), _botao, GUILayout.Width(100f), GUILayout.Height(40f)))
+                if ((prog.Completados.Count > 0 || andamento != null) && GUILayout.Button(T("Recomeçar", "Restart"), _botao, GUILayout.Width(100f), GUILayout.Height(40f)))
                 {
                     var erro = Campanha.Campanha.Comecar(c, true);
                     if (erro != null) _erro = erro; else _aberto = false;
@@ -175,15 +183,30 @@ namespace Bigorna.Menu
                 GUILayout.BeginHorizontal(GUI.skin.box);
                 GUILayout.BeginVertical();
                 GUILayout.Label(m.NomeVisivel, _texto);
-                GUILayout.Label(m.Resumo(Pt) + (TextoAlterado(m) == "" ? "" : " · " + TextoAlterado(m)) + (string.IsNullOrEmpty(m.Metadados.Descricao) ? "" : "\n" + m.Metadados.Descricao), _pequeno);
+                GUILayout.Label(m.Resumo(T) + (TextoAlterado(m) == "" ? "" : " · " + TextoAlterado(m)) + (string.IsNullOrEmpty(m.Metadados.Descricao) ? "" : "\n" + m.Metadados.Descricao), _pequeno);
                 GUILayout.EndVertical();
-                if (GUILayout.Button(T("Jogar", "Play"), _botao, GUILayout.Width(90f), GUILayout.Height(40f)))
+                if (GUILayout.Button(T("Grupo novo", "New party"), _botao, GUILayout.Width(110f), GUILayout.Height(40f)))
                 {
                     Log.Info("«Jogar» em " + m.NomeVisivel + " (" + m.Caminho + ")");
                     var erro = Lancador.Lancar(m);
                     if (erro != null) _erro = erro; else _aberto = false;
                 }
+                if (GUILayout.Button(T("Usar meus heróis", "Use my heroes"), _botao, GUILayout.Width(140f), GUILayout.Height(40f))) { _savesDe = _savesDe == m ? null : m; _saves = null; }
                 GUILayout.EndHorizontal();
+                if (_savesDe == m)
+                {
+                    // (o grupo de uma partida gravada: a lista, a mais recente primeiro)
+                    GUILayout.Label(Encontro.GrupoDoSave.TextoCurto, _pequeno);
+                    _saves = _saves ?? Encontro.GrupoDoSave.Saves();
+                    if (_saves.Count == 0) GUILayout.Label(T("Nenhuma partida gravada do jogo.", "No saved games of the game."), _pequeno);
+                    foreach (var sv in _saves)
+                        if (GUILayout.Button(sv.Rotulo + "  ·  " + sv.Detalhe, _botao))
+                        {
+                            Log.Info("«Usar meus heróis» em " + m.NomeVisivel + " com o save " + sv.Slot);
+                            var erro = Lancador.Lancar(m, sv); _savesDe = null;
+                            if (erro != null) _erro = erro; else _aberto = false;
+                        }
+                }
                 GUILayout.Space(4f);
             }
             GUILayout.EndScrollView();

@@ -729,8 +729,10 @@ namespace Bigorna.Motor
                 if (JogoFechaSozinho()) { _fecharCom = null; _redeDeSeguranca = false; Log.Info("  o jogo fecha a partida sozinho pelo herói caído"); return; }
                 if (Time.unscaledTime - _fecharDesde < 8f) return;
             }
-            bool ocupado = Jogo.MostrandoMensagem || Dialogos.Ocupado || Dialogos.NaFila > 0;
-            if (ocupado && Time.unscaledTime - _fecharDesde < 12f) return;
+            // (v247: uma cena propria por tocar ou tocando segura o fim ate acabar; um aviso comum, ate 12 s)
+            bool cena = Acoes.CenasPorTocar > 0 || Dialogos.Narrando || VideoProprio.EmMarcha;
+            bool ocupado = cena || Jogo.MostrandoMensagem || Dialogos.Ocupado || Dialogos.NaFila > 0;
+            if (ocupado && Time.unscaledTime - _fecharDesde < (cena ? 600f : 12f)) return;
             bool vitoria = _fecharCom.Value;
             _fecharCom = null;
             _redeDeSeguranca = false;

@@ -57,6 +57,9 @@ namespace Bigorna.Menu
             catch { return "sem-codigo"; }
         }
 
+        /// <summary>As recusas conhecidas do servidor de relatos (tools/relatos/Codigo.gs), na lingua do mod.</summary>
+        static string Recusa(string r) => r == "grande demais" ? T("pacote grande demais", "package too large") : r == "chave" ? T("chave não aceita", "key not accepted") : r;
+
         public static void Alternar() { Aberto = !Aberto; if (Aberto) { _situacao = ""; Lembrar(); } }
 
         static void Lembrar()
@@ -257,7 +260,7 @@ namespace Bigorna.Menu
                 }
                 else
                 {
-                    _situacao = T("O envio não confirmou (", "The upload was not confirmed (") + (recusa ?? req.error ?? (T("resposta ", "response ") + req.responseCode))
+                    _situacao = T("O envio não confirmou (", "The upload was not confirmed (") + (recusa != null ? Recusa(recusa) : req.error ?? (T("resposta ", "response ") + req.responseCode))
                         + T("). O pacote está salvo na pasta Relatos: mandem ao autor.", "). The package is saved in the Relatos folder: send it to the author.");
                     Log.Info("relato: envio sem confirmação (" + req.responseCode + " " + req.error + ")");
                 }

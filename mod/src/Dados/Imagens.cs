@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace Bigorna.Dados
@@ -69,6 +72,60 @@ namespace Bigorna.Dados
                 if (liberar) RenderTexture.ReleaseTemporary(rt);
                 if (t2 != null) UnityEngine.Object.Destroy(t2);
             }
+        }
+    }
+    /// <summary>v240: as imagens das obras sao arquivos com o nome do proprio conteudo ("imagens/&lt;hash&gt;.png"). O .dmap, o .dcamp e
+    /// o pacote.json levam so a referencia; o arquivo fica na pasta "imagens" ao lado deles, ou no deposito do editor
+    /// (Bigorna\Imagens\&lt;2&gt;\&lt;hash&gt;.png). Um texto em data: URL (os arquivos antigos, ou um baixado avulso) continua valendo.</summary>
+    public static class ImagensDaObra
+    {
+        /// <summary>A pasta de dados do jogo (definida ao iniciar: o Unity so a da na linha principal).</summary>
+        public static string Dados;
+        static readonly Regex Nome = new Regex("^[0-9a-f]{32}\\.(png|jpg|webp|gif)$");
+        static Dictionary<string, string> _indice; static DateTime _indiceQuando;
+        static readonly object _trava = new object();
+
+        public static bool EhReferencia(string s) => s != null && s.Length <= 48 && s.StartsWith("imagens/", StringComparison.Ordinal) && Nome.IsMatch(s.Substring(8));
+
+        /// <summary>Os bytes de uma imagem: a referencia lida do arquivo, ou o data: URL decodificado (null: nada legivel).</summary>
+        public static byte[] Bytes(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return null;
+            if (s.StartsWith("imagens/", StringComparison.Ordinal))
+            {
+                var f = Achar(s.Substring(8));
+                if (f == null) { Log.Info("imagem não encontrada: " + s + " (ela vai na pasta «imagens» ao lado do mapa)"); return null; }
+                return File.ReadAllBytes(f);
+            }
+            int k = s.IndexOf("base64,", StringComparison.Ordinal);
+            if (k >= 0) return Convert.FromBase64String(s.Substring(k + 7));
+            int v = s.IndexOf(',');
+            return Convert.FromBase64String(v >= 0 ? s.Substring(v + 1) : s);
+        }
+
+        /// <summary>O caminho do arquivo de uma imagem: o deposito, ou uma pasta "imagens" de CustomMaps ou de Pacotes.</summary>
+        public static string Achar(string nome)
+        {
+            if (string.IsNullOrEmpty(Dados) || !Nome.IsMatch(nome ?? "")) return null;
+            var f = Path.Combine(Dados, "Bigorna", "Imagens", nome.Substring(0, 2), nome);
+            if (File.Exists(f)) return f;
+            lock (_trava)
+            {
+                if (_indice != null && _indice.TryGetValue(nome, out var c) && File.Exists(c)) return c;
+                // (a varredura de novo so depois de 10 s: um mapa com muitas imagens faltando faz uma so)
+                if (_indice == null || (DateTime.UtcNow - _indiceQuando).TotalSeconds > 10)
+                {
+                    _indice = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase); _indiceQuando = DateTime.UtcNow;
+                    foreach (var raiz in new[] { "CustomMaps", "Pacotes" })
+                    {
+                        var d = Path.Combine(Dados, raiz); if (!Directory.Exists(d)) continue;
+                        try { foreach (var p in Directory.GetDirectories(d, "imagens", SearchOption.AllDirectories)) foreach (var a in Directory.GetFiles(p)) { var n = Path.GetFileName(a); if (Nome.IsMatch(n) && !_indice.ContainsKey(n)) _indice[n] = a; } }
+                        catch (Exception ex) { Log.Info("procurando imagens em " + raiz + ": " + ex.Message); }
+                    }
+                    if (_indice.TryGetValue(nome, out c)) return c;
+                }
+            }
+            return null;
         }
     }
 }

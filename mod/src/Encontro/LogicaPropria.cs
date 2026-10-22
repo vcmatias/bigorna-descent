@@ -21,7 +21,8 @@ namespace Bigorna.Encontro
     public static class LogicaPropria
     {
         /// <summary>Efeito automatico da defesa: o que o app aplica sozinho quando um heroi ataca o monstro.</summary>
-        public class EfeitoDeDefesa { public string Tipo; public int N; }
+        /// <summary>Um efeito: Tipo, N; no "spawn", Modo ("igual": o mesmo monstro; "tipo": um do mesmo tipo; "outro": Monstro).</summary>
+        public class EfeitoDeDefesa { public string Tipo; public int N; public string Modo; public string Monstro; }
         class Registro
         {
             public string Id; public EnemyModel Base; public HashSet<string> Novas = new HashSet<string>(StringComparer.Ordinal);
@@ -64,16 +65,58 @@ namespace Bigorna.Encontro
         {
             foreach (var f in efeitos ?? new List<EfeitoDeDefesa>())
             {
+                if ((f.Tipo ?? "").ToLowerInvariant() == "spawn") { Reforco(e, f, feitos); continue; }
+                // (a porcentagem da vida acompanha o tier: a da vida máxima de agora, arredondada para cima)
+                if ((f.Tipo ?? "").ToLowerInvariant() == "healpct")
+                {
+                    int p = Mathf.Clamp(f.N, 1, 100), k = Mathf.Max(1, Mathf.CeilToInt(e.StartingHealth * p / 100f));
+                    e.Health = Mathf.Min(e.StartingHealth, e.Health + k); feitos.Add("recupera " + p + "% (" + k + ")"); continue;
+                }
                 int n = Mathf.Clamp(f.N, -9, 9); if (n == 0) continue;
                 switch ((f.Tipo ?? "").ToLowerInvariant())
                 {
                     case "damage": e.BaseAttack += n; feitos.Add("dano +" + n); break;
                     case "nextdamage": { var d = e.ActivationDeltas; d.Damage += n; e.ActivationDeltas = d; feitos.Add("dano +" + n + " na próxima ativação"); break; }
+                    // (o movimento da ativação é o dela mais ActivationDeltas.Speed; o jogo zera os deltas no fim da ativação)
+                    case "nextspeed": { var d = e.ActivationDeltas; d.Speed += n; e.ActivationDeltas = d; feitos.Add("movimento +" + n + " na próxima ativação"); break; }
                     case "defense": e.Defense += n; feitos.Add("defesa +" + n); break;
                     case "rounddefense": e.TemporaryRoundDefense += n; feitos.Add("defesa +" + n + " até o fim da rodada"); break;
                     case "heal": e.Health = Mathf.Min(e.StartingHealth, e.Health + n); feitos.Add("recupera " + n); break;
                 }
             }
+        }
+
+        /// <summary>Reforço: N monstros entram junto deste (o mesmo, um do mesmo tipo ou o escolhido), no mesmo tier. O aplicativo
+        /// não acompanha onde as miniaturas estão depois de entrar: a figura nova aparece numa casa com chão junto da de entrada
+        /// deste, e o aviso pede para pô-la junto dele na mesa.</summary>
+        static void Reforco(SerializedEnemy e, EfeitoDeDefesa f, List<string> feitos)
+        {
+            int n = Mathf.Clamp(f.N, 1, 3); var modo = (f.Modo ?? "igual").ToLowerInvariant();
+            EnemyModel este = null; try { este = UserCollectionManager.GetEnemy(e.ModelId, false); } catch { }
+            string id = e.ModelId;
+            if (modo == "outro" && !string.IsNullOrEmpty(f.Monstro)) id = f.Monstro;
+            else if (modo == "tipo" && este != null)
+            {
+                // (um do mesmo tipo: da reserva do mapa ou dos que o mapa põe; sem outro, ele mesmo)
+                var ids = Inimigos.Reserva.Concat(Motor.Roteiro.Mapa?.Spawns?.Inimigos?.Select(x => x.Id) ?? Enumerable.Empty<string>()).Where(x => !string.IsNullOrEmpty(x)).Distinct()
+                    .Where(x => { try { var m = UserCollectionManager.GetEnemy(x, false); return m != null && m.Type == este.Type; } catch { return false; } }).ToList();
+                if (ids.Count > 0) id = ids[UnityEngine.Random.Range(0, ids.Count)];
+            }
+            EnemyModel novo = null; try { novo = UserCollectionManager.GetEnemy(id, false); } catch { }
+            if (novo == null) { feitos.Add("reforço: monstro desconhecido " + id); return; }
+            var casa = Inimigos.CasaDe(e); int[] pos = null;
+            if (casa.HasValue)
+            {
+                var (x0, y0) = casa.Value; int[][] perto = { new[] { 1, 0 }, new[] { -1, 0 }, new[] { 0, 1 }, new[] { 0, -1 }, new[] { 1, 1 }, new[] { -1, -1 }, new[] { 1, -1 }, new[] { -1, 1 } };
+                foreach (var d in perto) if (!Tabuleiro.CasaSemChao(x0 + d[0], y0 + d[1])) { pos = new[] { x0 + d[0], y0 + d[1] }; break; }
+                if (pos == null) pos = new[] { x0, y0 };
+            }
+            var lista = new List<Bigorna.Formato.Dmap.Inimigo>();
+            for (int i = 0; i < n; i++) lista.Add(new Bigorna.Formato.Dmap.Inimigo { Id = id, Pos = pos, Tier = e.Tier, Grupo = Inimigos.GrupoDe.TryGetValue(e.GUID ?? "", out var g) ? g : null });
+            string quem = Inimigos.NomeDoInimigo(e), qual = Inimigos.NomeDe(novo) ?? id;
+            Dialogos.Mensagem(Idioma.TF("<b>{0}</b> chama reforço: {1} × <b>{2}</b>. Ponha a miniatura junto dele na mesa.", "<b>{0}</b> calls for help: {1} × <b>{2}</b>. Put the miniature next to it on the table.", quem, n, qual), null, Idioma.T("Reforço", "Reinforcement"));
+            Inimigos.EntrarAgora(lista);
+            feitos.Add("reforço: " + n + " × " + id + " (" + modo + ")");
         }
 
         internal static List<EfeitoDeDefesa> EfeitosDe(string id) => id != null && _monstros.TryGetValue(id, out var r) ? r.Efeitos : null;
@@ -148,7 +191,7 @@ namespace Bigorna.Encontro
         }
 
         /// <summary>Uma arvore de dialogo nossa, presa a um filho de "pai" (usada como esta, sem clonar pela serializacao).</summary>
-        static DialogueTree NovaArvore(GameObject pai, string nomeGo, string nomeArvore, out DialogueTreeController dtc, params string[] variaveis)
+        internal static DialogueTree NovaArvore(GameObject pai, string nomeGo, string nomeArvore, out DialogueTreeController dtc, params string[] variaveis)
         {
             var filho = new GameObject(nomeGo);
             filho.transform.SetParent(pai.transform, false);
@@ -192,10 +235,10 @@ namespace Bigorna.Encontro
             {
                 var n = m.Groups[1].Value;
                 string N(string s) => s.Replace("N", "\\{" + n + "\\}");
-                if (Regex.IsMatch(limpo, N(@"\bthe N"), RegexOptions.IgnoreCase)) return monstro ?? "enemy";
+                if (Regex.IsMatch(limpo, N(@"\bthe N"), RegexOptions.IgnoreCase)) return monstro ?? Idioma.T("inimigo", "enemy");
                 if (Regex.IsMatch(limpo, N(@"N\s+(spaces?|damage|health|cards?|times)\b"), RegexOptions.IgnoreCase)
                     || Regex.IsMatch(limpo, N(@"(tests? \w+|suffers?|recovers?|terrif\w+|scars?|places?)\s+N\b"), RegexOptions.IgnoreCase)) return "1";
-                return heroi ?? "the hero";
+                return heroi ?? Idioma.T("o herói", "the hero");
             });
         }
 

@@ -33,7 +33,7 @@ namespace Bigorna.Menu
             _filtro = GUILayout.TextField(_filtro ?? "");
             if (GUILayout.Button(T("Parar tudo", "Stop all"), GUILayout.Width(90f))) Sons.Tocar("Stop_All");
             GUILayout.EndHorizontal();
-            GUILayout.Label(T("Último: ", "Last: ") + _ultimo + T("   ·   o nome é o que vai no gatilho «Play a sound» do editor", "   ·   the name is what goes in the editor's \"Play a sound\" trigger"));
+            GUILayout.Label(T("Último: ", "Last: ") + _ultimo + T("   ·   o nome é o que vai no gatilho «Tocar um som» do editor", "   ·   the name is what goes in the editor's “Play a sound” trigger"));
             _rolagem = GUILayout.BeginScrollView(_rolagem);
             var f = (_filtro ?? "").Trim().ToLowerInvariant();
             foreach (var (banco, eventos) in Sons.Bancos)
@@ -57,7 +57,7 @@ namespace Bigorna.Menu
 
         static void DesenharCenas()
         {
-            GUILayout.Label(T("Cenas (vídeos) da sua coleção. O nome ou o id é o que vai no gatilho «Start a cutscene».", "Cutscenes (videos) in your collection. The name or the id is what goes in the \"Start a cutscene\" trigger."));
+            GUILayout.Label(T("Cenas (vídeos) da sua coleção. O nome ou o id é o que vai no gatilho «Tocar um vídeo» do editor.", "Cutscenes (videos) in your collection. The name or the id is what goes in the editor's “Play a video” trigger."));
             _rolagem = GUILayout.BeginScrollView(_rolagem);
             try
             {

@@ -45,6 +45,8 @@ namespace Bigorna.Formato
             [JsonProperty("name")] public string Nome;
             [JsonProperty("author")] public string Autor;
             [JsonProperty("description")] public string Descricao;
+            /// <summary>A lingua em que a campanha foi feita (editor 0.1.6).</summary>
+            [JsonProperty("language")] public string Lingua;
             [JsonProperty("act")] public string Ato;
             /// <summary>Extensao Bigorna: "II" quando algum mapa da campanha usa componentes da caixa do Ato II.</summary>
             [JsonProperty("requiresAct")] public string AtoExigido;
@@ -150,14 +152,22 @@ namespace Bigorna.Formato
         public Dialogo DialogoPorId(string id) => string.IsNullOrEmpty(id) ? null : Dialogos.FirstOrDefault(d => string.Equals(d.Id, id, StringComparison.OrdinalIgnoreCase));
         public string CaminhoDoMapa(No n) { if (n == null || string.IsNullOrEmpty(n.Mapa)) return null; var c = Path.Combine(Pasta, n.Mapa); return File.Exists(c) ? c : null; }
 
+        /// <summary>As linguas da campanha (a original primeiro) e a que esta em uso; os mapas dela seguem a mesma escolha.</summary>
+        [JsonIgnore] public List<string> Linguas = new List<string>();
+        [JsonIgnore] public string LinguaEmUso;
+
         public static Dcamp Carregar(string caminho)
         {
             var texto = File.ReadAllText(caminho);
-            var j = Acervo.Pacotes.ExigePacotes(texto) ? Acervo.Pacotes.LerJson(texto) : null;
-            var faltam = j != null ? Acervo.Pacotes.Juntar(j) : new List<Acervo.Requisito>();
+            bool exige = Acervo.Pacotes.ExigePacotes(texto), traduz = Traducao.TemTraducoes(texto);
+            var j = exige || traduz ? Acervo.Pacotes.LerJson(texto) : null;
+            var (linguas, lingua) = Dmap.Traduzir(j, traduz, caminho);
+            var faltam = exige ? Acervo.Pacotes.Juntar(j) : new List<Acervo.Requisito>();
             var d = j != null ? j.ToObject<Dcamp>(JsonSerializer.CreateDefault()) : JsonConvert.DeserializeObject<Dcamp>(texto);
             if (d == null) throw new Exception("arquivo vazio");
-            d.Requer = j != null ? Acervo.Requisito.DoMapa(j["requires"]) : new List<Acervo.Requisito>(); d.PacotesFaltando = faltam;
+            d.Requer = exige ? Acervo.Requisito.DoMapa(j["requires"]) : new List<Acervo.Requisito>(); d.PacotesFaltando = faltam;
+            d.Linguas = linguas ?? (string.IsNullOrEmpty(d.Metadados?.Lingua) ? new List<string>() : new List<string> { Traducao.Codigo(d.Metadados.Lingua) });
+            d.LinguaEmUso = lingua ?? (d.Linguas.Count > 0 ? d.Linguas[0] : null);
             if (d.Formato != "dcamp") throw new Exception("não é um .dcamp (format=" + d.Formato + ")");
             if (d.Versao > VersaoAtual) Log.Info("«" + Path.GetFileName(caminho) + "» foi feita num editor mais novo (formato v" + d.Versao + "; este mod lê até v" + VersaoAtual + "): o que ele não conhece fica de fora. Atualize o Bigorna.");
             d.Caminho = caminho;

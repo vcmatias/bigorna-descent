@@ -31,6 +31,7 @@ namespace Bigorna
             try { Depuracao.Teclas(); } catch (Exception ex) { Log.Erro("modo de teste", ex); }
             try { VigiarCena(); } catch (Exception ex) { Log.Erro("vigiando a cena", ex); }
             try { Menu.BotaoDoMenu.Batimento(); } catch (Exception ex) { Log.Erro("botão do menu", ex); }
+            try { Campanha.SavesDaComunidade.Batimento(); } catch (Exception ex) { Log.Erro("partidas da comunidade", ex); }
             try { Menu.Atualizacao.Batimento(); } catch (Exception ex) { Log.Erro("atualização", ex); }
             try { MusicaPropria.Batimento(); } catch { }
             try { PacoteVirtual.Garantir(); } catch { }
@@ -48,7 +49,9 @@ namespace Bigorna
                 try { Roteiro.Batimento(); } catch (Exception ex) { Log.Erro("roteiro", ex); }
                 try { Encontro.CartoesDeMonstro.Batimento(); } catch (Exception ex) { Log.Erro("cartões de monstro", ex); }
                 try { Encontro.LogicaPropria.Batimento(); } catch (Exception ex) { Log.Erro("lógica dos monstros", ex); }
+                try { Encontro.Apetrechos.Batimento(); } catch (Exception ex) { Log.Erro("apetrechos", ex); }
                 try { Encontro.Escolta.Batimento(); } catch (Exception ex) { Log.Erro("escolta", ex); }
+                try { Encontro.FacanhasProprias.Batimento(); } catch (Exception ex) { Log.Erro("prêmio das façanhas", ex); }
             }
             if (_cenaAnterior == Scene.Worldmap || _cenaAnterior == Scene.City) { try { Campanha.Campanha.Batimento(); } catch (Exception ex) { Log.Erro("campanha", ex); } try { Campanha.MapaProprio.Batimento(); } catch (Exception ex) { Log.Erro("mapa próprio", ex); } }
             if (Time.unscaledTime >= _proximaVigilia)
@@ -68,11 +71,12 @@ namespace Bigorna
             Log.Info("cena: " + (antes?.ToString() ?? "?") + " → " + (cena?.ToString() ?? "?"));
             bool avulso = Lancador.Avulso && Lancador.Atual != null;
             bool? resultado = Lancador.Resultado;
+            var nomeDoMapa = Lancador.Atual?.NomeVisivel;
             if (antes == Scene.Game && cena != Scene.Game && !Lancador.Preparando) { Lancador.Encerrar(); try { HeroisProprios.DesfazerArmas(); } catch (Exception ex) { Log.Erro("devolvendo as armas", ex); } try { MusicaPropria.Parar(); } catch (Exception ex) { Log.Erro("parando a música", ex); } }
             try { PacoteVirtual.Instalar(); } catch { }
             bool mundo = cena == Scene.Worldmap || cena == Scene.City;
             if (cena == Scene.Titlescene) Idioma.JogoPronto = true;
-            if (cena == Scene.Titlescene) { try { HeroisProprios.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando os heróis", ex); } try { ReceitasProprias.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando as receitas", ex); } try { FacanhasProprias.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando as façanhas", ex); } try { PericiasProprias.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando as perícias", ex); } PainelMapas.Reler(); Campanha.Campanha.Fechar(); Campanha.MapaMundi.RegistrarTodas(); try { Dados.DadosDoEditor.NoTitulo(); } catch (Exception ex) { Log.Erro("dados do editor", ex); } }
+            if (cena == Scene.Titlescene) { try { HeroisProprios.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando os heróis", ex); } try { ReceitasProprias.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando as receitas", ex); } try { FacanhasProprias.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando as façanhas", ex); } try { PericiasProprias.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando as perícias", ex); } PainelMapas.Reler(); Campanha.Campanha.Fechar(); Campanha.MapaMundi.RegistrarTodas(); StartCoroutine(Campanha.SavesDaComunidade.AoEntrarNoTitulo()); try { Dados.DadosDoEditor.NoTitulo(); } catch (Exception ex) { Log.Erro("dados do editor", ex); } }
             if (mundo)
             {
                 try
@@ -89,7 +93,7 @@ namespace Bigorna
             if (cena == Scene.Game) { try { VozesProprias.NovoEncontro(); VozesProprias.Preparar(); } catch { } }
             if (cena == Scene.Game) { try { Campanha.Campanha.AoEntrarNoEncontro(); } catch (Exception ex) { Log.Erro("campanha ao entrar no encontro", ex); } }
             // missao avulsa terminada: o jogo iria ao mapa-mundi da campanha oficial; voltamos ao menu
-            if (avulso && antes == Scene.Game && mundo && Campanha.Campanha.Aberta == null) StartCoroutine(VoltarAoMenu());
+            if (avulso && antes == Scene.Game && mundo && Campanha.Campanha.Aberta == null) { try { GrupoDoSave.AoTerminar(nomeDoMapa); } catch (Exception ex) { Log.Erro("grupo no fim do mapa", ex); } StartCoroutine(VoltarAoMenu()); }
             // missao oficial (a aba "Mapas oficiais") terminada: tambem de volta ao menu
             if (Menu.MapasOficiais.EmJogo && antes == Scene.Game && mundo) { Menu.MapasOficiais.EmJogo = false; StartCoroutine(VoltarAoMenu()); }
             if (cena == Scene.Titlescene) Menu.MapasOficiais.EmJogo = false;
@@ -109,7 +113,8 @@ namespace Bigorna
         {
             try
             {
-                if (!Visivel) return;
+                // (a escolha do destino do grupo aparece mesmo com o resto escondido (F8), e por cima de tudo)
+                if (!Visivel) { try { GrupoDoSave.Desenhar(); } catch (Exception ex) { Log.Erro("janela do grupo", ex); } return; }
                 {
                     if (_rotulo == null) _rotulo = new GUIStyle(GUI.skin.label) { fontSize = 13 };
                     GUI.color = new Color(0.55f, 0.85f, 1f, 0.95f);
@@ -123,6 +128,7 @@ namespace Bigorna
                 Relatos.Desenhar();
                 Menu.Atualizacao.Desenhar();
                 Depuracao.Desenhar();
+                try { GrupoDoSave.Desenhar(); } catch (Exception ex) { Log.Erro("janela do grupo", ex); }
             }
             catch (Exception ex) { Log.Erro("OnGUI", ex); }
         }

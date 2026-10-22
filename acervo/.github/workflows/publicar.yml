@@ -30,7 +30,7 @@ jobs:
         run: |
           git config user.name "bigorna-acervo"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add itens indice.json
+          git add itens indice.json CATALOGO.md
           git commit -m "acervo: $TITULO (#$N)"
           git pull --rebase --quiet && git push
       - if: always()

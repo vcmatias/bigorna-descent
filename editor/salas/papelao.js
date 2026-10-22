@@ -153,22 +153,40 @@ const MODELOS_PAPELAO = {
     return [...caixaCartao(0.1, 0.1, 0.8, 0.8, 0, 0.08, '#5e5852', 'textura'), ...cruzCartao(0.5, 0.5, 0.86, 0.86, 0.06, 1.0, chamas)];
   },
   Statue() {
-    const pedra = pintaPedra('#5e6a78');
-    // a guardian in armour leaning on a sword, with a round shield and a cloak down to the plinth
-    const figura = (g, W, H) => { const c = W / 2;
-      const corpo = () => { g.beginPath(); g.moveTo(c - W * 0.2, H); g.quadraticCurveTo(c - W * 0.26, H * 0.62, c - W * 0.27, H * 0.3); g.quadraticCurveTo(c - W * 0.3, H * 0.2, c - W * 0.18, H * 0.19); g.lineTo(c - W * 0.07, H * 0.17);
-        g.lineTo(c - W * 0.075, H * 0.1); g.quadraticCurveTo(c - W * 0.08, H * 0.03, c, H * 0.015); g.quadraticCurveTo(c + W * 0.08, H * 0.03, c + W * 0.075, H * 0.1); g.lineTo(c + W * 0.07, H * 0.17); g.lineTo(c + W * 0.18, H * 0.19); g.quadraticCurveTo(c + W * 0.3, H * 0.2, c + W * 0.27, H * 0.3); g.quadraticCurveTo(c + W * 0.26, H * 0.62, c + W * 0.2, H); g.closePath();
-        g.moveTo(c - W * 0.2, H * 0.45); g.arc(c - W * 0.25, H * 0.45, W * 0.13, 0, Math.PI * 2); };
-      const pedra2 = () => { const gr = g.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, '#46515d'); gr.addColorStop(0.5, '#a2aebb'); gr.addColorStop(1, '#46515d'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
-        g.strokeStyle = 'rgba(28,34,42,.75)'; g.lineWidth = 2; [[-0.12, 0.5, -0.16, 0.99], [0.12, 0.5, 0.16, 0.99], [0, 0.55, 0, 0.99]].forEach(([a, b, d, e]) => { g.beginPath(); g.moveTo(c + W * a, H * b); g.lineTo(c + W * d, H * e); g.stroke(); });
-        [-1, 1].forEach(sx => { g.beginPath(); g.ellipse(c + sx * W * 0.19, H * 0.22, W * 0.09, H * 0.04, 0, 0, 7); g.fillStyle = '#7a8694'; g.fill(); g.stroke(); });
-        g.fillStyle = '#26303a'; g.fillRect(c - W * 0.05, H * 0.07, W * 0.1, H * 0.018); g.fillRect(c - W * 0.008, H * 0.07, W * 0.016, H * 0.06);
-        circulo(g, c - W * 0.25, H * 0.45, W * 0.13, '#6c7884', '#26303a', 2.5); circulo(g, c - W * 0.25, H * 0.45, W * 0.045, '#b4bec8', '#26303a', 1.5);
-        g.fillStyle = '#d0d8e0'; g.fillRect(c - W * 0.018, H * 0.34, W * 0.036, H * 0.6); g.strokeStyle = '#26303a'; g.lineWidth = 1.5; g.strokeRect(c - W * 0.018, H * 0.34, W * 0.036, H * 0.6);
-        g.fillStyle = '#5a6674'; g.fillRect(c - W * 0.09, H * 0.33, W * 0.18, H * 0.022); g.fillRect(c - W * 0.02, H * 0.27, W * 0.04, H * 0.06); circulo(g, c, H * 0.265, W * 0.03, '#8a96a4', '#26303a', 1.5);
-        g.fillStyle = '#7a8694'; g.beginPath(); g.ellipse(c, H * 0.36, W * 0.1, H * 0.03, 0, 0, 7); g.fill(); g.stroke(); };
-      silhueta(g, corpo, pedra2); };
-    return [...caixaCartao(0.4, 0.4, 2.2, 2.2, 0, 0.5, pedra, 'textura'), ...cruzCartao(1.5, 1.5, 1.7, 1.7, 0.5, 3.7, figura)];
+    // like the game's piece, all of card: a thin printed base and two printed cards slotted in a cross, the seated colossus
+    // of blue-grey stone cut out on each (from the front on one, in profile on the other), the staff in its hand
+    const pedra = (sem) => (g, W, H) => { const r = rngDe(sem + Math.round(W + H));
+      const gr = g.createLinearGradient(0, 0, W, H); gr.addColorStop(0, '#6a778a'); gr.addColorStop(0.5, '#8794a6'); gr.addColorStop(1, '#4a5566'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+      for (let i = 0; i < W * H / 260; i++) { g.fillStyle = `rgba(${r() < 0.5 ? '30,36,46' : '190,200,214'},${0.08 + r() * 0.12})`; g.fillRect(r() * W, r() * H, 2 + r() * 6, 1 + r() * 3); }
+      g.strokeStyle = 'rgba(16,20,28,.7)'; g.lineWidth = 1.4; for (let i = 0; i < 3 + W * H / 3200; i++) { let x = r() * W, y = r() * H; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 3; k++) { x += (r() - 0.5) * W * 0.12; y += r() * H * 0.08; g.lineTo(x, y); } g.stroke(); } };
+    const linha = (g, pts, cor, e) => { g.strokeStyle = cor; g.lineWidth = e; g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); };
+    const sombra = (g, f) => { g.fillStyle = 'rgba(16,20,28,.55)'; g.beginPath(); f(); g.fill(); };
+    // (the outline is drawn in fractions of the card: x across, y down)
+    const recorte = (pecas) => (g, W, H) => { g.beginPath(); pecas.forEach(([x0, y0, x1, y1]) => g.rect(W * x0, H * y0, W * (x1 - x0), H * (y1 - y0))); };
+    const frenteP = [[0.18, 0.06, 0.82, 0.62], [0.08, 0.58, 0.92, 1], [0.38, 0.1, 0.62, 0.3], [0.84, 0.02, 0.9, 1], [0.8, 0.0, 0.94, 0.05]];
+    const frente = (g, W, H) => silhueta(g, () => recorte(frenteP)(g, W, H), () => { pedra(1)(g, W, H);
+      // the throne's back (a carved frame), the seat block, the hooded figure: hood, face in shadow, shoulders, robe, lap, feet
+      g.strokeStyle = '#c6d0dc'; g.lineWidth = 2.5; g.strokeRect(W * 0.21, H * 0.09, W * 0.58, H * 0.5); g.strokeRect(W * 0.11, H * 0.62, W * 0.78, H * 0.34);
+      g.fillStyle = '#7d8a9c'; g.beginPath(); g.moveTo(W * 0.3, H * 0.62); g.lineTo(W * 0.32, H * 0.32); g.quadraticCurveTo(W * 0.5, H * 0.26, W * 0.68, H * 0.32); g.lineTo(W * 0.7, H * 0.62); g.closePath(); g.fill(); g.strokeStyle = '#1c222c'; g.lineWidth = 2; g.stroke();
+      g.fillStyle = '#8e9bad'; g.beginPath(); g.moveTo(W * 0.38, H * 0.3); g.quadraticCurveTo(W * 0.38, H * 0.1, W * 0.5, H * 0.1); g.quadraticCurveTo(W * 0.62, H * 0.1, W * 0.62, H * 0.3); g.closePath(); g.fill(); g.stroke();
+      sombra(g, () => g.ellipse(W * 0.5, H * 0.22, W * 0.07, H * 0.06, 0, 0, 7)); g.fillStyle = '#b8c6d8'; [0.47, 0.53].forEach(f => { g.beginPath(); g.ellipse(W * f, H * 0.21, W * 0.012, H * 0.008, 0, 0, 7); g.fill(); });
+      for (let i = 1; i < 5; i++) linha(g, [[W * (0.32 + i * 0.075), H * 0.36], [W * (0.33 + i * 0.075), H * 0.6]], 'rgba(20,26,34,.6)', 2);
+      g.fillStyle = '#8e9bad'; g.fillRect(W * 0.28, H * 0.6, W * 0.44, H * 0.08); g.strokeRect(W * 0.28, H * 0.6, W * 0.44, H * 0.08);
+      [[0.33, 0.45], [0.55, 0.67]].forEach(([a, b]) => { g.fillStyle = '#7d8a9c'; g.fillRect(W * a, H * 0.68, W * (b - a), H * 0.28); g.strokeRect(W * a, H * 0.68, W * (b - a), H * 0.28); });
+      g.fillStyle = '#8e9bad'; g.fillRect(W * 0.68, H * 0.36, W * 0.17, H * 0.06); g.strokeRect(W * 0.68, H * 0.36, W * 0.17, H * 0.06);   // the arm to the staff
+      g.fillStyle = '#3e4856'; g.fillRect(W * 0.84, H * 0.02, W * 0.06, H * 0.98); g.fillStyle = '#9aa8b8'; g.fillRect(W * 0.855, H * 0.02, W * 0.015, H * 0.98); g.fillStyle = '#c6d0dc'; g.fillRect(W * 0.8, 0, W * 0.14, H * 0.05); });
+    const ladoP = [[0.1, 0.04, 0.26, 0.62], [0.08, 0.58, 0.82, 1], [0.24, 0.1, 0.46, 0.6], [0.24, 0.48, 0.82, 0.62], [0.66, 0.02, 0.72, 1], [0.62, 0.0, 0.76, 0.05]];
+    const lado = (g, W, H) => silhueta(g, () => recorte(ladoP)(g, W, H), () => { pedra(2)(g, W, H);
+      // in profile: the throne's back behind, the seat block, the figure seated with the knees forward and the staff upright
+      g.strokeStyle = '#c6d0dc'; g.lineWidth = 2.5; g.strokeRect(W * 0.12, H * 0.07, W * 0.12, H * 0.52); g.strokeRect(W * 0.11, H * 0.64, W * 0.68, H * 0.32);
+      g.fillStyle = '#8e9bad'; g.beginPath(); g.moveTo(W * 0.26, H * 0.6); g.lineTo(W * 0.26, H * 0.3); g.quadraticCurveTo(W * 0.27, H * 0.1, W * 0.37, H * 0.1); g.quadraticCurveTo(W * 0.46, H * 0.12, W * 0.45, H * 0.32); g.lineTo(W * 0.44, H * 0.5); g.lineTo(W * 0.8, H * 0.5); g.lineTo(W * 0.8, H * 0.6); g.closePath(); g.fill(); g.strokeStyle = '#1c222c'; g.lineWidth = 2; g.stroke();
+      sombra(g, () => g.ellipse(W * 0.41, H * 0.22, W * 0.04, H * 0.06, 0, 0, 7));
+      for (let i = 0; i < 4; i++) linha(g, [[W * (0.48 + i * 0.08), H * 0.51], [W * (0.5 + i * 0.08), H * 0.59]], 'rgba(20,26,34,.6)', 2);
+      g.fillStyle = '#7d8a9c'; g.fillRect(W * 0.7, H * 0.6, W * 0.11, H * 0.36); g.strokeRect(W * 0.7, H * 0.6, W * 0.11, H * 0.36);   // the shins, feet on the ground
+      g.fillStyle = '#8e9bad'; g.fillRect(W * 0.4, H * 0.36, W * 0.28, H * 0.06); g.strokeRect(W * 0.4, H * 0.36, W * 0.28, H * 0.06);     // the arm forward, to the staff
+      g.fillStyle = '#3e4856'; g.fillRect(W * 0.66, H * 0.02, W * 0.06, H * 0.98); g.fillStyle = '#9aa8b8'; g.fillRect(W * 0.675, H * 0.02, W * 0.015, H * 0.98); g.fillStyle = '#c6d0dc'; g.fillRect(W * 0.62, 0, W * 0.14, H * 0.05); });
+    // (the base: a flat printed card of carved stone, hardly thicker than the board)
+    return [...caixaCartao(0.2, 0.2, 2.6, 2.6, 0, 0.06, '#5a6474', pintaPedra('#6c7686')), ...cruzCartao(1.5, 1.5, 2.6, 2.6, 0.06, 3.6, frente, lado)];
   },
   Wagon() {
     const roda = (g, W, H) => { const c = W / 2, r = Math.min(W, H) / 2 - 1; silhueta(g, () => { g.beginPath(); g.arc(c, H / 2, r, 0, Math.PI * 2); }, () => { g.fillStyle = '#6a4424'; g.fillRect(0, 0, W, H); circulo(g, c, H / 2, r * 0.78, '#2a1a10'); g.strokeStyle = '#7a5230'; g.lineWidth = 4; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; g.beginPath(); g.moveTo(c, H / 2); g.lineTo(c + Math.cos(a) * r * 0.8, H / 2 + Math.sin(a) * r * 0.8); g.stroke(); } circulo(g, c, H / 2, r * 0.18, '#5a3a1e', '#1a100a', 2); faixaMetal(g, 0, 0, 0, 0); }); };

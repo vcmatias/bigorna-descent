@@ -306,7 +306,7 @@ function daOficina(atos = 2) {
   const itens = (b.itens || []).filter(i => actDoItem(i) < atos);
   return { monstros: ms.filter(m => !m.villain && !m.named), chefes: ms.filter(m => m.villain || m.named),
     cartas: itens.filter(i => i.cls !== 'CraftingMaterialModel' && (i.custom || !i.base || CLS_CARTAS.includes(i.cls))),
-    materiais: itens.filter(i => i.cls === 'CraftingMaterialModel'), objetos: (b.objetos || []).filter(v => v && v.id) };
+    materiais: itens.filter(i => i.cls === 'CraftingMaterialModel'), objetos: (b.objetos || []).filter(v => v && v.id && !v.clone) };
 }
 /* the pools of map p that already have what the generated rooms draw from */
 const reservaComMonstros = p => (p.reserva || []).some(id => monstro(id));
@@ -327,10 +327,10 @@ function faltasDaOficina(atos, precisa) {
    crafting materials. What the Workshop already has is kept. Returns {monstros, itens} added */
 function selecaoInicial(atos, cats) {
   const b = bestiario(); const n = { monstros: 0, itens: 0 }; const nomeOk = c => c && c.name_en && !/^[A-Z0-9_' ]+$/.test(c.name_en);
-  if (cats.monstros) (CATALOGO.monstros || []).filter(c => nomeOk(c) && c.IsRandomEligible && !c.IsVillain && (c.Tiers || []).length && doAto(c, atos))
+  if (cats.monstros) (CATALOGO.monstros || []).filter(c => monstroDeEscolha(c) && nomeOk(c) && c.IsRandomEligible && !c.IsVillain && (c.Tiers || []).length && doAto(c, atos))
     .forEach(c => { if (!b.monstros.some(m => m.base === c._id)) { b.monstros.push(monstroDoCatalogo(c)); n.monstros++; } });
   if (cats.itens) (CATALOGO.itens || []).filter(c => nomeOk(c) && doAto(c, atos) && ((CLS_CARTAS.includes(c._cls) && !c.IsUpgrade && !c.IsDigital) || c._cls === 'CraftingMaterialModel'))
-    .forEach(c => { if (!b.itens.some(i => i.base === c._id)) { b.itens.push(itemDoCatalogo(c)); n.itens++; } });
+    .forEach(c => { if (!b.itens.some(i => i.base === c._id)) { const x = itemDoCatalogo(c); b.itens.push(x); trazerReceitasDoItem(x); n.itens++; } });
   return n;
 }
 /* the item pool of map p for the generated chests and searches: when it lacks item cards or materials, those of the
@@ -1675,10 +1675,10 @@ function padraoOriginal(tipo) {
 }
 const padroesDaOficina = () => { const b = oficina(); b.padroes = b.padroes && typeof b.padroes === 'object' && !Array.isArray(b.padroes) ? b.padroes : {}; return b.padroes; };
 /* the default of a kind: the Workshop's, or the game's; a fresh copy each time (null: the kind has none) */
-function padraoDe(tipo) { const w = padroesDaOficina()[tipo]; const p = w ? clone(w) : padraoOriginal(tipo); return p ? renovarUids(p) : null; }
+function padraoDe(tipo) { const w = padroesDaOficina()[tipo]; const p = w ? clone(w) : padraoOriginal(tipoDoObjeto(tipo)); return p ? renovarUids(p) : null; }
 /* a default the generator may put in any room: it does something, and points at no room nor object of the map it came from */
 const padraoPortatil = tipo => { const w = padroesDaOficina()[tipo]; if (!w || !(w.gatilhos || []).length) return false; const t = JSON.stringify(w); return !/"(open_room|remove_room|add_tile|remove_tile)"|"objSala"|"sala":/.test(t); };
-const temPadrao = tipo => !!(padroesDaOficina()[tipo] || padraoOriginal(tipo));
+const temPadrao = tipo => !!(padroesDaOficina()[tipo] || padraoOriginal(tipoDoObjeto(tipo)));
 /* the programming with its uids numbered in the order they appear (two copies of the same default compare equal) */
 function formaDaProgramacao(p) {
   p = p || {}; const ids = new Map(); const dar = u => { if (typeof u === 'string' && u && !ids.has(u)) ids.set(u, '#' + ids.size + '#'); };
@@ -1692,10 +1692,11 @@ function formaDaProgramacao(p) {
 const ordenar = x => Array.isArray(x) ? x.map(ordenar) : x && typeof x === 'object' ? Object.fromEntries(Object.keys(x).sort().filter(k => !(Array.isArray(x[k]) && !x[k].length && ['requisitos', 'senao'].includes(k)) && x[k] !== '' && x[k] !== undefined).map(k => [k, ordenar(x[k])])) : x;
 /* saves object o's programming as the default of its kind; the same as the game's default, the Workshop keeps nothing.
    Returns 'salvo', 'original' (it was the game's) */
-function salvarComoPadrao(o) { const p = programacaoDe(o); const orig = padraoOriginal(o.type);
-  if (orig && formaDaProgramacao(p) === formaDaProgramacao(orig)) { delete padroesDaOficina()[o.type]; return 'original'; }
-  padroesDaOficina()[o.type] = p; return 'salvo'; }
+function salvarComoPadrao(o) { const p = programacaoDe(o); const k = chaveDoPadrao(o); const orig = padraoOriginal(o.type);
+  // (a copy of a game object keeps its default even when it is the game's: the copy is that default)
+  if (k === o.type && orig && formaDaProgramacao(p) === formaDaProgramacao(orig)) { delete padroesDaOficina()[k]; return 'original'; }
+  padroesDaOficina()[k] = p; return 'salvo'; }
 const usarPadraoObjeto = () => { const t = typeof Tutorial !== 'undefined' && Tutorial.ativo() ? Tutorial.padrao() : null; if (t === 'sim') return true; if (t === 'nao') return false;   // (the tutorial holds it at a step)
   try { return localStorage.getItem('bigorna-padrao-objeto') !== '0'; } catch { return true; } };
 /* puts the default on object o (its triggers and texts are replaced) */
-function aplicarPadrao(o) { const p = padraoDe(o.type); if (!p) return false; CHAVES_PROGRAMACAO.forEach(k => { delete o[k]; }); Object.keys(o).forEach(k => { if (k.includes(':') && Array.isArray(o[k])) delete o[k]; }); Object.assign(o, { textClick: '', textUse: '', gatilhos: [], requisitos: [], senao: [] }, p); return true; }
+function aplicarPadrao(o) { const p = padraoDe(chaveDoPadrao(o)); if (!p) return false; CHAVES_PROGRAMACAO.forEach(k => { delete o[k]; }); Object.keys(o).forEach(k => { if (k.includes(':') && Array.isArray(o[k])) delete o[k]; }); Object.assign(o, { textClick: '', textUse: '', gatilhos: [], requisitos: [], senao: [] }, p); return true; }

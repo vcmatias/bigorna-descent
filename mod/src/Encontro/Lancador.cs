@@ -23,7 +23,8 @@ namespace Bigorna.Encontro
         /// <summary>Campanha: um dialogo de chegada a tocar depois de montar o tabuleiro e antes de escolher os herois.</summary>
         public static Action<Action> Prologo;
 
-        public static string Lancar(Dmap m)
+        /// <summary>Abre um mapa avulso: com grupo novo, ou com o grupo de uma partida gravada (Continuar herois).</summary>
+        public static string Lancar(Dmap m, GrupoDoSave.Save grupo = null)
         {
             if (m.PacotesFaltando != null && m.PacotesFaltando.Count > 0) return Acervo.Acervo.TextoFaltam(m.PacotesFaltando);
             var cena = CenaBase(m);
@@ -41,6 +42,7 @@ namespace Bigorna.Encontro
                 partida.EncounterIndex = 0;
                 partida.PartyName = "Bigorna";
                 partida.GameDifficulty = Dificuldade(m);
+                if (grupo != null) { var e = GrupoDoSave.Trazer(partida, grupo); if (e != null) return e; } else GrupoDoSave.SemOrigem();
                 var salvar = SingletonBehaviour<SaveLoadController>.Instance;
                 Jogo.DadosJogo.CurrentSaveIndex = 0;
                 if (salvar.GetExistingIndexes().Contains(0)) salvar.DeleteSaveSlot(0);
@@ -79,6 +81,7 @@ namespace Bigorna.Encontro
                 Roteiro.Parar();
                 Silencio.Reiniciar();
                 Dialogos.Limpar();
+                Passo("textos das missões (leitura)", TextosDeMissao.Comecar);
                 Passo("conteúdo próprio", () => Personalizados.Registrar(m.Custom, "«" + m.NomeVisivel + "»"));
                 Objetos.Limpar();
                 Inimigos.Reiniciar();
@@ -109,6 +112,8 @@ namespace Bigorna.Encontro
                 Passo("calar a base", () => Silencio.Calar());
                 Passo("apartar inimigos da base", () => Silencio.ApartarInimigosDaBase(new HashSet<string>(Inimigos.ModeloDe.Keys)));
                 Passo("fase do herói", Silencio.FaseDoHeroi);
+                yield return Seguro("textos das missões", TextosDeMissao.Esperar(30f));
+                Passo("textos das missões", TextosDeMissao.ReporTodos);
                 yield return Seguro("inimigos", Inimigos.Povoar(m));
                 if (minha != _geracao) yield break;
                 Passo("bloqueios", () => Bloquear(m));

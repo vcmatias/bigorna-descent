@@ -148,22 +148,16 @@ const ARTE_OBJ = {
   Ladder: { w: 1, h: 1, pintar(g, P) { pintarEscadaDeMao(g, P, 1); }},
   LadderMedium: { w: 1, h: 1, pintar(g, P) { pintarEscadaDeMao(g, P, 1.4); }},
   Statue: { w: 3, h: 3, pintar(g, P) {
-      const c = P * 1.5; sombraOval(g, c + 6, c + 8, P * 1.4, P * 1.4, 0.45);
-      g.save(); g.beginPath(); for (let i = 0; i < 8; i++) { const a = (i + 0.5) / 8 * Math.PI * 2; g.lineTo(c + Math.cos(a) * P * 1.38, c + Math.sin(a) * P * 1.38); } g.closePath(); g.clip();
-      pedras(g, 0, 0, P * 3, P * 3, '#9a948a', { alt: 16, seed: 14 }); g.restore();
-      g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = 2; g.beginPath(); for (let i = 0; i < 8; i++) { const a = (i + 0.5) / 8 * Math.PI * 2; g.lineTo(c + Math.cos(a) * P * 1.38, c + Math.sin(a) * P * 1.38); } g.closePath(); g.stroke();
-      circulo(g, c, c, P * 0.95, '#aaa498', 'rgba(0,0,0,.45)', 2);
-      // the figure from above: a cloaked warrior, pauldrons, helmet, a shield on one arm and a sword held forward
-      sombraOval(g, c + 6, c + 8, P * 0.7, P * 0.62, 0.5);
-      const pedra = g.createRadialGradient(c - 16, c - 16, 4, c, c, P * 0.8); pedra.addColorStop(0, '#ebe6db'); pedra.addColorStop(1, '#8e887c');
-      g.fillStyle = pedra; g.strokeStyle = '#5a554c'; g.lineWidth = 2.5;
-      g.beginPath(); g.moveTo(c - P * 0.42, c - P * 0.12); g.quadraticCurveTo(c - P * 0.62, c + P * 0.5, c - P * 0.2, c + P * 0.66); g.quadraticCurveTo(c, c + P * 0.74, c + P * 0.2, c + P * 0.66); g.quadraticCurveTo(c + P * 0.62, c + P * 0.5, c + P * 0.42, c - P * 0.12); g.quadraticCurveTo(c, c - P * 0.3, c - P * 0.42, c - P * 0.12); g.fill(); g.stroke();
-      g.strokeStyle = 'rgba(90,85,76,.5)'; g.lineWidth = 1.5; [-0.2, 0, 0.2].forEach(f => { g.beginPath(); g.moveTo(c + f * P, c + P * 0.05); g.quadraticCurveTo(c + f * P * 1.3, c + P * 0.4, c + f * P * 1.1, c + P * 0.66); g.stroke(); });
-      [-1, 1].forEach(sx => { circulo(g, c + sx * P * 0.36, c - P * 0.1, P * 0.17, pedra, '#5a554c', 2.5); circulo(g, c + sx * P * 0.36, c - P * 0.1, P * 0.08, null, 'rgba(90,85,76,.5)', 1.5); });
-      g.save(); g.translate(c - P * 0.58, c + P * 0.05); g.fillStyle = pedra; g.strokeStyle = '#5a554c'; g.lineWidth = 2.5; g.beginPath(); g.ellipse(0, 0, P * 0.18, P * 0.3, -0.2, 0, 7); g.fill(); g.stroke(); circulo(g, 0, 0, P * 0.06, '#c9c3b6', '#5a554c', 1.5); g.restore();
-      g.lineCap = 'round'; g.strokeStyle = '#5a554c'; g.lineWidth = 8; g.beginPath(); g.moveTo(c + P * 0.42, c); g.lineTo(c + P * 0.62, c - P * 0.9); g.stroke(); g.strokeStyle = '#e4e0d6'; g.lineWidth = 4.5; g.stroke();
-      g.strokeStyle = '#5a554c'; g.lineWidth = 5; g.beginPath(); g.moveTo(c + P * 0.3, c - P * 0.04); g.lineTo(c + P * 0.56, c + P * 0.06); g.stroke();
-      circulo(g, c, c - P * 0.14, P * 0.2, pedra, '#5a554c', 2.5); g.strokeStyle = '#5a554c'; g.lineWidth = 3; g.beginPath(); g.moveTo(c, c - P * 0.34); g.lineTo(c, c + P * 0.06); g.stroke();
+      // from above, like its cardboard piece: the printed stone base and, on it, the two cards of the colossus slotted in a
+      // cross (seen edge-on), with the shadow they cast and the top of the staff
+      sombraOval(g, P * 1.6, P * 1.65, P * 1.35, P * 1.45, 0.4);
+      const gr = g.createLinearGradient(P * 0.2, P * 0.2, P * 2.8, P * 2.8); gr.addColorStop(0, '#7d8a9c'); gr.addColorStop(1, '#4f5a6b'); g.fillStyle = gr; g.fillRect(P * 0.2, P * 0.2, P * 2.6, P * 2.6);
+      g.strokeStyle = '#1c222c'; g.lineWidth = 2; g.strokeRect(P * 0.2, P * 0.2, P * 2.6, P * 2.6); g.strokeStyle = '#c6d0dc'; g.strokeRect(P * 0.32, P * 0.32, P * 2.36, P * 2.36);
+      const r = rngDe(9); g.strokeStyle = 'rgba(16,20,28,.6)'; g.lineWidth = 1.4; for (let i = 0; i < 8; i++) { let x = P * (0.4 + r() * 2.2), y = P * (0.4 + r() * 2.2); g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 3; k++) { x += (r() - 0.5) * P * 0.3; y += r() * P * 0.2; g.lineTo(x, y); } g.stroke(); }
+      g.fillStyle = 'rgba(10,12,18,.35)'; g.fillRect(P * 1.56, P * 0.3, P * 0.22, P * 2.5); g.fillRect(P * 0.3, P * 1.56, P * 2.5, P * 0.22);   // the shadow of the cards
+      const carta = (x, y, w, h) => { g.fillStyle = '#8f8270'; g.fillRect(x, y, w, h); g.strokeStyle = '#2a2018'; g.lineWidth = 1.5; g.strokeRect(x, y, w, h); };
+      carta(P * 0.2, P * 1.46, P * 2.6, P * 0.08); carta(P * 1.46, P * 0.2, P * 0.08, P * 2.6);
+      circulo(g, P * 2.4, P * 1.5, P * 0.09, '#3e4856', '#1c222c', 2); circulo(g, P * 1.5, P * 2.03, P * 0.09, '#3e4856', '#1c222c', 2);   // the staff, on each card
     }},
   Wagon: { w: 3, h: 2, pintar(g, P) {
       sombraRet(g, P * 0.2, P * 0.24, P * 2.3, P * 1.52, 6);

@@ -273,10 +273,9 @@ namespace Bigorna.Encontro
             {
                 try
                 {
-                    int virgula = icone.IndexOf(',');
-                    var bytes = Convert.FromBase64String(virgula >= 0 ? icone.Substring(virgula + 1) : icone);
+                    var bytes = Dados.ImagensDaObra.Bytes(icone);
                     var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false) { name = "@Bigorna-Icone-" + (def.Id ?? "") };
-                    if (ImageConversion.LoadImage(tex, bytes))
+                    if (bytes != null && ImageConversion.LoadImage(tex, bytes))
                     {
                         var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
                         quad.name = "@Bigorna-Icone";
@@ -314,8 +313,7 @@ namespace Bigorna.Encontro
         internal static Texture2D LerImagem(string dataUri, string nome)
         {
             if (string.IsNullOrEmpty(dataUri)) return null;
-            int virgula = dataUri.IndexOf(',');
-            var bytes = Convert.FromBase64String(virgula >= 0 ? dataUri.Substring(virgula + 1) : dataUri);
+            var bytes = Dados.ImagensDaObra.Bytes(dataUri); if (bytes == null) return null;
             var tex = new Texture2D(2, 2, TextureFormat.RGBA32, true) { name = nome, wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4, hideFlags = HideFlags.DontUnloadUnusedAsset };
             return ImageConversion.LoadImage(tex, bytes) ? tex : null;
         }

@@ -118,13 +118,13 @@ function desenhar3dCorpo() {
   projeto.salas.forEach((s, si) => inimigosDaSala(s).forEach(({ e, origem }) => {
     const [x, y] = e.pos; const z = alturaDe(e.level) + 0.9; const spawn = origem.tipo === 'gat';
     const selecionado = sel && sel.tipo === 'inimigo' && sel.sala === si && ((origem.tipo === 'sala' && sel.g === undefined && sel.i === origem.i) || (origem.tipo === 'gat' && sel.g === origem.g && sel.obj === origem.obj && (sel.l || 'gatilhos') === origem.l && sel.i === origem.k));
-    const mm = monstro(e.enemy); const Hs = mm && mm.figura === 'standee' && mm.standee ? [1.1, 1.4, 1.9, 2.6][mm.size || 0] * (mm.escalaStandee || 1) * C : 0;
+    const mm = monstro(e.enemy); const Hs = mm && mm.figura === 'standee' && standeeDoMonstro(mm) ? [1.1, 1.4, 1.9, 2.6][mm.size || 0] * (mm.escalaStandee || 1) * C : 0;
     vol(x, y, x + 1, y + 1, z - 0.3, z + Math.max(0.3, Hs), () => { planoEm(z); const img = retratoImg('ini:' + e.enemy, iconeIni(e.enemy));
       ctx.globalAlpha = alfaSala(si) * (spawn ? 0.85 : 1);
       ctx.fillStyle = ehPool(e.enemy) ? COR.pool : spawn ? COR.spawn : COR.inimigo; ctx.beginPath(); ctx.arc(x * C + C / 2, y * C + C / 2, C * 0.44, 0, Math.PI * 2); ctx.fill();
       if (img && img.complete && img.naturalWidth) { ctx.save(); ctx.beginPath(); ctx.arc(x * C + C / 2, y * C + C / 2, C * 0.38, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(img, x * C + C * 0.12, y * C + C * 0.12, C * 0.76, C * 0.76); ctx.restore(); }
       ctx.globalAlpha = 1; if (selecionado) marcarSelecao(x, y, 1, 1);
-      if (Hs) { const im = retratoImg('standee:' + mm.id, mm.standee);
+      if (Hs) { const im = retratoImg('standee:' + mm.id, standeeDoMonstro(mm));
         if (im && im.complete && im.naturalWidth) { const [bx, by] = naTela(proj3(x + .5, y + .5, z)); const [, ty] = naTela(proj3(x + .5, y + .5, z + Hs));
           const hp = by - ty, wp = Hs * vista3d.zoom * im.naturalWidth / im.naturalHeight; planoTela(); ctx.globalAlpha = alfaSala(si); if (hp > 2) ctx.drawImage(im, bx - wp / 2, ty, wp, hp); ctx.globalAlpha = 1; } } });
   }));
@@ -323,12 +323,40 @@ function escadaDeMao(o, z0, n, alfa, selecionado) {
 }
 
 // ------------------------------------------------------------ view control
+/* the change between the plan (2D) and the 3D view is smooth, as a turn of the camera: going in, the 3D starts straight
+   from above, framed as the plan, and tilts to the first angle; going out, it turns straight up over the same place and the
+   plan comes in its place. The mode itself changes at once (the clicks and keys are those of the new mode from the start);
+   the 3D only keeps showing while it turns up (saida3d) */
+let saida3d = null;
+/* a picture of the canvas as it is now, laid over it and faded out (the old view melting into the new) */
+function dissolverTela(dur = 240) {
+  try {
+    const f = document.createElement('canvas'); f.width = tela.width; f.height = tela.height; f.getContext('2d').drawImage(tela, 0, 0);
+    f.className = 'fotoDaTela'; Object.assign(f.style, { left: tela.offsetLeft + 'px', top: tela.offsetTop + 'px', width: tela.clientWidth + 'px', height: tela.clientHeight + 'px', transition: `opacity ${dur}ms ease` });
+    tela.parentElement.appendChild(f);
+    requestAnimationFrame(() => requestAnimationFrame(() => { f.style.opacity = '0'; }));
+    setTimeout(() => f.remove(), dur + 80);
+  } catch { }
+}
 function alternar3d(ligar) {
   const on = ligar === undefined ? !vista3d.on : ligar;
   if (on === vista3d.on) return;
   vista3d.on = on; vista3d.foco = null; cursor = null; cruz = null; ferramenta = null; escolha = null; movendo = null; arrasto = null; orbita = null;
   $('#controles3d').hidden = !on;
-  if (on) { enquadrar3d(); marcarVisto('dica:3d'); } tudo();
+  const r = tela.getBoundingClientRect();
+  if (on) {
+    // from the plan: straight from above with its framing, then the tilt to the first angle
+    saida3d = null; dissolverTela(140);
+    vista3d.yaw = 0; vista3d.pitch = 0; vista3d.zoom = Math.min(4, Math.max(0.2, vista.zoom)); vista3d.px = vista.px; vista3d.py = vista.py;
+    marcarVisto('dica:3d'); tudo(); animar3d(-0.6, 0.95, 300);
+    return;
+  }
+  // to the plan: the plan is framed on the place the 3D looks at; the 3D turns straight up over it, then the plan comes
+  const [cx, cy] = centro3d(); vista.zoom = Math.min(4, Math.max(0.2, vista3d.zoom));
+  vista.px = r.width / 2 - cx * C * vista.zoom; vista.py = r.height / 2 - cy * C * vista.zoom;
+  const volta = Math.round(vista3d.yaw / (2 * Math.PI)) * 2 * Math.PI, t = performance.now(); saida3d = t;
+  animar3d(volta, 0, Math.abs(vista3d.pitch) + Math.abs(vista3d.yaw - volta) < 0.05 ? 1 : 200, () => { if (saida3d !== t) return; dissolverTela(140); saida3d = null; vista3d.yaw = 0; desenhar(); });
+  tudo();
 }
 /* one redraw per frame, however many mouse events arrive */
 let quadroPedido = false;
@@ -346,16 +374,14 @@ function angulo3d(yaw, pitch) {
   const p = proj3(x, y, 0); vista3d.px = r.width / 2 - p.sx * vista3d.zoom; vista3d.py = r.height / 2 - p.sy * vista3d.zoom;
 }
 let animacao3d = null;
-function animar3d(yaw, pitch) {
-  const de = { yaw: vista3d.yaw, pitch: vista3d.pitch }, t0 = performance.now(), dur = 260; animacao3d = t0;
-  const passo = t => { if (animacao3d !== t0) return; const k = Math.min(1, (t - t0) / dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
-    angulo3d(de.yaw + (yaw - de.yaw) * e, de.pitch + (pitch - de.pitch) * e); desenhar(); if (k < 1) requestAnimationFrame(passo); else animacao3d = null; };
+function animar3d(yaw, pitch, dur = 260, fim = null) {
+  const de = { yaw: vista3d.yaw, pitch: vista3d.pitch }, t0 = performance.now(); animacao3d = t0;
+  const passo = t => { if (animacao3d !== t0) { if (fim && saida3d) fim(); return; } const k = Math.min(1, (t - t0) / dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    angulo3d(de.yaw + (yaw - de.yaw) * e, de.pitch + (pitch - de.pitch) * e); desenhar(); if (k < 1) requestAnimationFrame(passo); else { animacao3d = null; if (fim) fim(); } };
   requestAnimationFrame(passo);
 }
 const girar3d = graus => animar3d(vista3d.yaw + graus * Math.PI / 180, vista3d.pitch);
 const inclinar3d = graus => animar3d(vista3d.yaw, vista3d.pitch + graus * Math.PI / 180);
-const vistaDeCima = () => animar3d(Math.round(vista3d.yaw / (Math.PI / 2)) * Math.PI / 2, 0);
-const vistaInicial = () => animar3d(-0.6, 0.95);
 /* the mouse in 3D: dragging moves the map (the angle stays); the right button (or Alt+drag) turns it; the wheel zooms */
 function mouse3d(tipo, ev) {
   if (tipo === 'down') { if (ev.button > 2) return; animacao3d = null; orbita = { x: ev.clientX, y: ev.clientY, yaw: vista3d.yaw, pitch: vista3d.pitch, px: vista3d.px, py: vista3d.py, girar: ev.button === 2 || ev.altKey, botao: ev.button }; return; }
@@ -368,7 +394,7 @@ function mouse3d(tipo, ev) {
 }
 $$('#controles3d [data-c3]').forEach(b => b.onclick = () => { const c = b.dataset.c3;
   if (c === 'esq') girar3d(-45); else if (c === 'dir') girar3d(45); else if (c === 'sobe') inclinar3d(-12); else if (c === 'desce') inclinar3d(12);
-  else if (c === 'topo') vistaDeCima(); else if (c === 'inicio') vistaInicial(); else if (c === 'enq') enquadrar3d(); else if (c === 'sair') alternar3d(false); });
+  else if (c === 'enq') enquadrar3d(); else if (c === 'sair') alternar3d(false); });
 function zoom3dEm(f, mx, my) { const z = Math.min(4, Math.max(0.2, vista3d.zoom * f)); const k = z / vista3d.zoom; vista3d.px = mx - (mx - vista3d.px) * k; vista3d.py = my - (my - vista3d.py) * k; vista3d.zoom = z; pedirDesenho(); }
 function zoom3d(f) { const r = tela.getBoundingClientRect(); zoom3dEm(f, r.width / 2, r.height / 2); }
 function enquadrar3d() {
@@ -483,7 +509,7 @@ function desenharBloco(v, casas, z0, alfa, x0, y0, w, h) {
   ctx.globalAlpha = alfa;
   for (let i = 0; i < n; i++) { planoEm(z0 + H * i / n); ctx.fillStyle = escurecer(cor, 0.55 + 0.25 * i / n); casas.forEach(([x, y]) => ctx.fillRect(x * C + 0.5, y * C + 0.5, C - 1, C - 1)); }
   planoEm(z0 + H); ctx.fillStyle = cor; casas.forEach(([x, y]) => ctx.fillRect(x * C + 0.5, y * C + 0.5, C - 1, C - 1));
-  const im = retratoImg('topo:' + v.id + ':' + (v.topo ? v.topo.length : (v.glifo || '') + (v.cor || '') + (v.icone || '').length), v.topo || iconeObj(v.id));
+  const im = retratoImg('topo:' + v.id + ':' + (v.topo ? (ehImg(v.topo) ? v.topo : v.topo.length) : (v.glifo || '') + (v.cor || '') + (ehImg(v.icone) ? v.icone : (v.icone || '').length)), v.topo || iconeObj(v.id));
   if (im && im.complete && im.naturalWidth) {
     const lado = Math.max(w, h); ctx.save(); ctx.beginPath(); casas.forEach(([x, y]) => ctx.rect(x * C, y * C, C, C)); ctx.clip();
     ctx.drawImage(im, (x0 + w / 2 - lado / 2) * C, (y0 + h / 2 - lado / 2) * C, lado * C, lado * C); ctx.restore();

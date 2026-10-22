@@ -105,8 +105,7 @@ namespace Bigorna.Menu
             GUI.Box(r, ""); GUI.Box(r, ""); GUI.Box(r, "");
             GUILayout.BeginArea(new Rect(r.x + 14f, r.y + 12f, r.width - 28f, r.height - 24f));
             GUILayout.Label(T("Há uma versão nova do Bigorna: ", "A new version of Bigorna is out: ") + _versaoNova, _titulo);
-            GUILayout.Label(T("Você tem a versão " + Bootstrap.Versao + ". A atualização traz o mod e o editor. Posso baixar e instalar?",
-                "You have version " + Bootstrap.Versao + ". The update brings the mod and the editor. May I download and install it?"), _pequeno);
+            GUILayout.Label(TF("Você tem a versão {0}. A atualização traz o mod e o editor. Posso baixar e instalar?", "You have version {0}. The update brings the mod and the editor. May I download and install it?", Bootstrap.Versao), _pequeno);
             if (!string.IsNullOrEmpty(_notas))
             {
                 GUILayout.Label(T("<b>O que mudou:</b>", "<b>What changed:</b>"), _pequeno);
@@ -141,7 +140,7 @@ namespace Bigorna.Menu
 
         static IEnumerator Baixar()
         {
-            _baixando = true; _situacao = T("Baixando a versão " + _versaoNova + "…", "Downloading version " + _versaoNova + "…");
+            _baixando = true; _situacao = TF("Baixando a versão {0}…", "Downloading version {0}…", _versaoNova);
             Log.Info("atualização: baixando " + _url);
             using (var req = UnityWebRequest.Get(_url))
             {
@@ -169,7 +168,7 @@ namespace Bigorna.Menu
         {
             int fim = -1;
             for (int i = z.Length - 22; i >= Math.Max(0, z.Length - 65557); i--) if (BitConverter.ToUInt32(z, i) == 0x06054b50) { fim = i; break; }
-            if (fim < 0) throw new Exception("zip sem diretório central");
+            if (fim < 0) throw new Exception(T("zip sem diretório central", "zip without a central directory"));
             int n = BitConverter.ToUInt16(z, fim + 10); int p = (int)BitConverter.ToUInt32(z, fim + 16);
             for (int k = 0; k < n; k++)
             {
@@ -182,7 +181,7 @@ namespace Bigorna.Menu
                 if (arq.Contains("/source/")) continue;
                 int dados = local + 30 + BitConverter.ToUInt16(z, local + 26) + BitConverter.ToUInt16(z, local + 28);
                 if (metodo == 0) { var r = new byte[tam]; Buffer.BlockCopy(z, dados, r, 0, tam); return r; }
-                if (metodo != 8) throw new Exception("compressão " + metodo + " desconhecida");
+                if (metodo != 8) throw new Exception(TF("compressão {0} desconhecida", "unknown compression {0}", metodo));
                 using (var ms = new MemoryStream(z, dados, comp)) using (var d = new DeflateStream(ms, CompressionMode.Decompress)) using (var o = new MemoryStream(tam)) { d.CopyTo(o); return o.ToArray(); }
             }
             return null;
@@ -211,7 +210,7 @@ namespace Bigorna.Menu
                 Process.Start(new ProcessStartInfo("cmd.exe", "/c \"" + bat + "\"") { CreateNoWindow = true, UseShellExecute = false, WindowStyle = ProcessWindowStyle.Hidden });
                 Log.Info("atualização: instalação marcada para quando o jogo fechar" + (reabrir ? " (fechando e reabrindo agora)" : ""));
                 if (reabrir) { _aberto = false; Application.Quit(); }
-                else { _agendado = true; _situacao = T("A versão " + _versaoNova + " será instalada quando vocês fecharem o jogo.", "Version " + _versaoNova + " will be installed when you close the game."); }
+                else { _agendado = true; _situacao = TF("A versão {0} será instalada quando vocês fecharem o jogo.", "Version {0} will be installed when you close the game.", _versaoNova); }
             }
             catch (Exception ex) { _situacao = T("Não consegui instalar: ", "Could not install: ") + ex.Message; Log.Erro("atualização", ex); }
         }

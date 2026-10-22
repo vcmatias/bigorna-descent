@@ -30,7 +30,7 @@ no computador dessa pessoa.
      o mod lê a sua cópia (um aviso no canto mostra o andamento; alguns minutos na primeira vez) e depois começar ou
      continuar uma campanha do jogo até o mapa-múndi aparecer. O mod fotografa o mapa para o editor, e a janela marca
      cada passo conforme acontece. A instalação só conclui depois da foto do mapa.
-   - **Pronto**: cria, se você quiser, o atalho `Bigorna Rooms` na Área de Trabalho.
+   - **Pronto**: cria, se você quiser, o atalho `Bigorna Editor` na Área de Trabalho (o aplicativo, que o mod instalou na etapa anterior).
 3. Se o instalador for fechado antes do mapa, o mod continua instalado e o editor segue bloqueado, mostrando os passos
    que faltam; rode o instalador de novo ou siga os passos no jogo.
 
@@ -48,19 +48,25 @@ Sem janela: `powershell -ExecutionPolicy Bypass -File install-bigorna.ps1 -Conso
 Na tela de título, na primeira vez (e de novo depois de uma atualização do jogo), o mod lê a cópia do jogo e grava em
 `%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of the Dark\Editor`:
 
-- `Bigorna-Salas.html`: o editor (abre no Chrome ou no Edge, sem internet);
+- `Bigorna-Salas.html`: o editor (o aplicativo o abre; também abre no Chrome ou no Edge, que então guardam o trabalho no próprio navegador);
 - `bigorna-game-data.js`: peças, monstros, itens, personagens, heróis, façanhas, receitas, textos em inglês, imagens
   e sons da cópia do jogo;
 - `bigorna-worldmap.js`: o mapa-múndi, fotografado na primeira visita ao mapa-múndi de cada ato. O editor é liberado quando existe a foto de algum ato.
+
+O aplicativo **Bigorna Editor** fica em `%LOCALAPPDATA%\Bigorna\App` (o mod o põe lá na tela de título; o atalho e o botão
+"Abrir editor" do jogo o abrem). A janela dele usa o motor do Microsoft Edge, que já vem no Windows. Ele grava tudo em
+arquivos, sem pedir autorização: a Oficina (uma só, para todos os mapas e campanhas) fica em `Pacotes\<id>\pacote.bigorna`,
+os mapas exportados vão direto para `CustomMaps`. Ao abrir, ele lê todos os pacotes da pasta `Pacotes` (os importados e os
+baixados do acervo); as entradas desses pacotes mudam numa cópia, que vai para a sua Oficina. (Ele fica fora da `LocalLow`
+de propósito: ali o Windows rodaria o aplicativo com integridade baixa, onde o motor do Edge não abre.)
 
 Um aviso no canto mostra o andamento. No painel "Mapas da comunidade" da tela de título ficam os botões
 "Abrir editor" e "Refazer dados do editor".
 
 ## Idioma
 
-O mod e o editor falam português e inglês. A janela do instalador tem a caixa de idioma (começa na língua do Windows) e
-ajusta os dois. Depois, o botão de idioma no painel "Mapas da comunidade" troca o mod, e o editor tem a própria escolha
-nas configurações dele.
+O mod segue a língua do jogo, nas 13 línguas dele. O editor fala português e inglês: começa na língua do jogo (inglês
+quando o jogo está em outra) e tem a própria escolha nas configurações dele.
 
 **Guarde `bigorna-game-data.js` e `bigorna-worldmap.js` só para você**: eles têm textos e imagens do jogo.
 Compartilhe os mapas e campanhas que fizer (`.dmap`, `.dcamp`); quem abrir usa a própria cópia do jogo.

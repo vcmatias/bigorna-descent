@@ -70,11 +70,11 @@ function relatorioNarrativo() {
     f.forcaMedia = f.pontes ? Math.round(soma / f.pontes * 10) / 10 : 0; });
   // (what the generator will ask of the file and it does not give yet)
   const H = HISTORIAS;
-  const semNarr = (lista, nome) => { const n = (lista || []).filter(x => !(x && x.narrativa)).length; if (n) r.lacunas.push(nome + ': ' + n + ' sem metadados narrativos'); };
+  const semNarr = (lista, nome) => { const n = (lista || []).filter(x => !(x && x.narrativa)).length; if (n) r.lacunas.push(nome + ': ' + n + L2(' without narrative metadata', ' sem metadados narrativos')); };
   Object.entries(H.aberturas || {}).forEach(([k, v]) => { semNarr(v.npcs, 'aberturas.' + k + '.npcs'); semNarr(v.pistas, 'aberturas.' + k + '.pistas'); });
   // (a list of plain names, the champions: their metadata stand beside them, in the grammar's regras_especiais)
   const paralelo = k => ((gramaticaNarrativa().regras_especiais || {})[k] || {}).metadado_individual || {};
   Object.entries(H.regras || {}).forEach(([k, v]) => semNarr((v || []).filter(x => !(typeof x === 'string' && paralelo(k)[x])), 'regras.' + k));
-  ['arcos', 'eventos', 'transicoes', 'regras_ritmo', 'causalidade'].forEach(k => { if (!r.gramatica.includes(k)) r.lacunas.push('gramática sem ' + k); });
+  ['arcos', 'eventos', 'transicoes', 'regras_ritmo', 'causalidade'].forEach(k => { if (!r.gramatica.includes(k)) r.lacunas.push(L2('grammar without ', 'gramática sem ') + k); });
   return r;
 }

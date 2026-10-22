@@ -31,21 +31,37 @@ namespace Bigorna.Campanha
         }
 
         /// <summary>Partida nova (ou continuada pelo progresso da pasta) no mapa-mundi do jogo.</summary>
-        public static string Comecar(Dcamp c, bool recomecar)
+        /// <param name="grupo">"Continuar herois": a partida gravada de onde vem o grupo (null: grupo novo, ou, ao continuar uma
+        /// campanha comecada, o grupo de onde ela veio).</param>
+        public static string Comecar(Dcamp c, bool recomecar, Encontro.GrupoDoSave.Save grupo = null)
         {
             if (c.PacotesFaltando != null && c.PacotesFaltando.Count > 0) return Acervo.Acervo.TextoFaltam(c.PacotesFaltando);
             try
             {
                 Abrir(c);
+                bool comecada = Estado.Completados.Count > 0 && !recomecar;
                 if (recomecar) Estado.Zerar();
+                // (de onde vem o grupo: o save escolhido agora; ao continuar, o de quando a campanha comecou; senao, grupo novo)
+                var origem = grupo ?? (comecada ? Estado.Origem() : null);
+                if (!comecada || grupo != null) Estado.PorOrigem(origem);
                 var modelo = CampanhaDoJogo(c);
                 if (modelo == null) return Idioma.T("Nenhuma campanha do jogo disponível para servir de base.", "No campaign of the game is available to serve as the base.");
                 var partida = new SerializedGame(modelo.Id);
                 partida.Initialize();
                 partida.PartyName = c.NomeVisivel;
                 try { partida.UnavailableHeroes?.Clear(); } catch { }
-                try { if (partida.FeatProgresses.Count == 0 && partida.RealCompletedFeats.Count == 0) partida.SetPartyStartingFeats(); } catch (Exception ex) { Log.Info("proezas de saída: " + ex.Message); }
-                try { InventarioInicial(partida, c.Comeco); } catch (Exception ex) { Log.Erro("inventário de saída da campanha", ex); }
+                if (origem != null)
+                {
+                    // (o grupo do save chega como esta: o inventario inicial do criador e as proezas de saida ficam de fora)
+                    var e = Encontro.GrupoDoSave.Trazer(partida, origem); if (e != null) return e;
+                    Estado.PorOrigem(origem);   // (com o carimbo da gravacao de onde o grupo saiu agora)
+                }
+                else
+                {
+                    Encontro.GrupoDoSave.SemOrigem();
+                    try { if (partida.FeatProgresses.Count == 0 && partida.RealCompletedFeats.Count == 0) partida.SetPartyStartingFeats(); } catch (Exception ex) { Log.Info("proezas de saída: " + ex.Message); }
+                    try { InventarioInicial(partida, c.Comeco); } catch (Exception ex) { Log.Erro("inventário de saída da campanha", ex); }
+                }
                 int n = 0;
                 foreach (var no in c.Nos)
                 {
@@ -58,6 +74,8 @@ namespace Bigorna.Campanha
                 var salvar = SingletonBehaviour<SaveLoadController>.Instance;
                 Jogo.DadosJogo.CurrentSaveIndex = salvar.GetFirstFreeIndex();
                 Log.Info("partida de «" + c.NomeVisivel + "» na ranhura " + Jogo.DadosJogo.CurrentSaveIndex + " com " + n + " destino(s) de saída");
+                // (a partida desta campanha sai da tela "Carregar campanha" do jogo e volta por "Continuar campanha", na ficha dela)
+                SavesDaComunidade.Registrar(partida.SaveSlotGUID, c);
                 _ranhuraVista = Jogo.DadosJogo.CurrentSaveIndex;
                 Jogo.Carregador.LoadWorldMap(partida, true);
                 _emCurso = null;
@@ -119,6 +137,8 @@ namespace Bigorna.Campanha
                     if (!c.Nos.Any(n => ativos.Contains(n.Id))) continue;
                     Log.Info("partida carregada é da campanha «" + c.NomeVisivel + "»; reabrindo");
                     Abrir(c);
+                    SavesDaComunidade.Registrar(partida.SaveSlotGUID, c);
+                    Encontro.GrupoDoSave.Lembrar(Estado.Origem());
                     try { partida.UnavailableHeroes?.Clear(); } catch { }
                     return true;
                 }
@@ -222,6 +242,8 @@ namespace Bigorna.Campanha
             Estado.Completar(n.Id);
             try { Jogo.Partida?.CompletedDestinationIds?.AddUniqueItem(n.Id); Jogo.Partida?.ActiveDestinationIds?.Remove(n.Id); Jogo.Sujo(); } catch { }
             Recompensar(n);
+            // (todos os mapas feitos: a campanha terminou; com o grupo de um save, a mesa escolhe o destino dele)
+            try { if (Aberta.Nos.Where(x => x.EhMapa).All(x => Estado.Completado(x.Id))) Encontro.GrupoDoSave.AoTerminar(Aberta.NomeVisivel); } catch (Exception ex) { Log.Erro("fim da campanha", ex); }
             var d = Aberta.DialogoPorId(n.AoCompletar);
             if (d != null) Conversa.Tocar(Aberta, d, Sincronizar); else Sincronizar();
         }

@@ -45,7 +45,7 @@ namespace Bigorna.Encontro
             try
             {
                 var persistente = Jogo.Persistente;
-                var pedido = new MessageRequest { Key = Idioma.T("Escolham até " + vagas + " heróis para esta missão.", "Choose up to " + vagas + " heroes for this quest."), CallbackContinue = () => { } };
+                var pedido = new MessageRequest { Key = Idioma.TF("Escolham até {0} heróis para esta missão.", "Choose up to {0} heroes for this quest.", vagas), CallbackContinue = () => { } };
                 var cfg = new StoryMessageSettings { BackgroundType = StoryMessageBackgroundType.Camp, CloseOnFinish = true };
                 ui.StoryMessageDialog.IsHeroSelect = true;
                 persistente.StoryMessages.DisplayMessage(pedido, cfg);

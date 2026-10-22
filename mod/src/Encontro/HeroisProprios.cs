@@ -140,12 +140,20 @@ namespace Bigorna.Encontro
         }
 
         /// <summary>A imagem da peca (a que aparece montada na arma e o icone nas listas) vira um recurso do pacote virtual.</summary>
+        /// <summary>A caixa forjada de uma imagem de peca (do "Montar" do editor), pelo nome da textura; sem forma, a do jogo.
+        /// Vale tambem para as pecas novas da Oficina (itens).</summary>
+        public static void Forma(string nomeDaTextura, JToken forma)
+        {
+            if (string.IsNullOrEmpty(nomeDaTextura)) return;
+            if (forma is JObject f) _formas[nomeDaTextura] = new Vector4((float?)f["x"] ?? 0f, (float?)f["y"] ?? 0f, Mathf.Max(0.05f, (float?)f["w"] ?? 1f), Mathf.Max(0.05f, (float?)f["h"] ?? 1f));
+            else _formas.Remove(nomeDaTextura);
+        }
+
         static void ImagemDaPeca(WeaponPartsModel p, string pid, string dataUri, JToken forma = null)
         {
             var tex = Oficina.LerImagem(dataUri, "@Bigorna-Peca-" + pid);
             if (tex == null) { Log.Info("  imagem da peça «" + pid + "» ilegível"); return; }
-            if (forma is JObject f) _formas[tex.name] = new Vector4((float?)f["x"] ?? 0f, (float?)f["y"] ?? 0f, Mathf.Max(0.05f, (float?)f["w"] ?? 1f), Mathf.Max(0.05f, (float?)f["h"] ?? 1f));
-            else _formas.Remove(tex.name);
+            Forma(tex.name, forma);
             var caminho = PacoteVirtual.Registrar("D3/Bigorna/Weapon Parts/" + pid + ".png", tex);
             p.ArmoryAssetPath = caminho; p.TextureAssetPath = caminho; p.IsPromo = false; p.NoTexture = false;
         }
@@ -378,6 +386,10 @@ namespace Bigorna.Encontro
             }
             try { Jogo.UI?.HeroMenu?.SyncTo(Jogo.Partida.ActivePlayers); } catch { }
         }
+
+        /// <summary>O heroi entrou neste mapa com armas da Oficina (trocadas ao comecar e devolvidas ao sair): o arsenal dos
+        /// gatilhos nao mexe nelas.</summary>
+        public static bool ArmasDoMapa(SerializedPlayer h) => h != null && _nasMaos.Any(x => ReferenceEquals(x.lista, h.EquippedWeapons) || ReferenceEquals(x.lista, h.DefaultWeaponsBuild));
 
         /// <summary>Ao sair do encontro: cada heroi volta a ter a arma (e as pecas) que tinha.</summary>
         public static void DesfazerArmas()

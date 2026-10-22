@@ -30,7 +30,7 @@ all of that from your installed copy, on your computer (see below).
      screen while the mod reads your copy (a notice in the corner shows the progress; a few minutes the first time),
      then start or continue a campaign of the game until the world map shows. The mod pictures the map for the editor,
      and the window ticks each step as it happens. The installation finishes only once the map is pictured.
-   - **Done**: optionally makes a `Bigorna Rooms` shortcut on the desktop.
+   - **Done**: optionally makes a `Bigorna Editor` shortcut on the desktop (the app, which the mod installed in the step before).
 3. If you close the installer before the map, the mod stays installed and the editor stays locked, showing the steps
    still missing; run the installer again or just follow them in the game.
 
@@ -48,10 +48,17 @@ Without a window: `powershell -ExecutionPolicy Bypass -File install-bigorna.ps1 
 On the title screen, the first time (and again after a game update), the mod reads your copy of the game and writes,
 into `%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of the Dark\Editor`:
 
-- `Bigorna-Salas.html`: the editor (it opens in Chrome or Edge, no internet needed);
+- `Bigorna-Salas.html`: the editor (the app opens it; Chrome or Edge open it too, and then keep the work in the browser);
 - `bigorna-game-data.js`: tiles, monsters, items, characters, heroes, feats, recipes, English texts, pictures and
   sounds from your copy of the game;
 - `bigorna-worldmap.js`: the world map, pictured the first time you open the world map in each act. The editor unlocks once any act has its picture.
+
+The **Bigorna Editor** app lives in `%LOCALAPPDATA%\Bigorna\App` (the mod puts it there on the title screen; the shortcut and
+the game's "Open editor" button open it). Its window uses the Microsoft Edge engine that comes with Windows. It keeps
+everything in files, with nothing to allow: the Workshop (one for every map and campaign) is in `Pacotes\<id>\pacote.bigorna`,
+exported maps go straight into `CustomMaps`. When it opens, it reads every package of the `Pacotes` folder (imported or
+downloaded from the community library); the entries of those packages change in a copy, which goes into your Workshop. (It
+stays out of `LocalLow` on purpose: there Windows would run the app at low integrity, where the Edge engine does not open.)
 
 A notice in the corner shows the progress. On the title screen, the "Community maps" panel has the buttons
 "Open editor" and "Rebuild editor data" (read the game again).
@@ -96,6 +103,5 @@ the DLLs from your `Legends of the Dark_Data\Managed` folder into `source/refs/`
 
 ## Language
 
-The mod and the editor speak English and Portuguese. The installer window has a language box (it starts in the Windows language)
-and sets both. Later, the language button in the "Community maps" panel switches the mod, and the editor has its own
-choice in its settings.
+The mod follows the game's language, in its 13 languages. The editor speaks English and Portuguese: it starts in the
+game's language (English when the game is in another one) and has its own choice in its settings.
