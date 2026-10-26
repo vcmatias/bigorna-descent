@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contra III Editor</title>
+<link rel="stylesheet" href="editor.css">
+</head>
+<body>
+<header>
+  <h1>Contra III Editor</h1>
+  <label class="botao">Abrir ROM<input type="file" id="arquivo" accept=".sfc,.smc,.bin" hidden></label>
+  <span id="estado">Abra a sua cópia de <i>Contra III: The Alien Wars</i> (USA). Nada sai do seu computador.</span>
+</header>
+<nav id="abas">
+  <button data-aba="graficos" class="ativa">Gráficos</button>
+  <button data-aba="sprites">Sprites</button>
+  <button data-aba="fases">Fases</button>
+  <button data-aba="exportar">Exportar e testar</button>
+</nav>
+
+<main>
+<section id="aba-graficos" class="aba ativa">
+  <div class="colunas">
+    <aside>
+      <h2>Scripts de gráficos</h2>
+      <p class="nota">Lidos do banco $05, como o jogo faz em $00:90A8.</p>
+      <div id="lista-scripts" class="lista"></div>
+      <h3>Fluxo por endereço</h3>
+      <div class="linha"><input id="ender-fluxo" placeholder="$06:8000" size="10"><button id="abrir-fluxo">Abrir</button></div>
+    </aside>
+    <div class="principal">
+      <div class="linha">
+        <strong id="titulo-fluxo">Nenhum fluxo aberto</strong>
+        <label>bpp <select id="bpp"><option>2</option><option selected>4</option><option>8</option></select></label>
+        <label>zoom <select id="zoom"><option>2</option><option selected>3</option><option>4</option></select></label>
+        <label>paleta <input id="ender-paleta" placeholder="cinza ou $xx:xxxx" size="12"></label>
+        <label>linha <input id="linha-paleta" type="number" min="0" max="15" value="0" style="width:3.5em"></label>
+      </div>
+      <canvas id="folha"></canvas>
+      <div id="painel-tile" class="linha escondido">
+        <canvas id="tile-grande" width="192" height="192"></canvas>
+        <div>
+          <div id="cores" class="cores"></div>
+          <p class="nota">Clique numa cor e pinte o tile. As mudanças ficam no fluxo até você gravar.</p>
+          <button id="gravar-fluxo">Gravar o fluxo na ROM</button>
+          <span id="resultado-gravar"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="aba-sprites" class="aba">
+  <div class="linha">
+    <label>quadro em <input id="ender-quadro" placeholder="$06:8000" size="10"></label>
+    <button id="ver-quadro">Ver</button><button id="proximo-quadro">Próximo ›</button>
+    <span class="nota">Tiles e paleta: os do fluxo aberto em Gráficos.</span>
+  </div>
+  <div class="colunas">
+    <canvas id="quadro" width="256" height="256"></canvas>
+    <pre id="pecas"></pre>
+  </div>
+  <p class="nota">Formato lido do construtor de OAM em $00:EB1A: um byte com o número de peças e, por peça,
+    [x][y][tile][atributos]. Ainda falta conferir com a ROM.</p>
+</section>
+
+<section id="aba-fases" class="aba">
+  <div class="linha">
+    <label>fase <select id="fase"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label>
+    <span class="nota">Fases 2 e 5 (vista de cima, Mode 7) usam outro formato, ainda não coberto.</span>
+  </div>
+  <h2>Inimigos</h2>
+  <p class="nota">Uma lista por tela, na ordem em que a câmera chega nela. Cada inimigo nasce quando a rolagem dentro
+    da tela passa do gatilho (0-254); x e y são relativos à tela. Os tipos são o número do ator ($05:A48A).</p>
+  <div id="inimigos"></div>
+  <h2>Colisão</h2>
+  <p class="nota">A colisão vem do número do tile 8x8: 12 limiares dividem os tiles em classes ($00:CC37).</p>
+  <pre id="limiares"></pre>
+</section>
+
+<section id="aba-exportar" class="aba">
+  <h2>Exportar</h2>
+  <p>O patch IPS é feito contra a ROM original e leva só os bytes que você mudou: é ele que se compartilha.</p>
+  <div class="linha"><input id="nome" value="contra3-editado" size="20">
+    <button id="baixar-ips">Baixar patch .ips</button><button id="baixar-rom">Baixar ROM editada .sfc</button></div>
+  <p id="resumo-mudancas" class="nota"></p>
+  <h2>Testar no Contra3Recomp</h2>
+  <p>O recomp lê os dados da ROM na hora; com o checksum corrigido, ele aceita a ROM editada.</p>
+  <div class="linha"><label>começar na fase <select id="fase-teste"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label></div>
+  <pre id="comando-recomp"></pre>
+</section>
+</main>
+
+<script src="../nucleo/rom.js"></script>
+<script src="../nucleo/lzss.js"></script>
+<script src="../nucleo/recursos.js"></script>
+<script src="../nucleo/graficos.js"></script>
+<script src="../nucleo/patch.js"></script>
+<script src="../nucleo/fases.js"></script>
+<script src="editor.js"></script>
+</body>
+</html>

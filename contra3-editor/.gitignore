@@ -1,0 +1,7 @@
+# nada do jogo entra no repositório
+*.sfc
+*.smc
+*.ips
+*.bps
+dist/
+node_modules/
