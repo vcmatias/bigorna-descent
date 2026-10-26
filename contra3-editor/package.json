@@ -1,8 +1,0 @@
-{
-  "name": "contra3-editor",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Editor de fases, inimigos e graficos para Contra III: The Alien Wars (SNES)",
-  "scripts": { "test": "node --test testes/*.test.js" },
-  "license": "MIT"
-}
