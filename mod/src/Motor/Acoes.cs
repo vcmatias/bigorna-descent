@@ -672,6 +672,38 @@ namespace Bigorna.Motor
             _ateARodada.Clear();
         }
 
+        // ------------------------------------------------------------ v265: a partida em andamento
+        static List<float[]> Posicoes(List<Transform> l) => l.Where(t => t != null).Select(t => new[] { t.position.x, t.position.y, t.position.z }).ToList();
+        /// <summary>As casas que o mod destacou (as tres listas), pela posicao no mundo.</summary>
+        public static EstadoDoMapa.RealcesE ExportarDestaques() => new EstadoDoMapa.RealcesE { Realces = Posicoes(_realces), AteARodada = Posicoes(_ateARodada), Destinos = Posicoes(_destinos) };
+
+        /// <summary>A partida retomada: o jogo repoe os destaques gravados, mas o mod nao saberia apaga-los (os de ate a proxima
+        /// rodada ficariam para sempre). Eles saem; os do mod voltam pelas listas dele (RestaurarDestaques).</summary>
+        public static void EsquecerDestaquesDoJogo()
+        {
+            var cena = Jogo.Cena; if (cena == null) return;
+            _realces.Clear(); _ateARodada.Clear(); _destinos.Clear();
+            var m = cena.GetType().GetMethod("ClearAllHighlights", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+            if (m != null) m.Invoke(cena, null); else cena.HighlightsCoordinates.Clear();
+        }
+
+        public static void RestaurarDestaques(EstadoDoMapa.RealcesE e)
+        {
+            var cena = Jogo.Cena; if (cena == null || e == null) return;
+            int n = 0;
+            void Pos(List<float[]> de, List<Transform> para)
+            {
+                foreach (var p in de ?? new List<float[]>())
+                {
+                    if (p == null || p.Length < 3) continue;
+                    var tr = Jogo.CasaDaGrade(new Vector3(p[0], p[1], p[2])); if (tr == null || para.Contains(tr)) continue;
+                    try { cena.AddPersistentHighlight(tr); para.Add(tr); n++; } catch { }
+                }
+            }
+            Pos(e.Realces, _realces); Pos(e.AteARodada, _ateARodada); Pos(e.Destinos, _destinos);
+            if (n > 0) Log.Info("destaques como estavam: " + n + " casa(s)");
+        }
+
         public static void LimparRealces()
         {
             LimparAteARodada();

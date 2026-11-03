@@ -27,6 +27,8 @@ namespace Bigorna.Encontro
         static int _banco;
 
         public static void Reiniciar() { _banco = 0; }
+        /// <summary>v265: a sobra dos pontos (a partida em andamento a guarda).</summary>
+        public static int Banco { get => _banco; set => _banco = Math.Max(0, value); }
 
         public static bool EhVaga(Dmap.Inimigo e) => e != null && string.Equals(e.Id, Id, StringComparison.OrdinalIgnoreCase);
 

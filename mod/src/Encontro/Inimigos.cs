@@ -331,7 +331,7 @@ namespace Bigorna.Encontro
         }
 
         /// <summary>A cor da base, na lingua do mod (para o registro, em portugues).</summary>
-        static string NomeCor(PlasticIds id, bool registro = false)
+        internal static string NomeCor(PlasticIds id, bool registro = false)
         {
             Func<string, string, string> t = registro ? (Func<string, string, string>)((pt, en) => pt) : Idioma.T;
             switch (id)
@@ -452,6 +452,58 @@ namespace Bigorna.Encontro
         public static void Tirar(SerializedEnemy e)
         {
             try { Jogo.Controle.RemoveEnemy(e); } catch (Exception ex) { Log.Info("  não tirei o inimigo: " + ex.Message); }
+        }
+
+        // ------------------------------------------------------------ v265: a partida em andamento
+        static EstadoDoMapa.OrigemRef Ref(Dmap.Inimigo i, Dmap m)
+        {
+            int k = i == null ? -1 : (m?.Spawns?.Inimigos?.IndexOf(i) ?? -1);
+            return k >= 0 ? new EstadoDoMapa.OrigemRef { I = k } : new EstadoDoMapa.OrigemRef { Propria = i };
+        }
+        static Dmap.Inimigo DaRef(EstadoDoMapa.OrigemRef r, Dmap m)
+        {
+            if (r == null) return null;
+            var lista = m?.Spawns?.Inimigos;
+            if (r.I >= 0 && lista != null && r.I < lista.Count) return lista[r.I];
+            return r.Propria;
+        }
+
+        /// <summary>De onde veio cada inimigo em jogo, os que esperam a sala, a reserva e a sobra dos pontos balanceados.</summary>
+        public static EstadoDoMapa.InimigosE Exportar(Dmap m)
+        {
+            var e = new EstadoDoMapa.InimigosE { GrupoDe = new Dictionary<string, string>(GrupoDe), ModeloDe = new Dictionary<string, string>(ModeloDe), Reserva = new List<string>(Reserva), Banco = Balanceado.Banco };
+            foreach (var kv in OrigemDe) if (kv.Value != null) e.OrigemDe[kv.Key] = Ref(kv.Value, m);
+            foreach (var x in _emSalaOculta) e.EmSalaOculta.Add(new EstadoDoMapa.EsperaE { Inimigo = Ref(x.inimigo, m), Sala = x.sala });
+            return e;
+        }
+
+        /// <summary>Depois de Reiniciar, numa partida retomada: os inimigos em jogo vem da gravacao do jogo; isto devolve o que o
+        /// mod sabe deles (grupo, modelo, a entrada do mapa) e os que ainda esperam a sala deles.</summary>
+        public static void Restaurar(Dmap m, EstadoDoMapa.InimigosE e)
+        {
+            if (e == null) return;
+            foreach (var kv in e.GrupoDe ?? new Dictionary<string, string>()) if (kv.Key != null) GrupoDe[kv.Key] = kv.Value;
+            foreach (var kv in e.ModeloDe ?? new Dictionary<string, string>()) if (kv.Key != null) ModeloDe[kv.Key] = kv.Value;
+            foreach (var kv in e.OrigemDe ?? new Dictionary<string, EstadoDoMapa.OrigemRef>()) { var o = DaRef(kv.Value, m); if (kv.Key != null && o != null) OrigemDe[kv.Key] = o; }
+            Reserva.Clear(); Reserva.AddRange((e.Reserva ?? new List<string>()).Where(x => !string.IsNullOrEmpty(x)));
+            _emSalaOculta.Clear();
+            foreach (var x in e.EmSalaOculta ?? new List<EstadoDoMapa.EsperaE>()) { var o = DaRef(x?.Inimigo, m); if (o != null && !string.IsNullOrEmpty(x.Sala)) _emSalaOculta.Add((o, x.Sala)); }
+            Balanceado.Banco = e.Banco;
+            Log.Info("inimigos como estavam: " + Jogo.Inimigos.Count + " em jogo, " + _emSalaOculta.Count + " esperando a sala, reserva " + Reserva.Count);
+        }
+
+        /// <summary>Os inimigos em jogo agora, com a base e a casa (para a mesa remontar o tabuleiro ao retomar).</summary>
+        public static List<string> NaMesa()
+        {
+            var r = new List<string>();
+            foreach (var e in Jogo.Inimigos)
+            {
+                if (e == null) continue;
+                var c = CasaDe(e);
+                r.Add(c.HasValue ? Idioma.TF("{0}, base {1}, casa {2}", "{0}, {1} base, space {2}", NomeDoInimigo(e), NomeCor(e.PlasticId), c.Value.Item1 + "," + c.Value.Item2)
+                    : Idioma.TF("{0}, base {1}", "{0}, {1} base", NomeDoInimigo(e), NomeCor(e.PlasticId)));
+            }
+            return r;
         }
     }
 }

@@ -29,7 +29,7 @@ function desenharDestaqueDaSala() {
   ctx.setLineDash([]); ctx.shadowBlur = 0;
   // the label over the top row: what a click on the outline does, or how the moving ends
   const y0 = Math.min(...casas.map(c => c.y)); const lx = Math.min(...casas.filter(c => c.y === y0).map(c => c.x)) * C;
-  const rot = mover ? tr('Moving: drag the room · Esc or a click outside ends it') : tr('Click the outline to move the room');
+  const rot = mover ? tr('Moving: drag the room · R turns it · Esc or a click outside ends it') : tr('Click the outline to move the room · R turns it');
   ctx.font = `600 ${11 / z}px system-ui`; const w = ctx.measureText(rot).width;
   ctx.fillStyle = mover ? 'rgba(80,55,20,.95)' : 'rgba(40,30,18,.9)'; ctx.fillRect(lx, y0 * C - 19 / z, w + 12 / z, 17 / z);
   ctx.fillStyle = '#f3cf8f'; ctx.fillText(rot, lx + 6 / z, y0 * C - 6.5 / z);
@@ -271,11 +271,12 @@ function desenhar() {
     ctx.globalAlpha = 0.75; desenharPilar({ type: pilarEscolhido, pos: cruz }, 1, false, ok.ok ? ok.peca.level : 0); ctx.globalAlpha = 1;
     ctx.strokeStyle = ok.ok ? COR.ok : COR.erro; ctx.lineWidth = 2 / vista.zoom; ctx.beginPath(); ctx.arc(cruz[0] * C, cruz[1] * C, C * 0.36, 0, Math.PI * 2); ctx.stroke();
   } else if (cursor && salaAtual >= 0 && (escolha || ferramenta === 'objeto' || ferramenta === 'inimigo' || ferramenta === 'heroi')) {
-    const casas = !escolha && ferramenta === 'objeto' ? casasDoObjeto({ type: tipoDoObjeto(objetoEscolhido), pos: cursor, rot }) : [cursor];
-    const ok = escolha ? (escolha.modo === 'object' ? !!oQueHa(cursor[0], cursor[1], true) : salaNoNivel(cursor[0], cursor[1], nivel) >= 0) : (!escolha && ferramenta === 'objeto' && ehTerreno({ type: tipoDoObjeto(objetoEscolhido) })) || casas.every(([x, y]) => salaNoNivel(x, y, nivel) === salaAtual);
+    const pondo = ferramenta === 'objeto' && (!escolha || pondoAbridor()), pede = escolha && !pondo;
+    const casas = pondo ? casasDoObjeto({ type: tipoDoObjeto(objetoEscolhido), pos: cursor, rot }) : [cursor];
+    const ok = pede ? (escolha.modo === 'object' ? !!oQueHa(cursor[0], cursor[1], true) : salaNoNivel(cursor[0], cursor[1], nivel) >= 0) : (pondo && ehTerreno({ type: tipoDoObjeto(objetoEscolhido) })) || casas.every(([x, y]) => salaNoNivel(x, y, nivel) === salaAtual);
     ctx.strokeStyle = ok ? COR.ok : COR.erro; ctx.lineWidth = 2 / vista.zoom;
     casas.forEach(([x, y]) => ctx.strokeRect(x * C + 1, y * C + 1, C - 2, C - 2));
-    if (!escolha && ferramenta === 'objeto') { const tex = texturaDoObjeto(tipoDoObjeto(objetoEscolhido)); const img = tex || imagemObj(tipoDoObjeto(objetoEscolhido)); if (img && img.complete && img.naturalWidth) { ctx.globalAlpha = .6; const xs = casas.map(c => c[0]), ys = casas.map(c => c[1]); const w = Math.max(...xs) - Math.min(...xs) + 1, h = Math.max(...ys) - Math.min(...ys) + 1; (tex ? desenharTexturaGirada : desenharImagemGirada)(img, { type: objetoEscolhido, rot }, Math.min(...xs), Math.min(...ys), w, h); ctx.globalAlpha = 1; } }
+    if (pondo) { const tex = texturaDoObjeto(tipoDoObjeto(objetoEscolhido)); const img = tex || imagemObj(tipoDoObjeto(objetoEscolhido)); if (img && img.complete && img.naturalWidth) { ctx.globalAlpha = .6; const xs = casas.map(c => c[0]), ys = casas.map(c => c[1]); const w = Math.max(...xs) - Math.min(...xs) + 1, h = Math.max(...ys) - Math.min(...ys) + 1; (tex ? desenharTexturaGirada : desenharImagemGirada)(img, { type: objetoEscolhido, rot }, Math.min(...xs), Math.min(...ys), w, h); ctx.globalAlpha = 1; } }
   }
   ctx.restore();
 }
@@ -482,7 +483,7 @@ tela.addEventListener('mousedown', ev => {
   }
   // the generated room waiting on the board is dragged whole
   if (!escolha && !ferramenta && posicionandoPrevia() && chaoDaSala(GER.previa).has(x + ',' + y)) { movendoSala = { de: [x, y] }; tela.style.cursor = 'grabbing'; return; }
-  if (escolha) { const q = oQueHa(x, y, true); let ok = false; try { ok = escolha.cb(x, y, q); } catch (e) { console.error(e); } if (ok) { if (escolha.repetir) { renderPropriedades(); renderSalas(); renderConferencia(); desenhar(); } else terminarClique(); } return; }
+  if (escolha && !pondoAbridor()) { const q = oQueHa(x, y, true); let ok = false; try { ok = escolha.cb(x, y, q); } catch (e) { console.error(e); } if (ok) { if (escolha.repetir) { renderPropriedades(); renderSalas(); renderConferencia(); desenhar(); } else terminarClique(); } return; }
   if (!ferramenta) {
     const cz = cruzamentoPerto(ev); const pil = cz && pilarEm(cz[0], cz[1]);
     if (pil && pil.si === salaAtual && (pil.p.level || 0) === nivel) { sel = { tipo: 'pilar', sala: pil.si, pi: pil.pi, pos: [cz[0], cz[1]] }; tudo(); return; }
@@ -506,7 +507,7 @@ tela.addEventListener('mousedown', ev => {
     const alfombra = ehAlfombra(pecaEscolhida);
     const caixa = ehCaixa(pecaEscolhida);
     const p = { tile: pecaEscolhida, pos: [x, y], rot, level: alfombra ? 0 : nivel, pilares: [] }; if (ehEspecial(pecaEscolhida)) p.level = nivelEspecial(p);   // (a special tile takes the level of where it stands)
-    if (alfombra && usoAlfombra(pecaEscolhida) >= caixaAlfombra(pecaEscolhida)) return aviso(VERSO_ALFOMBRA[pecaEscolhida] ? 'All ' + CAIXA_ALFOMBRAS + ' ' + nomeAlfombra(pecaEscolhida) + ' / ' + nomeAlfombra(VERSO_ALFOMBRA[pecaEscolhida]) + ' cards are already on the map (the two faces share the same cards).' : 'All ' + caixaAlfombra(pecaEscolhida) + ' cop' + (caixaAlfombra(pecaEscolhida) > 1 ? 'ies' : 'y') + ' of ' + nomeAlfombra(pecaEscolhida) + ' are already on the map (change the copies in the Workshop).');
+    if (alfombra && usoAlfombra(pecaEscolhida) >= caixaAlfombra(pecaEscolhida)) return aviso(VERSO_ALFOMBRA[pecaEscolhida] ? 'All ' + caixaAlfombra(pecaEscolhida) + ' ' + nomeAlfombra(pecaEscolhida) + ' / ' + nomeAlfombra(VERSO_ALFOMBRA[pecaEscolhida]) + ' cards are already on the map (the two faces share the same cards).' : 'All ' + caixaAlfombra(pecaEscolhida) + ' cop' + (caixaAlfombra(pecaEscolhida) > 1 ? 'ies' : 'y') + ' of ' + nomeAlfombra(pecaEscolhida) + ' are already on the map (change the copies in the Workshop).');
     if (alfombra && nivel > 0) return aviso('Underlays lie on the floor: pick level 0 on the ribbon.');
     if (!alfombra && s.pecas.filter(q => numeroDaPeca(q.tile) === numeroDaPeca(p.tile)).length >= caixaDaPeca(numeroDaPeca(p.tile)) && typeof Tutorial !== 'undefined' && Tutorial.ativo() && Tutorial.explicar('pecas-mesma-sala')) return;   // (the tutorial explains it the first time)
     // the same tile again in this room: only as the marker of where it moves to ("Move a tile")
@@ -528,6 +529,7 @@ tela.addEventListener('mousedown', ev => {
     s.herois.push([x, y, nivel]); tudo(); return;
   }
   if (ferramenta === 'objeto') {
+    const comoAbridor = pondoAbridor();   // (placed while "Generate room" asks for the opener: it becomes the opener)
     // (a copy of a game object goes on the board as that piece, with o.molde: its default is the copy's)
     const tipo = tipoDoObjeto(objetoEscolhido), molde = tipo !== objetoEscolhido ? objetoEscolhido : null;
     const terreno = ehTerreno({ type: tipo });
@@ -540,7 +542,12 @@ tela.addEventListener('mousedown', ev => {
     // (a step of the tutorial asks for a door with no script: the box must be unticked first)
     if (typeof Tutorial !== 'undefined' && Tutorial.ativo() && Tutorial.exigeSemPadrao() && usarPadraoObjeto()) return avisoLongo(tr('Untick “Default script” first: a door with it opens a new room by itself.'), 6000);
     if (usarPadraoObjeto()) aplicarPadrao(o);
-    const por = () => { s.objetos.push(o); sel = { tipo: 'objeto', sala: salaAtual, i: s.objetos.length - 1 }; ferramenta = null; gatAberto = -1; tudo();
+    const por = () => { s.objetos.push(o);
+      // the opener of the room to generate: the generator gives it the trigger for the new room (a default "Open a room"
+      // with no room yet would be a second one)
+      if (comoAbridor && escolha) { o.gatilhos = (o.gatilhos || []).filter(g => !(g.tipo === 'open_room' && (g.sala === '' || g.sala == null))); const e = escolha, q = { tipo: 'objeto', sala: salaAtual, i: s.objetos.length - 1 };
+        ferramenta = null; let ok = false; try { ok = e.cb(o.pos[0], o.pos[1], q); } catch (err) { console.error(err); } if (ok) terminarClique(); else tudo(); return; }
+      sel = { tipo: 'objeto', sala: salaAtual, i: s.objetos.length - 1 }; ferramenta = null; gatAberto = -1; tudo();
       // more pieces on the table than the boxes hold: say so (the piece stays)
       const caixa = caixaDoTerreno(o.type); if (caixa !== null) { const uso = terrenoEmUso(o.type); if (uso > caixa) avisoLongo(tr('More than your boxes hold') + ': ' + uso + ' ' + tr('on the table') + ' / ' + caixa + ' ' + tr('in your boxes') + ' (' + nomeObj(baseObj(o.type)) + ').' + partilhaDe(grupoDoTerreno(o.type))); }
       // a door, a gate or a point of interest with its default script opens a room: the room is created at once and tied to

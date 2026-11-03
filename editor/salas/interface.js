@@ -26,9 +26,13 @@ const FERRAMENTAS = [
   ['pilar', 'Pillar', 'P', 'Pick the level of the elevated tile on the ribbon and click one of its sockets (the dots: between two squares on a straight edge, never a corner). The pillar belongs to that tile and enters the game with it. Level 1 tiles take short, medium or tall pillars; level 2 medium or tall; level 3 tall.'],
   ['apagar', 'Delete', 'D', 'Click what you want to remove.'],
 ];
+/* the click asked by "Generate room" (which object opens the new room) also takes a new object: the Objects tool stays on,
+   and the object placed becomes the opener (the generator gives it the trigger "Open a room" for the new room) */
+const aceitaObjetoNovo = () => !!(escolha && escolha.objetoNovo && salaAtual >= 0 && !vista3d.on);
+const pondoAbridor = () => aceitaObjetoNovo() && ferramenta === 'objeto';
 function renderFaixa() {
   const el = $('#faixa'); const semSala = salaAtual < 0 || !!escolha || vista3d.on;
-  el.innerHTML = `<div class="grupo"><div class="botoes">${FERRAMENTAS.map(([id, nome, letra, ajuda]) => { const off = id === 'heroi' && salaAtual !== 0; return `<button data-f="${id}" class="fer ${ferramenta === id ? 'ativo' : ''}" ${semSala || off ? 'disabled' : ''} title="${esc(ajuda)} (${letra})"><span class="ico"><img loading="lazy" decoding="async" ${imgTardia(icone(id === 'peca' ? 'Tile' : id === 'heroi' ? 'Hero' : id === 'objeto' ? 'Chest' : id === 'inimigo' ? 'Enemy' : id === 'pilar' ? 'PillarObj' : 'Delete', '#f3cf8f', null))} alt=""></span><span class="rot"><u>${letra}</u>${nome.slice(1)}</span></button>` + (id === 'pilar' ? `<button id="fxContas" class="fer" ${vista3d.on ? 'disabled' : ''} title="Every counter of the map (keys found, levers pulled…): create them, set where they start, see what adds to them and what waits for them"><span class="ico"><img loading="lazy" decoding="async" ${imgTardia(icone('Counter', '#f3cf8f', null))} alt=""></span><span class="rot">Counts${contadoresDoMapa().length ? ' <span class="etq">' + contadoresDoMapa().length + '</span>' : ''}</span></button>` : ''); }).join('')}</div><div class="legenda">Place · Esc selects</div></div>
+  el.innerHTML = `<div class="grupo"><div class="botoes">${FERRAMENTAS.map(([id, nome, letra, ajuda]) => { const off = (id === 'heroi' && salaAtual !== 0) || (semSala && !(id === 'objeto' && aceitaObjetoNovo())); return `<button data-f="${id}" class="fer ${ferramenta === id ? 'ativo' : ''}" ${off ? 'disabled' : ''} title="${esc(ajuda)} (${letra})"><span class="ico"><img loading="lazy" decoding="async" ${imgTardia(icone(id === 'peca' ? 'Tile' : id === 'heroi' ? 'Hero' : id === 'objeto' ? 'Chest' : id === 'inimigo' ? 'Enemy' : id === 'pilar' ? 'PillarObj' : 'Delete', '#f3cf8f', null))} alt=""></span><span class="rot"><u>${letra}</u>${nome.slice(1)}</span></button>` + (id === 'pilar' ? `<button id="fxContas" class="fer" ${vista3d.on ? 'disabled' : ''} title="Every counter of the map (keys found, levers pulled…): create them, set where they start, see what adds to them and what waits for them"><span class="ico"><img loading="lazy" decoding="async" ${imgTardia(icone('Counter', '#f3cf8f', null))} alt=""></span><span class="rot">Counts${contadoresDoMapa().length ? ' <span class="etq">' + contadoresDoMapa().length + '</span>' : ''}</span></button>` : ''); }).join('')}</div><div class="legenda">Place · Esc selects</div></div>
     <div class="grupo"><div class="botoes"><button id="fxRot" title="Rotate the selection or the piece in hand (R)" ${semSala ? 'disabled' : ''}>↻ Rotate</button><button id="fxCopiar" title="Copy the selection (Ctrl+C), then paste it with Ctrl+V: a click places each copy" ${!sel || !['objeto', 'inimigo'].includes(sel.tipo) ? 'disabled' : ''}>⧉ Copy</button><button id="fxColar" title="Paste the copied piece (Ctrl+V): click where it goes" ${!areaCopia || semSala ? 'disabled' : ''}>📋 Paste</button></div><div class="legenda">Edit</div></div>
     <div class="grupo"><div class="botoes niveis">${[0, 1, 2, 3, 4, 5, 6].map(l => `<button data-nv="${l}" class="${nivel === l ? 'ativo' : ''}" ${l > nivelMaximoLiberado() ? 'disabled' : ''} title="${l > 3 && l > nivelMaximoLiberado() ? 'Levels 4 to 6 open once something stands at level 3 (the game box of Act I, a tile at level 3)' : 'Level you work on (PageUp / PageDown): new pieces go there and only what is on it can be picked'}">${l}</button>`).join('')}</div><div class="legenda">Level ${nivel > 0 ? '· only level ' + nivel + ' is editable' : '· floor'}</div></div>
     <div class="grupo"><div class="botoes"><button id="fxMenos" title="Zoom out (−)">−</button><button id="fxMais" title="Zoom in (+)">+</button><button id="fxEnq" title="Fit the map in view">⤢ Fit</button><button id="fx3d" class="${vista3d.on ? 'ativo' : ''}" title="Turn the map in three dimensions to see the layers (3). Looking only: go back to the plan to edit.">◈ 3D</button></div><div class="legenda">${vista3d.on ? 'View · drag moves · right-drag turns' : 'View · drag to pan · wheel zooms'}</div></div>
@@ -47,15 +51,27 @@ function mudarNivel(l) {
 }
 function girar_selecao() {
   if (sel && sel.tipo === 'contador') return;
+  // the whole room selected (picked in the list, or being moved): it turns with everything in it
+  const sr = modoMoverSala != null ? modoMoverSala : destaqueSala;
+  if (!sel && !ferramenta && !escolha && sr != null && projeto.salas[sr] && !projeto.salas[sr]._previa) return girarSalaInteira(sr);
   if (sel && sel.tipo === 'peca') { const s = projeto.salas[sel.sala]; const p = s.pecas[sel.i]; const r = ((p.rot || 0) + 90) % 360; if (colide({ ...p, rot: r }, sel.sala, sel.i)) return aviso('Rotated, the tile overlaps another one.'); girarPecaComAnexos(sel.sala, sel.i); tudo(); return; }
   if (sel && sel.tipo === 'objeto') { const o = projeto.salas[sel.sala].objetos[sel.i]; o.rot = ((o.rot || 0) + 90) % 360; tudo(); return; }
   rot = (rot + 90) % 360; renderPaleta(); desenhar();
+}
+/* a quarter turn clockwise of room si with its tiles, pillars, objects, monsters, hero spaces and the squares its triggers
+   point at; if it lands on another room it turns back (three more turns around the same pivot) */
+function girarSalaInteira(si) {
+  const s = projeto.salas[si]; if (!s.pecas.some(q => !ehAlfombra(q.tile))) return aviso(tr('The room has no tiles to turn.'));
+  girarSala(s);
+  if (situacaoDaSala(si).choca) { girarSala(s); girarSala(s); girarSala(s); aviso(tr('Turned, the room overlapped another one: it stayed as it was.')); }
+  else aviso(tr('Room turned 90°, with everything in it.'));
+  tudo();
 }
 function apagarSelecao(q) {
   if (!q || q.tipo === 'contador') return;
   const disse = (tipo, nome) => aviso(tipo + ' deleted' + (nome ? ': ' + nome : '') + '.');
   if (q.tipo === 'pilar') { const p = projeto.salas[q.sala].pecas[q.pi]; p.pilares = (p.pilares || []).filter(x => !(x.pos[0] === q.pos[0] && x.pos[1] === q.pos[1])); sel = null; tudo(); disse('Pillar'); return; }
-  if (q.tipo === 'objeto') { const o = projeto.salas[q.sala].objetos[q.i]; const nome = o ? rotulo(o) : ''; removerObjeto(q.sala, q.i); if (!projeto.salas[q.sala].objetos.includes(o)) disse('Object', nome); return; }
+  if (q.tipo === 'objeto') { const o = projeto.salas[q.sala].objetos[q.i]; const nome = o ? rotulo(o) : ''; removerObjeto(q.sala, q.i, false, false, () => disse('Object', nome)); return; }
   if (q.tipo === 'peca') {
     const desc = descricaoDosAnexos(q.sala, q.i);
     if (desc && !confirm('Removing this tile also removes what sits on it: ' + desc + '.\n\nRemove them all?')) return;
@@ -144,7 +160,8 @@ function renderSalas() {
   projeto.salas.forEach((s, i) => {
     const d = document.createElement('div'); d.className = 'sala' + (i === salaAtual ? ' ativa' : '') + (s._previa ? ' previa' : '');
     const probs = problemasDaSala(i); const abre = abridoresDe(i);
-    d.innerHTML = `<span class="n">${i + 1}</span><div><div><span data-sem-traducao>${esc(s.nome)}</span>${s._previa ? ' <span class="etq">preview · not added yet</span>' : ''}</div><small>${s.pecas.length} tiles · ${s.objetos.length} objects · ${inimigosDaSala(s).length} monsters${abre.length ? ' · opened by ' + abre.map(x => '“' + esc(rotulo(x.o)) + '”').join(', ') : ''}</small></div><span class="${probs.length ? 'falta' : 'ok'}" title="${esc(probs.join('; '))}">${probs.length ? '!' : '✓'}</span>`;
+    d.innerHTML = `<span class="n">${i + 1}</span><div><div><span data-sem-traducao>${esc(s.nome)}</span>${s._previa ? ' <span class="etq">preview · not added yet</span>' : ''}</div><small>${s.pecas.length} tiles · ${s.objetos.length} objects · ${inimigosDaSala(s).length} monsters${abre.length ? ' · opened by ' + abre.map(x => '“' + esc(rotulo(x.o)) + '”').join(', ') : ''}</small></div><span class="${probs.length ? 'falta' : 'ok'}" title="${esc(probs.join('; '))}">${probs.length ? '!' : '✓'}</span>${!s._previa ? `<button class="sm lixeira" data-apagasala title="${esc(tr('Remove this room'))}">🗑</button>` : ''}`;
+    const lx = d.querySelector('[data-apagasala]'); if (lx) lx.onclick = e => { e.stopPropagation(); apagarSala(i); };
     d.onclick = () => { if (vista3d.on) return focar3d(i); salaAtual = i; sel = null; ferramenta = null; destaqueSala = s._previa ? null : i; modoMoverSala = null; tudo(); enquadrarSala(i); };
     el.appendChild(d);
   });
@@ -301,7 +318,7 @@ function esconderPainel(id) { const d = $('#' + id); if (d) d.hidden = true; }
 
 // ------------------------------------------------------------ palette (floating)
 function renderPaleta() {
-  if (salaAtual < 0 || escolha || vista3d.on || !ferramenta || ferramenta === 'apagar' || ferramenta === 'heroi') { esconderPainel('paleta'); return; }
+  if (salaAtual < 0 || (escolha && !pondoAbridor()) || vista3d.on || !ferramenta || ferramenta === 'apagar' || ferramenta === 'heroi') { esconderPainel('paleta'); return; }
   const d = painelFlutuante('paleta', ({ peca: 'Tiles', objeto: 'Objects', inimigo: 'Monsters', pilar: 'Pillars' })[ferramenta]); d.hidden = false;
   const el = d.querySelector('.corpo'); el.innerHTML = '';
   if (ferramenta === 'peca') {
@@ -508,38 +525,57 @@ function renderSalaProps() {
     <div class="sub">Spawn pool of this room</div>
     <p class="ajuda">Starts with every monster of the map’s pool (Workshop). Click a lit one to leave it out of this room only; click a dim one to add it for this room only.</p>
     <div id="s_pool"></div>
-    ${projeto.salas.length > 1 ? '<div class="linha acoes"><button id="s_apaga" class="perigo">Remove this room</button></div>' : ''}`;
+    <div class="linha acoes"><button id="s_apaga" class="perigo">Remove this room</button></div>`;
   widgetPoolDaSala($('#s_pool'), salaAtual);
   $('#s_nome').oninput = e => { s.nome = e.target.value; renderSalas(); renderFaixa(); desenhar(); };
   const t = $('#s_texto'); if (t) t.oninput = e => { s.texto = e.target.value; };
   const td = $('#s_depois'); if (td) td.oninput = e => { s.textoDepois = e.target.value; };
-  const ap = $('#s_apaga'); if (ap) ap.onclick = () => {
-    const n = salaAtual, aviso0 = n === 0 ? '\n\nRoom 2 becomes the starting room: give it hero spaces.' : '', depois = n < projeto.salas.length - 1 ? '\n\nThe rooms after it move up one number; the triggers, requirements and missions that point to them follow.' : '';
-    if (!confirm('Remove room ' + (n + 1) + ' (' + s.nome + ') and everything in it? The triggers that open or remove it go too.' + depois + aviso0)) return;
-    removerSala(n); salaAtual = Math.min(n, projeto.salas.length - 1); sel = null; limparAbridores(); tudo(); };
+  const ap = $('#s_apaga'); if (ap) ap.onclick = () => apagarSala(salaAtual);
   if (s.objetivos.length) renderObjetivos(s);
+}
+/* removes room n after asking (the room panel and the 🗑 of each room in the list): the room in work follows its number */
+function apagarSala(n) {
+  const s = projeto.salas[n]; if (!s) return;
+  const aviso0 = n === 0 && projeto.salas.length > 1 ? '\n\nRoom 2 becomes the starting room: give it hero spaces.' : '', depois = n < projeto.salas.length - 1 ? '\n\nThe rooms after it move up one number; the triggers, requirements and missions that point to them follow.' : '';
+  if (!confirm('Remove room ' + (n + 1) + ' (' + s.nome + ') and everything in it? The triggers that open or remove it go too.' + depois + aviso0)) return;
+  removerSala(n);
+  salaAtual = salaAtual > n ? salaAtual - 1 : Math.min(salaAtual, projeto.salas.length - 1);   // (-1 when the map has no room left)
+  if (destaqueSala != null) destaqueSala = destaqueSala === n ? null : destaqueSala > n ? destaqueSala - 1 : destaqueSala;
+  modoMoverSala = null; sel = null; limparAbridores(); tudo();
 }
 /* takes a room out of the map (any room, not only the last): references to later rooms move up one number;
    references to the removed room go (triggers that open, remove or add pieces of it, requirements about it, targets in it) */
 function removerSala(idx) {
-  const mapa = i => i === idx ? undefined : i > idx ? i - 1 : i;
+  remapearSalas(i => i === idx ? undefined : i > idx ? i - 1 : i);
+  projeto.salas.splice(idx, 1);
+}
+/* room n goes to the front (the starting room generated for a map with no hero spaces yet): the rooms before it move down one */
+function levarSalaParaInicio(n) {
+  if (n <= 0 || !projeto.salas[n]) return;
+  remapearSalas(i => i === n ? 0 : i < n ? i + 1 : i);
+  const s = projeto.salas.splice(n, 1)[0]; projeto.salas.unshift(s);
+}
+/* every reference to a room by its number follows mapa (old number → new; undefined: the room goes, and so do the triggers
+   that open, remove or move pieces of it, the requirements about it and the targets in it) */
+function remapearSalas(mapa) {
+  const sai = i => mapa(i) === undefined;
   const grupoNovo = str => { const m = /^room-(\d+)(-pool)?$/.exec(str || ''); if (!m) return str; const k = mapa(+m[1] - 1); return k === undefined ? null : 'room-' + (k + 1) + (m[2] || ''); };
-  const DA_SALA = ['open_room', 'remove_room', 'remove_tile', 'add_tile'];
-  const requisitos = lista => (lista || []).filter(r => { if (r.sala === undefined || !['room_open', 'enemies_defeated', 'object_used'].includes(r.tipo)) return true; if (r.sala === idx) return false; r.sala = mapa(r.sala); return true; });
+  const DA_SALA = ['open_room', 'remove_room', 'remove_tile', 'add_tile', 'move_tile'];
+  const requisitos = lista => (lista || []).filter(r => { if (r.sala === undefined || !['room_open', 'enemies_defeated', 'object_used'].includes(r.tipo)) return true; if (sai(r.sala)) return false; r.sala = mapa(r.sala); return true; });
   const ajustar = o => {
     o.requisitos = requisitos(o.requisitos);
     listasDe(o).forEach(l => { if (!o[l]) return; o[l] = o[l].filter(g => {
-      if (DA_SALA.includes(g.tipo) && g.sala !== undefined) { if (g.sala === idx) return false; g.sala = mapa(g.sala); }
-      if (g.objSala !== undefined) { if (g.objSala === idx) { delete g.objSala; delete g.objIndex; } else g.objSala = mapa(g.objSala); }
-      if (g.inimigo) { if (g.inimigo.sala === idx) delete g.inimigo; else g.inimigo.sala = mapa(g.inimigo.sala); }
-      if (g.salaAlvo !== undefined) { if (g.salaAlvo === idx) delete g.salaAlvo; else g.salaAlvo = mapa(g.salaAlvo); }
+      if (DA_SALA.includes(g.tipo) && g.sala !== undefined && g.sala !== '' && g.sala !== null) { if (sai(g.sala)) return false; g.sala = mapa(g.sala); }
+      if (g.objSala !== undefined) { if (sai(g.objSala)) { delete g.objSala; delete g.objIndex; } else g.objSala = mapa(g.objSala); }
+      if (g.marcaSala !== undefined) { if (sai(g.marcaSala)) { delete g.marcaSala; delete g.marcaIndex; } else g.marcaSala = mapa(g.marcaSala); }
+      if (g.inimigo) { if (sai(g.inimigo.sala)) delete g.inimigo; else g.inimigo.sala = mapa(g.inimigo.sala); }
+      if (g.salaAlvo !== undefined) { if (sai(g.salaAlvo)) delete g.salaAlvo; else g.salaAlvo = mapa(g.salaAlvo); }
       if (g.grupo) { const ng = grupoNovo(g.grupo); if (ng === null) delete g.grupo; else g.grupo = ng; }
       g.requisitos = requisitos(g.requisitos); return true; }); });
   };
-  projeto.salas.forEach((ss, si) => { if (si === idx) return; donosDaSala(ss).forEach(({ o }) => ajustar(o)); ss.abertaPor = (ss.abertaPor || []).filter(r => r.sala !== idx).map(r => ({ ...r, sala: mapa(r.sala) })); });
+  projeto.salas.forEach((ss, si) => { if (sai(si)) return; donosDaSala(ss).forEach(({ o }) => ajustar(o)); ss.abertaPor = (ss.abertaPor || []).filter(r => !sai(r.sala)).map(r => ({ ...r, sala: mapa(r.sala) })); });
   (projeto.contadores || []).forEach(ajustar);
-  const fm = projeto.meta.finalMission; if (fm && fm.sala !== undefined) { if (fm.sala === idx) { fm.sala = 0; delete fm.objeto; } else fm.sala = mapa(fm.sala); }
-  projeto.salas.splice(idx, 1);
+  const fm = projeto.meta.finalMission; if (fm && fm.sala !== undefined) { if (sai(fm.sala)) { fm.sala = 0; delete fm.objeto; } else fm.sala = mapa(fm.sala); }
 }
 const TIPOS_OBJETIVO = [['use_object', 'Use an object of this room'], ['defeat_room', 'Defeat the enemies of this room'], ['table', 'Declared at the table (anything the app cannot see)']];
 function renderObjetivos(s) {
@@ -803,7 +839,7 @@ window.addEventListener('keydown', ev => {
   if (ev.key === 'c' || ev.key === 'C') { if (sel && sel.tipo === 'objeto') copiarObjeto(); return; }
   if (ev.key === 'Delete' || ev.key === 'Backspace') { if (sel && !escolha) apagarSelecao(sel); return; }
   const atalhos = { t: 'peca', h: 'heroi', o: 'objeto', e: 'inimigo', p: 'pilar', d: 'apagar' };
-  if (!ev.ctrlKey && !ev.metaKey && !ev.altKey && atalhos[ev.key.toLowerCase()] && salaAtual >= 0 && !escolha) { const f = atalhos[ev.key.toLowerCase()]; if (f === 'heroi' && salaAtual !== 0) return; ferramenta = ferramenta === f ? null : f; sel = null; tudo(); return; }
+  if (!ev.ctrlKey && !ev.metaKey && !ev.altKey && atalhos[ev.key.toLowerCase()] && salaAtual >= 0 && (!escolha || (atalhos[ev.key.toLowerCase()] === 'objeto' && aceitaObjetoNovo()))) { const f = atalhos[ev.key.toLowerCase()]; if (f === 'heroi' && salaAtual !== 0) return; ferramenta = ferramenta === f ? null : f; sel = null; tudo(); return; }
   if (ev.key.startsWith('Arrow')) {
     ev.preventDefault();
     const dx = ev.key === 'ArrowLeft' ? -1 : ev.key === 'ArrowRight' ? 1 : 0, dy = ev.key === 'ArrowUp' ? -1 : ev.key === 'ArrowDown' ? 1 : 0;

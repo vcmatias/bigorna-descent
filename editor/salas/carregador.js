@@ -27,6 +27,15 @@
     window.BIGORNA_JOGO = jogo;
     window.BIGORNA_MAPA = mapa || {};
     const tela = document.getElementById('semDados'); if (tela) tela.remove();
+    // (v259: the mod's one-shot generator in a language other than pt and en: its table of texts, next to the editor, first)
+    const ling = /[?&]gerador=1(&|$)/.test(location.search || '') && (/[?&]lingua=([a-z]{2}(?:-[a-z]{2})?)(&|$)/.exec(location.search || '') || [])[1];
+    if (ling && ling !== 'pt' && ling !== 'en' && ling !== 'qq' && !(window.GERADOR_TRAD && window.GERADOR_TRAD[ling])) {
+      const t = document.createElement('script'); t.src = 'bigorna-gerador-' + ling + '.js';
+      t.onload = t.onerror = () => rodarApp(); document.head.appendChild(t); return;
+    }
+    rodarApp();
+  }
+  function rodarApp() {
     const s = document.createElement('script');
     const fonte = document.getElementById('bigorna-app');
     s.textContent = fonte.textContent;

@@ -305,9 +305,9 @@ namespace Bigorna.Formato
                 var partes = new List<string>();
                 string F(string pt, string en, params object[] a) { try { return string.Format(t(pt, en), a); } catch { return string.Format(en, a); } }
                 if (!string.IsNullOrEmpty(Metadados?.Autor)) partes.Add(F("por {0}", "by {0}", Metadados.Autor));
-                partes.Add(F("{0} peças", "{0} tiles", Board?.Pecas?.Count ?? 0));
-                partes.Add(F("{0} inimigos", "{0} enemies", Spawns?.Inimigos?.Count ?? 0));
-                partes.Add(F("{0} gatilhos", "{0} triggers", Gatilhos?.Count ?? 0));
+                partes.Add(F("{0} peças", "{0} tiles", Contagens != null ? Contagens[0] : Board?.Pecas?.Count ?? 0));
+                partes.Add(F("{0} inimigos", "{0} enemies", Contagens != null ? Contagens[1] : Spawns?.Inimigos?.Count ?? 0));
+                partes.Add(F("{0} gatilhos", "{0} triggers", Contagens != null ? Contagens[2] : Gatilhos?.Count ?? 0));
                 if (Metadados?.Herois != null && Metadados.Herois.Length == 2) partes.Add(F("{0} a {1} heróis", "{0} to {1} heroes", Metadados.Herois[0], Metadados.Herois[1]));
                 return string.Join(" · ", partes.ToArray());
             }
@@ -321,14 +321,65 @@ namespace Bigorna.Formato
         /// <summary>As linguas do mapa (a original primeiro) e a que esta em uso (editor 0.1.7: mapas em varias linguas).</summary>
         [JsonIgnore] public List<string> Linguas = new List<string>();
         [JsonIgnore] public string LinguaEmUso;
+        /// <summary>v264: lido so pela ficha (a lista): as contagens do resumo (pecas, inimigos, gatilhos); null: lido inteiro.</summary>
+        [JsonIgnore] public int[] Contagens;
 
-        public static Dmap Carregar(string caminho)
+        public static Dmap Carregar(string caminho) => Montar(File.ReadAllText(caminho), null, caminho);
+
+        /// <summary>v264: so a ficha do mapa, para a lista dos mapas da comunidade: o comeco do arquivo (o editor grava ali a
+        /// meta e a "ficha": o ato, os pacotes, as linguas, as traducoes da meta e as contagens do resumo), sem ler as salas,
+        /// as imagens e a copia do editor. Um arquivo de antes da ficha e lido inteiro. Para jogar, o mapa e lido inteiro
+        /// (Lancador).</summary>
+        public static Dmap CarregarFicha(string caminho)
+        {
+            JObject h = null; try { h = Cabeca(caminho, false); } catch { h = null; }
+            if (h == null) return Carregar(caminho);
+            var d = Montar(null, DaCabeca(h), caminho);
+            d.Contagens = (h["ficha"]?["counts"] as JObject) is JObject c ? new[] { (int?)c["tiles"] ?? 0, (int?)c["enemies"] ?? 0, (int?)c["triggers"] ?? 0 } : new int[3];
+            return d;
+        }
+
+        /// <summary>O comeco do arquivo ate a ficha (e, numa campanha, os nos que vem logo depois dela), lido aos poucos e sem
+        /// passar dali; null: o arquivo nao comeca assim (feito antes da ficha) e deve ser lido inteiro.</summary>
+        internal static JObject Cabeca(string caminho, bool campanha)
+        {
+            using (var fs = new FileStream(caminho, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1 << 16))
+            using (var sr = new StreamReader(fs))
+            using (var r = new JsonTextReader(sr) { DateParseHandling = DateParseHandling.None })
+            {
+                if (!r.Read() || r.TokenType != JsonToken.StartObject) return null;
+                var j = new JObject(); bool ficha = false;
+                while (r.Read() && r.TokenType == JsonToken.PropertyName)
+                {
+                    var nome = (string)r.Value;
+                    if (nome != "format" && nome != "version" && nome != "meta" && nome != "ficha" && !(campanha && ficha && nome == "nodes")) return null;
+                    if (!r.Read()) return null;
+                    j[nome] = JToken.ReadFrom(r);
+                    if (nome == "ficha") ficha = true;
+                    if (ficha && (!campanha || j["nodes"] != null)) return j;
+                }
+                return null;
+            }
+        }
+
+        /// <summary>O documento leve da ficha: format, version, meta (e nos), com os pacotes, as linguas e as traducoes dela.</summary>
+        internal static JObject DaCabeca(JObject h)
+        {
+            var f = h["ficha"] as JObject; var j = new JObject();
+            foreach (var k in new[] { "format", "version", "meta", "nodes" }) if (h[k] != null) j[k] = h[k];
+            if (f?["requires"] is JArray rq && rq.Count > 0) j["requires"] = rq;
+            if (f?["languages"] is JArray ls && ls.Count > 0) j["languages"] = ls;
+            if (f?["translations"] is JObject ts && ts.Count > 0) j["translations"] = ts;
+            return j;
+        }
+
+        /// <summary>O mapa a partir do texto do arquivo (ou do JSON ja lido).</summary>
+        static Dmap Montar(string texto, JObject j0, string caminho)
         {
             // (um mapa do acervo diz quais pacotes exige: o conteudo deles entra no "custom" antes da leitura; o do mapa vence)
             // (um mapa em varias linguas: os textos trocam pelos da lingua escolhida antes de tudo)
-            var texto = File.ReadAllText(caminho);
-            bool exige = Acervo.Pacotes.ExigePacotes(texto), traduz = Traducao.TemTraducoes(texto);
-            var j = exige || traduz ? Acervo.Pacotes.LerJson(texto) : null;
+            bool exige = j0 != null ? j0["requires"] != null : Acervo.Pacotes.ExigePacotes(texto), traduz = j0 != null ? j0["translations"] != null || j0["languages"] != null : Traducao.TemTraducoes(texto);
+            var j = j0 ?? (exige || traduz ? Acervo.Pacotes.LerJson(texto) : null);
             var (linguas, lingua) = Traduzir(j, traduz, caminho);
             var faltam = exige ? Acervo.Pacotes.Juntar(j) : new List<Acervo.Requisito>();
             var d = j != null ? j.ToObject<Dmap>(JsonSerializer.CreateDefault()) : JsonConvert.DeserializeObject<Dmap>(texto);
@@ -403,13 +454,33 @@ namespace Bigorna.Formato
             }
         }
 
-        public static List<Dmap> CarregarTodos(string pasta)
+        // ------------------------------------------------------------ v263: os arquivos ja lidos
+        /* A lista dos mapas da comunidade lia e montava todos os .dmap e .dcamp a cada abertura da tela (e a cada 5 s com o
+           painel aberto): mapas de teste com imagens embutidas tem dezenas de MB, e o jogo parava. O lido fica guardado pelo
+           caminho, valendo enquanto o arquivo for o mesmo (tamanho e data), a lingua em que ele abre for a mesma e os pacotes
+           instalados (que mudam o que falta) forem os mesmos. Seguro entre linhas de execucao (a lista e lida ao fundo). */
+        static readonly object _trava = new object();
+        static readonly Dictionary<string, (long tam, DateTime quando, string assinatura, object lido)> _lidos = new Dictionary<string, (long, DateTime, string, object)>(StringComparer.OrdinalIgnoreCase);
+        internal static T Lembrado<T>(string caminho, string extra, Func<string, T> ler, string modo = "") where T : class
+        {
+            var fi = new FileInfo(caminho); long tam = fi.Length; var quando = fi.LastWriteTimeUtc;
+            var assinatura = Traducao.Assinatura(caminho) + "|" + extra; var chave = caminho + "|" + modo;   // (v264: a ficha e o arquivo inteiro guardados à parte)
+            lock (_trava) if (_lidos.TryGetValue(chave, out var e) && e.tam == tam && e.quando == quando && e.assinatura == assinatura && e.lido is T t) return t;
+            var novo = ler(caminho);
+            lock (_trava) _lidos[chave] = (tam, quando, assinatura, novo);
+            return novo;
+        }
+        /// <summary>Quantos arquivos estao guardados (o teste e o registro).</summary>
+        public static int Guardados { get { lock (_trava) return _lidos.Count; } }
+
+        /// <summary>Os mapas da pasta, os ja lidos sem ler de novo (extra: o carimbo dos pacotes instalados).</summary>
+        public static List<Dmap> CarregarTodos(string pasta, string extra = "", bool soFicha = false)
         {
             var lista = new List<Dmap>();
             if (!Directory.Exists(pasta)) return lista;
             foreach (var arq in Directory.GetFiles(pasta, "*.dmap").OrderBy(x => x))
             {
-                try { lista.Add(Carregar(arq)); }
+                try { lista.Add(soFicha ? Lembrado(arq, extra, CarregarFicha, "ficha") : Lembrado(arq, extra, Carregar)); }
                 catch (Exception ex) { Log.Info("mapa ilegível " + Path.GetFileName(arq) + ": " + ex.Message); }
             }
             return lista;

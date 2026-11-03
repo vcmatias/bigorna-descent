@@ -48,6 +48,22 @@ namespace Bigorna.Motor
         }
         /// <summary>Um mapa comeca: o pool volta ao do arquivo e nenhum item dele conta como ja dado.</summary>
         public static void NovoMapa() { _mapaDaLista = null; _mapaDoPool = null; _doPool.Clear(); }
+
+        /// <summary>v265: o pool de itens agora (null: o do mapa, sem mudancas) e os itens dele ja dados.</summary>
+        public static Formato.EstadoDoMapa.ButimE Exportar() => new Formato.EstadoDoMapa.ButimE
+        {
+            Pool = Roteiro.Mapa != null && ReferenceEquals(_mapaDaLista, Roteiro.Mapa) ? new List<string>(_pool) : null,
+            DoPool = ReferenceEquals(_mapaDoPool, Roteiro.Mapa) ? _doPool.ToList() : new List<string>()
+        };
+
+        /// <summary>v265: o pool de uma partida retomada (depois de o roteiro saber qual e o mapa).</summary>
+        public static void Importar(Formato.EstadoDoMapa.ButimE e)
+        {
+            NovoMapa();
+            if (e == null || Roteiro.Mapa == null) return;
+            if (e.Pool != null) { _mapaDaLista = Roteiro.Mapa; _pool = new List<string>(e.Pool.Where(x => !string.IsNullOrEmpty(x))); }
+            _mapaDoPool = Roteiro.Mapa; foreach (var id in e.DoPool ?? new List<string>()) if (!string.IsNullOrEmpty(id)) _doPool.Add(id);
+        }
         public static void MudarPool(string id, bool tirar)
         {
             if (string.IsNullOrEmpty(id)) return;

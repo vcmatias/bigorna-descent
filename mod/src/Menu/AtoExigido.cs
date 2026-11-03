@@ -25,7 +25,8 @@ namespace Bigorna.Menu
         {
             if (m == null) return false;
             if (!string.IsNullOrEmpty(m.Metadados?.AtoExigido)) return EhII(m.Metadados.AtoExigido);
-            return Lembrar(m.Caminho, () => Olhar(m));
+            // (v264: o mapa lido só pela ficha não tem as peças: o ato sai do mapa inteiro)
+            return Lembrar(m.Caminho, () => Olhar(m.Contagens != null && !string.IsNullOrEmpty(m.Caminho) ? Dmap.Lembrado(m.Caminho, "", Dmap.Carregar) : m));
         }
 
         public static bool Ato2(Dcamp c)
@@ -35,7 +36,7 @@ namespace Bigorna.Menu
             return Lembrar(c.Caminho, () => c.Nos.Where(n => n != null && n.EhMapa).Any(n =>
             {
                 var cm = c.CaminhoDoMapa(n); if (cm == null) return false;
-                try { var d = Dmap.Carregar(cm); return Ato2(d); } catch { return false; }
+                try { var d = Dmap.Lembrado(cm, "", Dmap.Carregar); return Ato2(d); } catch { return false; }   // (v263: o mapa já lido não é lido de novo)
             }));
         }
 

@@ -18,6 +18,8 @@ namespace Bigorna.Formato
         public static string LinguaDoJogo = "en";
         /// <summary>Quem diz a lingua do jogo na hora (o mod liga ao jogo; null: vale LinguaDoJogo).</summary>
         public static Func<string> LinguaDoJogoAgora;
+        /// <summary>v263: a lingua do jogo lida antes de uma leitura ao fundo (fora da linha principal a Unity nao responde).</summary>
+        public static volatile string LinguaCongelada;
         /// <summary>Onde ficam as escolhas dos jogadores (por mapa ou campanha).</summary>
         public static string ArquivoDeEscolhas;
 
@@ -70,17 +72,29 @@ namespace Bigorna.Formato
         public static void Definir(string chave, string lingua)
         {
             if (string.IsNullOrEmpty(chave)) return;
-            var e = Escolhas(); e[chave] = Codigo(lingua);
+            Dictionary<string, string> e; lock (_travaEscolhas) { e = Escolhas(); e[chave] = Codigo(lingua); }
             try { if (!string.IsNullOrEmpty(ArquivoDeEscolhas)) File.WriteAllText(ArquivoDeEscolhas, JsonConvert.SerializeObject(e, Formatting.Indented)); }
             catch (Exception ex) { Log.Info("gravando a língua escolhida: " + ex.Message); }
         }
+
+        /// <summary>v263: o que decide a lingua em que um arquivo abre (a escolha dos jogadores para ele e a lingua do jogo): o
+        /// arquivo ja lido vale enquanto isto nao mudar.</summary>
+        public static string Assinatura(string caminho)
+        {
+            string e = ""; var chave = Chave(caminho);
+            lock (_travaEscolhas) { if (!string.IsNullOrEmpty(chave) && Escolhas().TryGetValue(chave, out var x)) e = Codigo(x); }
+            string agora = LinguaCongelada; if (agora == null) try { agora = LinguaDoJogoAgora?.Invoke(); } catch { }
+            return e + "/" + Codigo(string.IsNullOrEmpty(agora) ? LinguaDoJogo : agora);
+        }
+        static readonly object _travaEscolhas = new object();
 
         /// <summary>A lingua em que o mapa abre: a escolhida, a do jogo, a original (nessa ordem, entre as que ele tem).</summary>
         public static string Escolher(string chave, List<string> linguas)
         {
             if (linguas == null || linguas.Count == 0) return "";
-            if (!string.IsNullOrEmpty(chave) && Escolhas().TryGetValue(chave, out var e) && linguas.Contains(Codigo(e))) return Codigo(e);
-            string agora = null; try { agora = LinguaDoJogoAgora?.Invoke(); } catch { }
+            string e = null; lock (_travaEscolhas) { if (!string.IsNullOrEmpty(chave)) Escolhas().TryGetValue(chave, out e); }
+            if (e != null && linguas.Contains(Codigo(e))) return Codigo(e);
+            string agora = LinguaCongelada; if (agora == null) try { agora = LinguaDoJogoAgora?.Invoke(); } catch { }
             var j = Codigo(string.IsNullOrEmpty(agora) ? LinguaDoJogo : agora);
             if (linguas.Contains(j)) return j;
             return linguas[0];

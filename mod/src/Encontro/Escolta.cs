@@ -29,6 +29,27 @@ namespace Bigorna.Encontro
 
         public static void Reiniciar() { _regras.Clear(); _chaves.Clear(); _daRodada.Clear(); _rodada = int.MinValue; }
 
+        /// <summary>v265: os protegidos agora (os nomes na ordem das chaves, as regras, quem ja escolheu nesta rodada).</summary>
+        public static Formato.EstadoDoMapa.EscoltaE Exportar() => new Formato.EstadoDoMapa.EscoltaE
+        {
+            Chaves = _chaves.OrderBy(kv => int.TryParse(kv.Value.Substring(kv.Value.LastIndexOf('_') + 1), out var n) ? n : 0).Select(kv => kv.Key).ToList(),
+            Regras = _regras.Select(r => new Formato.EstadoDoMapa.RegraE { Nome = r.Nome, Grupo = r.Grupo, Chance = r.Chance }).ToList(),
+            DaRodada = new Dictionary<string, string>(_daRodada), Rodada = _rodada
+        };
+
+        /// <summary>v265: os protegidos de uma partida retomada (as chaves dos nomes, na mesma ordem: os monstros que ja miravam um
+        /// protegido guardam a chave dele).</summary>
+        public static void Importar(Formato.EstadoDoMapa.EscoltaE e)
+        {
+            Reiniciar();
+            if (e == null) return;
+            foreach (var n in e.Chaves ?? new List<string>()) if (!string.IsNullOrEmpty(n)) ChaveDe(n);
+            foreach (var r in e.Regras ?? new List<Formato.EstadoDoMapa.RegraE>()) if (r != null && !string.IsNullOrEmpty(r.Nome)) _regras.Add(new Regra { Nome = r.Nome, Chave = ChaveDe(r.Nome), Grupo = string.IsNullOrEmpty(r.Grupo) ? null : r.Grupo, Chance = Mathf.Clamp(r.Chance, 0, 100) });
+            foreach (var kv in e.DaRodada ?? new Dictionary<string, string>()) if (kv.Key != null) _daRodada[kv.Key] = kv.Value ?? "";
+            _rodada = e.Rodada;
+            if (_regras.Count > 0) Log.Info("protegidos como estavam: " + string.Join(", ", _regras.Select(r => r.Nome + (r.Grupo != null ? " (" + r.Grupo + ")" : "")).ToArray()));
+        }
+
         static string NomeDe(string nome) => string.IsNullOrEmpty(nome) ? Idioma.T("o protegido", "the protected one") : nome;
 
         static string ChaveDe(string nome)

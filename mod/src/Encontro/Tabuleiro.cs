@@ -43,6 +43,10 @@ namespace Bigorna.Encontro
         public static readonly Dictionary<(int, int), string> GrupoDaCasa = new Dictionary<(int, int), string>();
         public static readonly List<string> PorColocar = new List<string>();
         static List<GameTile> _porSoltar;
+        /// <summary>v265: todas as pecas que o mod pos nesta partida (as entidades delas saem da gravacao ao retomar) e as pecas
+        /// movidas por gatilho (o indice no .dmap e o lugar novo).</summary>
+        static readonly List<GameTile> _criadas = new List<GameTile>();
+        static readonly Dictionary<int, Dmap.Peca> _movidas = new Dictionary<int, Dmap.Peca>();
 
         public static IEnumerable<string> GruposOcultos => _ocultas.Keys;
 
@@ -62,6 +66,7 @@ namespace Bigorna.Encontro
             Montado = false;
             NossaCena = false;
             _postas.Clear();
+            _criadas.Clear(); _movidas.Clear();
             _tiradas.Clear();
             _pecaDe.Clear();
             _indiceDe.Clear();
@@ -103,7 +108,7 @@ namespace Bigorna.Encontro
             {
                 var tile = Colocar(p, enc.transform);
                 if (tile == null) continue;
-                _postas.Add(tile);
+                _postas.Add(tile); _criadas.Add(tile);
                 _pecaDe[tile] = p;
                 _indiceDe[tile] = pecas.IndexOf(p);
                 if (!string.IsNullOrEmpty(p.Grupo))
@@ -559,7 +564,7 @@ namespace Bigorna.Encontro
                     Jogo.Som("Place_Generic");
                     Nucleo.Instancia?.StartCoroutine(DeslizarPeca(t, dePos, deRot, atePos, ateRot, locais.Select(l => (l.o.Corpo.transform, l.pos, l.rot)).ToList(), () =>
                     {
-                        _pecaDe[t] = novo;
+                        _pecaDe[t] = novo; if (_indiceDe.TryGetValue(t, out var im)) _movidas[im] = novo;
                         foreach (var c in velhas) GrupoDaCasa.Remove(c);
                         if (grupo != null) foreach (var c in CasasDe(t)) GrupoDaCasa[c] = grupo;
                         int dr = ((rot - p0.Rot) % 360 + 360) % 360;
@@ -698,6 +703,99 @@ namespace Bigorna.Encontro
         }
 
         public static string GrupoDe(int x, int y) => GrupoDaCasa.TryGetValue((x, y), out var g) ? g : null;
+
+        // ------------------------------------------------------------ v265: a partida em andamento
+        /// <summary>As pecas agora: na mesa, ocultas (a sala ainda fechada) ou fora; as movidas; as salas fechadas; as casas
+        /// que sairam da mesa; a sala de cada casa.</summary>
+        public static EstadoDoMapa.TabuleiroE Exportar()
+        {
+            var e = new EstadoDoMapa.TabuleiroE();
+            var ocultas = new HashSet<GameTile>(_ocultas.Values.SelectMany(l => l));
+            foreach (var kv in _indiceDe.OrderBy(kv => kv.Value))
+            {
+                var t = kv.Key; if (t == null) continue;
+                int estado = !_postas.Contains(t) ? EstadoDoMapa.Fora : ocultas.Contains(t) ? EstadoDoMapa.Oculta : EstadoDoMapa.NaMesa;
+                e.Pecas.Add(new EstadoDoMapa.PecaE { I = kv.Value, Estado = estado, Movida = _movidas.TryGetValue(kv.Value, out var mv) ? mv : null });
+            }
+            e.Ocultas.AddRange(_ocultas.Keys);
+            e.Tiradas = _tiradas.Select(c => new[] { c.Item1, c.Item2 }).ToList();
+            e.GrupoDaCasa = GrupoDaCasa.Select(kv => new EstadoDoMapa.CasaE { X = kv.Key.Item1, Y = kv.Key.Item2, Grupo = kv.Value }).ToList();
+            return e;
+        }
+
+        /// <summary>Antes de montar: as pecas movidas por gatilho entram no mapa ja no lugar novo.</summary>
+        public static void AplicarMovidas(Dmap m, EstadoDoMapa.TabuleiroE e)
+        {
+            if (m?.Board?.Pecas == null || e?.Pecas == null) return;
+            int n = 0;
+            foreach (var p in e.Pecas) if (p?.Movida != null && p.I >= 0 && p.I < m.Board.Pecas.Count) { m.Board.Pecas[p.I] = p.Movida; n++; }
+            if (n > 0) Log.Info("  " + n + " peça(s) entram no lugar para onde foram movidas");
+        }
+
+        /// <summary>Depois de montar: cada peca como estava (na mesa, ainda oculta, fora), sem os avisos de montagem; as salas
+        /// abertas voltam a bloquear o que bloqueavam; as casas e as salas, como estavam.</summary>
+        public static void Restaurar(EstadoDoMapa.TabuleiroE e)
+        {
+            if (e == null) return;
+            _porSoltar = null;
+            var porIndice = new Dictionary<int, EstadoDoMapa.PecaE>();
+            foreach (var p in e.Pecas ?? new List<EstadoDoMapa.PecaE>()) if (p != null) porIndice[p.I] = p;
+            foreach (var p in porIndice.Values) if (p.Movida != null) _movidas[p.I] = p.Movida;
+            var fechadas = new HashSet<string>(e.Ocultas ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+            var cena = Jogo.Cena;
+            int naMesa = 0, fora = 0;
+            foreach (var g in _ocultas.Keys.ToList())
+            {
+                if (fechadas.Contains(g)) continue;
+                foreach (var t in _ocultas[g])
+                {
+                    var v = t != null ? t.GetComponent<GameVisibility>() : null;
+                    if (v != null && v.BlockingPositions != null && v.BlockingPositions.Length > 0) try { cena?.AddDynamicBlockingPositions(v.BlockingPositions); } catch { }
+                }
+                _ocultas.Remove(g);
+            }
+            foreach (var t in _postas.ToList())
+            {
+                if (t == null) continue;
+                int estado;
+                if (_indiceDe.TryGetValue(t, out var i) && porIndice.TryGetValue(i, out var pe)) estado = pe.Estado;
+                else estado = _pecaDe.TryGetValue(t, out var q) && !string.IsNullOrEmpty(q.Grupo) && fechadas.Contains(q.Grupo) ? EstadoDoMapa.Oculta : EstadoDoMapa.NaMesa;
+                if (estado == EstadoDoMapa.Fora)
+                {
+                    _postas.Remove(t); fora++;
+                    try { t.GetComponent<GameVisibility>()?.SetVisibility(false, false); } catch { }
+                    t.gameObject.SetActive(false);
+                }
+                else if (estado == EstadoDoMapa.NaMesa)
+                {
+                    t.gameObject.SetActive(true);
+                    try { t.GetComponent<GameVisibility>()?.SetVisibility(true, false); } catch { }
+                    Rotular(t); naMesa++;
+                }
+            }
+            foreach (var l in _ocultas.Values) l.RemoveAll(t => t == null || !_postas.Contains(t));
+            foreach (var g in _ocultas.Where(kv => kv.Value.Count == 0).Select(kv => kv.Key).ToList()) _ocultas.Remove(g);
+            _tiradas.Clear(); foreach (var c in e.Tiradas ?? new List<int[]>()) if (c != null && c.Length >= 2) _tiradas.Add((c[0], c[1]));
+            GrupoDaCasa.Clear(); foreach (var c in e.GrupoDaCasa ?? new List<EstadoDoMapa.CasaE>()) if (c != null && !string.IsNullOrEmpty(c.Grupo)) GrupoDaCasa[(c.X, c.Y)] = c.Grupo;
+            var enc = Jogo.Encontro;
+            if (enc != null) { enc.AllTiles = _postas.ToArray(); Enquadrar(enc); }
+            RefazerGradeAgora();
+            try { var vis = _postas.Where(t => t != null && t.gameObject.activeSelf).ToList(); if (vis.Count > 0) Jogo.Cena?.CameraEncounter?.FocusOn(Centro(vis)); } catch { }
+            Log.Info("peças como estavam: " + naMesa + " na mesa, " + fora + " fora, salas ainda fechadas: " + (_ocultas.Count == 0 ? "nenhuma" : string.Join(", ", _ocultas.Keys.ToArray())));
+        }
+
+        /// <summary>As entidades do jogo nas pecas que o mod pos (a gravacao do jogo as guarda; ao retomar, elas saem dela).</summary>
+        public static IEnumerable<string> EntidadesNossas()
+        {
+            foreach (var t in _criadas)
+            {
+                if (t == null) continue;
+                foreach (var ge in t.GetComponentsInChildren<GameEntity>(true)) if (ge != null && !string.IsNullOrEmpty(ge.GUID)) yield return ge.GUID;
+            }
+        }
+
+        /// <summary>O nome de cada peca na mesa agora (para a mesa remontar o tabuleiro ao retomar).</summary>
+        public static List<string> PecasNaMesa() => _postas.Where(t => t != null && t.gameObject.activeSelf).Select(NomeNaMesa).GroupBy(n => n).OrderBy(g => g.Key).Select(g => g.Count() > 1 ? g.Key + " ×" + g.Count() : g.Key).ToList();
 
         // a sala oculta de uma casa num nivel: um viaduto ainda fechado (nivel 2) passa por cima do chao de uma sala aberta, e o
         // que esta nesse chao (nivel 0) nao espera o viaduto. Sem peca nenhuma naquele nivel, vale a regra de antes (a casa)

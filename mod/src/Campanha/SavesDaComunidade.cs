@@ -80,11 +80,14 @@ namespace Bigorna.Campanha
             return r;
         }
 
-        static bool Rascunho(int slot, SerializedSaveDataInfo i) => slot == 0 && i != null && i.PartyName == "Bigorna";
+        // (v265: o mapa oneshot grava como "Bigorna Oneshot", a marca das partidas dele)
+        static bool Rascunho(int slot, SerializedSaveDataInfo i) => slot == 0 && i != null && (i.PartyName == "Bigorna" || i.PartyName == Encontro.Lancador.NomeDoOneshot);
 
         /// <summary>Os nos de cada campanha da pasta (varias campanhas podem ter nos de mesmo id: "map-1").</summary>
+        static IReadOnlyList<Dcamp> RelidasJa() { Menu.PainelMapas.Reler(); return Menu.PainelMapas.Campanhas; }
+        // (v263: as campanhas da pasta antes de classificar: a leitura ao fundo pode não ter acabado)
         static List<KeyValuePair<Dcamp, HashSet<string>>> NosDasCampanhas()
-            => Menu.PainelMapas.Campanhas.Select(c => new KeyValuePair<Dcamp, HashSet<string>>(c, new HashSet<string>(c.Nos.Where(n => !string.IsNullOrEmpty(n?.Id)).Select(n => n.Id), StringComparer.OrdinalIgnoreCase))).ToList();
+            => (Menu.PainelMapas.JaLida ? Menu.PainelMapas.Campanhas : RelidasJa()).Select(c => new KeyValuePair<Dcamp, HashSet<string>>(c, new HashSet<string>(c.Nos.Where(n => !string.IsNullOrEmpty(n?.Id)).Select(n => n.Id), StringComparer.OrdinalIgnoreCase))).ToList();
 
         /// <summary>O jogo conhece o destino (missao ou evento do proprio jogo; os nossos ficam na colecao com o prefixo).</summary>
         static bool DoJogo(string id)

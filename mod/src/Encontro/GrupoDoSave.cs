@@ -59,7 +59,7 @@ namespace Bigorna.Encontro
             foreach (var kv in Bigorna.Campanha.SavesDaComunidade.Infos())
             {
                 var i = kv.Value; if (i == null || kv.Key < 1) continue;
-                if (kv.Key == 0 && i.PartyName == "Bigorna") continue;   // (o rascunho que os mapas avulsos usam: refeito a cada mapa)
+                if (kv.Key == 0 && (i.PartyName == "Bigorna" || i.PartyName == Lancador.NomeDoOneshot)) continue;   // (o rascunho que os mapas avulsos usam: refeito a cada mapa)
                 DateTime quando = DateTime.MinValue; try { if (i.Timestamp > 0) quando = new DateTime(i.Timestamp); } catch { }
                 r.Add(new Save { Slot = kv.Key, Nome = i.PartyName, Guid = i.SlotGUID, Ato = i.Act, Quando = quando, Campanha = Bigorna.Campanha.SavesDaComunidade.CampanhaDe(i) });
             }
@@ -72,6 +72,13 @@ namespace Bigorna.Encontro
             var s = Salvar; if (s == null) return null;
             try { return s.GetMostRecentSaveData(slot); } catch (Exception ex) { Log.Erro("lendo o save " + slot, ex); return null; }
         }
+
+        /// <summary>A partida (o estado do jogo) da gravacao mais recente de uma ranhura, ou null.</summary>
+        public static SerializedGame JogoDoSave(int slot) => Ler(slot)?.GameSceneData?.GameState;
+
+        /// <summary>v262, Novo jogo +: o grupo de uma partida oficial passa a outra partida oficial (o que so existe nos mapas
+        /// do Bigorna fica de fora, como na volta ao save).</summary>
+        public static void CopiarParaNovoJogo(SerializedGame de, SerializedGame para) => Copiar(de, para, false);
 
         /// <summary>Uma partida nova (de mapa ou de campanha) recebe o grupo do save. Devolve um erro, ou null.</summary>
         public static string Trazer(SerializedGame partida, Save save)
@@ -92,6 +99,21 @@ namespace Bigorna.Encontro
 
         /// <summary>Grupo novo: nada vem de save nenhum.</summary>
         public static void SemOrigem() { Origem = null; }
+
+        /// <summary>v265: a partida de origem da equipe em jogo, para a partida em andamento (null: equipe nova).</summary>
+        public static Formato.EstadoDoMapa.OrigemE ExportarOrigem() => Origem == null ? null : new Formato.EstadoDoMapa.OrigemE
+        {
+            Slot = Origem.Slot, Nome = Origem.Nome, Guid = Origem.Guid, Ato = (int)Origem.Ato, Quando = Origem.Quando == DateTime.MinValue ? 0 : Origem.Quando.Ticks,
+            NoMeio = Origem.NoMeioDeMissao, Campanha = Origem.Campanha, Carimbo = Origem.Carimbo
+        };
+
+        /// <summary>v265: a partida retomada lembra de onde veio a equipe (para a escolha do fim do mapa).</summary>
+        public static void ImportarOrigem(Formato.EstadoDoMapa.OrigemE o)
+        {
+            if (o == null) { Origem = null; return; }
+            DateTime quando = DateTime.MinValue; try { if (o.Quando > 0) quando = new DateTime(o.Quando); } catch { }
+            Origem = new Save { Slot = o.Slot, Nome = o.Nome, Guid = o.Guid, Ato = (Act)o.Ato, Quando = quando, NoMeioDeMissao = o.NoMeio, Campanha = o.Campanha, Carimbo = o.Carimbo };
+        }
 
         /// <summary>O que e do grupo passa de uma partida a outra; o resto (missao, mapa-mundi, cidade, historia) fica.
         /// As listas sao copiadas dentro das listas de destino (o controle de proezas do jogo guarda as dele).</summary>

@@ -563,7 +563,8 @@ function fichaFacanha(c, f) {
 // ------------------------------------------------------------ export
 const idFacanhaExportada = id => { const f = (oficina().facanhas || []).find(x => x.id === id); return f ? (f.base || f.id) : id; };
 function facanhasExportadas() {
-  return (oficina().facanhas || []).map(f => { const x = f.filtros || {};
+  // (v255: the game's own feats go as the game has them, in its language: only copies and new ones are sent)
+  return (oficina().facanhas || []).filter(f => !f.base).map(f => { const x = f.filtros || {};
     return { id: f.base || f.id, ...(f.base ? { game: f.base } : {}), hero: f.heroi, text: '<b>' + (f.nome || 'Feat') + '</b>: ' + textoDaFacanha(f), goal: f.meta || 1, timing: f.momento || 1, required: f.precisa || 0, act: f.ato || 0,
       ...(f.premios ? { rewards: f.premios.filter(id => !id.startsWith('ITEM:')).map(id => id.startsWith('RECEITA:') ? idReceitaExportada(id.slice(8)) : id) } : {}),
       // (items: the game gives none on a feat; the mod hands them over when the reward is taken)

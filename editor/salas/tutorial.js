@@ -2,7 +2,7 @@
    tutorial, or "I know it all" (asked again, and ⚙ Settings can repeat it). The tutorial starts on an empty map with the
    Workshop, the generators, the campaign and the objects' default script locked, and opens the editor step by step:
    the first rooms by hand (tiles, heroes, a door with "Open a room"), a chest that gives items, the default script (a door
-   that opens its room by itself), monsters (none yet: to the Workshop, import about ten), the room generator (a door with no
+   that opens its room by itself), monsters (none yet: to the Workshop, import about ten; then one placed in a room), the room generator (a door with no
    script, one room to place), and at last the campaign, where everything unlocks and each part explains itself once. Leaving
    the campaign closes it with the map generator and the bug report of the game (F9).
    A small panel in a corner says the task at hand; windows (popups) mark the turns; what a step has not reached is locked
@@ -49,15 +49,21 @@ const PASSOS_TUTORIAL = [
     // (the new room: the last one when the step began)
     ao: () => { salaAtual = Tutorial.marca('salas') - 1; nivel = 0; sel = null; ferramenta = 'peca'; tudo(); },
     feito: () => (projeto.salas[Tutorial.marca('salas') - 1]?.pecas || []).length >= 2 },
+  // (with monsters in the Workshop the Enemy palette lists them and the step ends when Enemy is pressed; with none, the mouse
+  // over "Open the Workshop" brings the "oops" of the next step. Placing one comes after the workshops, in "colocar")
   { id: 'monstros', titulo: 'Monsters', texto: 'Let’s put some monsters in a room: press Enemy (E).', alvo: '#pl_monstros', reserva: '[data-f="inimigo"]', libera: ['[data-f="inimigo"]'], padrao: null, gatilhos: null,
     janela: ['Monsters', 'Now for some monsters: the Enemy button is unlocked.'],
-    feito: () => MONSTROS().length >= 10 || projeto.salas.some(s => (s.inimigos || []).length) },
+    feito: () => (ferramenta === 'inimigo' && MONSTROS().length > 0) || Tutorial.inimigosNoMapa() > Tutorial.marca('inimigos') },
   { id: 'importar', titulo: 'The monster workshop', texto: 'In the Workshop, press “Import…” and bring in about 10 monsters from the game for this map.', alvo: '#f_importar', libera: ['#btnOficina'], tranca: ['#abasF button:not([data-aba="monstros"])'], padrao: null, gatilhos: null,
     janela: ['Ops!', 'Oops, there are no monsters available yet. They come from the Workshop: “Import…” brings in monsters from your game, with filters for act, type, and size, while “+ Create” lets you make your own. Import about 10 monsters for this map.'],
     ao: () => { abrirFichas('monstros'); }, feito: () => MONSTROS().length >= 10 },
   { id: 'oficinas', titulo: 'The workshops', texto: 'Have a look around the other workshops if you like, then head back to Rooms (◂ Rooms).', alvo: '#fVoltar', libera: ['#btnOficina'], padrao: null, gatilhos: null,
     janela: ['The spawn pool', 'These monsters automatically go into the map’s spawn pool, and the game draws balanced groups for each room from it. So import only the monsters you actually want to fight. There is also a workshop for every part of the game: NPCs, items, weapons, recipes, feats, skills, heroes, tiles, and objects. They are all unlocked now. Have a look around.'],
     feito: () => $('#telaFichas').hidden },
+  { id: 'colocar', titulo: 'Monsters in a room', texto: 'With Enemy (E), pick a monster in the palette and click a square of a room. Place at least one.', alvo: '[data-f="inimigo"]', libera: ['[data-f="inimigo"]'], padrao: null, gatilhos: null,
+    janela: ['Monsters in a room', 'Monsters placed in a room enter when it opens (those of the starting room are there from the start). The palette has the monsters of the Workshop and the balanced group: a space the game fills when the room opens, with monsters of the spawn pool, as strong as the number of heroes asks. Place at least one monster.'],
+    ao: () => { $('#telaFichas').hidden = true; if (salaAtual < 0 && projeto.salas.length) salaAtual = 0; ferramenta = 'inimigo'; sel = null; tudo(); },
+    feito: () => Tutorial.inimigosNoMapa() > Tutorial.marca('inimigos') },
   { id: 'porta2', titulo: 'A door with no script', texto: 'Untick “Default script” (it glows) and place a Door at the edge of a room. This time, it stays quiet and opens nothing by itself.', alvo: 'label:has(#objPadrao)', reserva: '[data-f="objeto"]', destaque: true, libera: ['#m_nome', '#btnMapa'], tranca: [SO_PORTA, '[data-f="peca"]', '[data-f="heroi"]', '[data-f="apagar"]', '[data-f="inimigo"]', '[data-f="pilar"]', '#btnOficina', '#m_nome', '#btnMapa'], padrao: null, gatilhos: [], semPadrao: true,
     janela: ['Rooms made for you', 'Besides building rooms by hand, the editor can build them for you: choose the object that will open the room, and the generator creates one with tiles, objects, and monsters according to your settings. The map name and Map setup are unlocked now too. First, we want a door with no script. A door with the default script would open a new room by itself, and that is not what we want here.'],
     ao: () => { ferramenta = 'objeto'; objetoEscolhido = 'Door'; tudo(); }, feito: () => Tutorial.portasSemScript() > Tutorial.marca('portas') },
@@ -95,6 +101,7 @@ var Tutorial = (() => {
   const passo = () => estado && !estado.feito ? PASSOS_TUTORIAL[estado.passo] : null;
   const liberados = () => new Set(PASSOS_TUTORIAL.slice(0, estado.passo + 1).flatMap(p => p.libera || []));
   const portasSemScript = () => projeto.salas.reduce((n, s) => n + s.objetos.filter(o => ehTipo(o, 'Door') && !todosGatilhos(o).length).length, 0);
+  const inimigosNoMapa = () => projeto.salas.reduce((n, s) => n + (s._previa ? 0 : (s.inimigos || []).length), 0);
   /* what the step points at right now: its own "agora" (a step that changes as the work goes), else its target on screen,
      else its fallback (the Object button while the default-script box is not on screen) */
   function mira(p) {
@@ -189,9 +196,10 @@ var Tutorial = (() => {
   }
   function entrar() {
     const p = passo(); if (!p) return;
-    estado.marcas = { salas: projeto.salas.length, portas: portasSemScript() }; gravar(); aplicar(); desenhar();
+    estado.marcas = { salas: projeto.salas.length, portas: portasSemScript(), inimigos: inimigosNoMapa() }; gravar(); aplicar(); desenhar();
     // (a task already done moves on at once: a chest programmed before its step)
-    let pronto = false; try { pronto = ['bau', 'importar'].includes(p.id) && p.feito(); } catch { }
+    // (and the import, when the Workshop already has monsters: they can be placed right away)
+    let pronto = false; try { pronto = (p.id === 'bau' && p.feito()) || (p.id === 'importar' && MONSTROS().length > 0); } catch { }
     if (pronto) return avancar();
     const seguir = () => { try { p.ao && p.ao(); } catch { } aplicar(); if (p.destaque) flash(); };
     if (p.janela) janela(p.janela[0], p.janela[1], seguir); else seguir();
@@ -226,7 +234,7 @@ var Tutorial = (() => {
     if (projeto.salas.length || campanha) { try { salvarRapido(); } catch { } }
     campanha = null; projeto = projetoNovo(); projeto.meta.author = typeof autorGuardado === 'function' ? autorGuardado() : ''; salaAtual = -1; sel = null; ferramenta = null;
     try { $('#telaFichas').hidden = true; } catch { } try { if (!$('#telaCampanha').hidden) fecharCampanha(); } catch { }
-    tudo(); estado = { v: 2, passo: 0, feito: false }; entrar();
+    tudo(); estado = { v: 3, passo: 0, feito: false }; entrar();
     if (!relogio) relogio = setInterval(conferir, 500);
   }
   /* the first question: the tutorial, or "I know it all" (sure? ⚙ can repeat it) */
@@ -239,7 +247,7 @@ var Tutorial = (() => {
   /* the first time: nothing of the editor kept in this browser yet (the language aside) */
   const primeiraVez = () => { try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^bigorna-/.test(k) && k !== 'bigorna-idioma') return false; } } catch { } return true; };
   /* on opening: the question the first time (never under automation); a tutorial left half way goes on */
-  function aoAbrir() { const e = ler(); if (e && (e.feito || e.v !== 2)) return;   // (v 2: the steps of this tutorial; an older one left half way is let go)
+  function aoAbrir() { const e = ler(); if (e && (e.feito || e.v !== 3)) return;   // (v 3: the steps of this tutorial, with "colocar"; an older one left half way is let go)
     if (!e) { if (!navigator.webdriver && primeiraVez()) perguntar(); return; }
     estado = e; aplicar(); desenhar(); if (!relogio) relogio = setInterval(conferir, 500); }
   /* an explanation the editor asks for at a moment of its own (a tile laid twice): once per tutorial, then what comes next */
@@ -266,7 +274,7 @@ var Tutorial = (() => {
     return null; }
   const janelaAbertaAgora = () => janelaAberta;
   return { iniciar, perguntar, aoAbrir, conferir, terminar, explicar, previaMovida, centroDaPrevia, centroDoObjeto, salaDaPorta, janelaAberta: janelaAbertaAgora, estado: () => estado, ativo: () => !!estado && !estado.feito,
-    marca: k => (estado && estado.marcas && estado.marcas[k]) || 0, portasSemScript,
+    marca: k => (estado && estado.marcas && estado.marcas[k]) || 0, portasSemScript, inimigosNoMapa,
     padrao: () => passo()?.padrao ?? null, gatilhos: () => passo()?.gatilhos ?? null, exigeSemPadrao: () => !!passo()?.semPadrao, umCandidato: () => !!passo()?.umCandidato };
 })();
 /* the hints of the tour: each part marks itself seen when it opens */
@@ -278,4 +286,4 @@ var Tutorial = (() => {
 })();
 /* the notes of the tutorial inside the editor's own windows */
 (() => { const st = document.createElement('style'); st.textContent = '.tutNota { display: block; margin: 4px 0 8px; padding: 6px 8px; border-left: 3px solid #e0a458; background: rgba(224,164,88,.12); color: #f3cf8f; font-size: 12px; line-height: 1.4; white-space: normal; text-align: left; }'; document.head.appendChild(st); })();
-Tutorial.aoAbrir();
+if (!(typeof location !== 'undefined' && /[?&]gerador=1(&|$)/.test(location.search || ''))) Tutorial.aoAbrir();   // (v258: not in the mod's one-shot generator)

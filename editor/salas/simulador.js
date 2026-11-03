@@ -1,6 +1,7 @@
 /* Simulation of a map (debug): a small party plays the map on the table's own rules, at a low intensity, to see whether
    it can be won and whether it asks the right effort. The model (see LEIAME, "Simulação"):
-   - heroes: SIM.herois of them, SIM.vida health each (a pool: the party falls when the pool is empty), SIM.acoes actions a
+   - heroes: SIM.herois of them, the health of the act each (VIDA_POR_ATO: the Act II hero cards have more, 11 on average;
+     the act of the party, or else the act the map asks for) (a pool: the party falls when the pool is empty), SIM.acoes actions a
      round, no special weapons nor abilities; every test roll gives SIM.sucessos successes (a test asking more fails; a
      cumulative one adds them up try after try); an attack deals SIM.dano per success minus the monster's defence (at least
      1);
@@ -13,9 +14,14 @@
    What it reports, besides the outcome: health lost and left, rounds, items and gold, monsters, heals that came when the
    party was whole, effects against monsters used with no monster in play. */
 const SIM = { herois: 2, vida: 8, acoes: 2, sucessos: 2, dano: 3, defesa: 0.5, golpe: 0, fadiga: 0.3, maxRodadas: 60 };
+/* v261: the health of a hero by act (the average of the hero cards: Act I about 8, Act II 11) */
+const VIDA_POR_ATO = { 1: 8, 2: 11 };
 
+/* opcoes.ato: the act of the party (the one-shot map with a saved party); without it, the act the map asks for. A health
+   given in opcoes (the custom simulation) stays */
 function simularMapa(pm, opcoes = {}) {
-  const cfg = { ...SIM, ...opcoes }; const H = cfg.herois;
+  const ato = +opcoes.ato === 2 || +opcoes.ato === 1 ? +opcoes.ato : comProjeto(pm, () => atoNecessario(pm));
+  const cfg = { ...SIM, ...opcoes, ato }; if (opcoes.vida == null) cfg.vida = VIDA_POR_ATO[ato] || SIM.vida; const H = cfg.herois;
   return comProjeto(pm, () => simularPartida(pm, cfg, H));
 }
 function simularPartida(pm, cfg, H) {

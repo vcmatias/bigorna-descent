@@ -204,7 +204,7 @@ function imagensDe(x) { const s = new Set(); const anda = (o, prof) => { if (!o 
 async function textoAvulso(x, esp) {
   const nomes = [...imagensDe(x)]; const dados = new Map();
   for (const n of nomes) { try { const b = await Deposito.ler(n); if (b) dados.set('imagens/' + n, await new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => ok(null); r.readAsDataURL(b); })); } catch { } }
-  return JSON.stringify(x, (k, v) => typeof v === 'string' && dados.has(v) ? (dados.get(v) || v).replace(/^data:application\/octet-stream/, 'data:image/' + (v.endsWith('.jpg') ? 'jpeg' : v.slice(-3))) : (typeof trocarOriginais === 'function' ? trocarOriginais(k, v) : v), esp);
+  return JSON.stringify(comFicha(x), (k, v) => typeof v === 'string' && dados.has(v) ? (dados.get(v) || v).replace(/^data:application\/octet-stream/, 'data:image/' + (v.endsWith('.jpg') ? 'jpeg' : v.slice(-3))) : (typeof trocarOriginais === 'function' ? trocarOriginais(k, v) : v), esp);
 }
 /* the bytes of a reference (for a zip) */
 async function bytesDaImg(ref) { const b = await Deposito.ler(nomeDaImg(ref)); return b ? new Uint8Array(await b.arrayBuffer()) : null; }

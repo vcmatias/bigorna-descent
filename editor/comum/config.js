@@ -7,7 +7,8 @@
    data folder (CustomMaps, Pacotes, Editor), with nothing to allow: GET /api/ler, POST /api/gravar, GET /api/lista, POST
    /api/apagar (paths relative to that folder). In a plain browser, Arquivos.ativo is false and nothing here is used. */
 const Arquivos = (() => {
-  const ativo = typeof location !== 'undefined' && location.protocol === 'https:' && location.host === 'bigorna.app';
+  // (v258: the page the mod's one-shot generator opens in the app, ?gerador=1, works as in a browser: none of the user's files)
+  const ativo = typeof location !== 'undefined' && location.protocol === 'https:' && location.host === 'bigorna.app' && !/[?&]gerador=1(&|$)/.test(location.search || '');
   const url = (acao, c) => '/api/' + acao + (c != null ? '?c=' + encodeURIComponent(c) : '');
   async function ler(c, como = 'text') {
     const r = await fetch(url('ler', c), { cache: 'no-store' }); if (r.status === 404) return null;

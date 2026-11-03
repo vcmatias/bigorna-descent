@@ -269,6 +269,21 @@ namespace Bigorna.Acervo
 
         public static int EdicaoInstalada(string id) { var j = Ler(id); return j == null ? 0 : Math.Max(1, (int?)j["edition"] ?? 1); }
 
+        /// <summary>v263: o carimbo dos pacotes instalados (cada pacote.json e a sua data): os mapas ja lidos valem enquanto ele
+        /// for o mesmo (um pacote novo muda o que falta e o que entra no mapa).</summary>
+        public static string Carimbo()
+        {
+            if (string.IsNullOrEmpty(Raiz) || !Directory.Exists(Raiz)) return "";
+            try
+            {
+                var sb = new StringBuilder();
+                foreach (var d in Directory.GetDirectories(Raiz).OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+                { var c = Path.Combine(d, "pacote.json"); if (File.Exists(c)) sb.Append(Path.GetFileName(d)).Append(':').Append(File.GetLastWriteTimeUtc(c).Ticks).Append(';'); }
+                return sb.ToString();
+            }
+            catch { return ""; }
+        }
+
         /// <summary>O texto de um .dmap/.dcamp cita "requires"? (So entao ele e lido em JSON solto para a juncao; os outros seguem
         /// pelo caminho de sempre.)</summary>
         public static bool ExigePacotes(string texto) => texto != null && texto.IndexOf("\"requires\"", StringComparison.Ordinal) >= 0;

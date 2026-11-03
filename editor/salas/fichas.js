@@ -114,7 +114,7 @@ const ordensDaAba = () => [['criacao', 'Order of creation'], ['nome', 'A–Z'], 
 function ordenarLista(xs) { const o = _ordemDaLista[chaveDaListaF()] || 'criacao'; if (o === 'nome') return xs.slice().sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), undefined, { sensitivity: 'base' }));
   if (o === 'valor') return xs.slice().sort((a, b) => (b.valor || 0) - (a.valor || 0) || String(a.nome || '').localeCompare(String(b.nome || ''))); return xs; }
 const chaveDaListaF = () => abaF + (abaF === 'itens' ? ':' + tipoItem : '');
-const ehDoJogoNaOficina = x => !!(x && x.base && !x.custom);
+const ehDoJogoNaOficina = x => !!(x && x.base);   // (v255: an original stays the game's, even one an older version changed)
 const ORIGEM_F = { nome: 'Origin', semRotulo: true, opcoes: [['proprio', 'Own'], ['jogo', 'Of the game']], de: x => ehDoJogoNaOficina(x) ? 'jogo' : 'proprio' };
 const temReceita = x => receitasDoAlvo(x).length > 0 || receitasDoJogoDoAlvo(x).length > 0;
 function categoriasDaAba() {
@@ -409,7 +409,7 @@ $('#esqF').addEventListener('click', e => { if (e.target.closest('[data-lote]'))
 /* 🗑 Delete several…: the entries of the tab on screen (filtered by name and kind), ticked and deleted at once. What a
    single Delete does for each is done here too: placements taken off the board, ids forgotten in pools, loot and rewards */
 function entradasParaApagar() {
-  const b = oficina(); const proprio = x => (x.custom || !x.base) ? 'own' : 'jogo';
+  const b = oficina(); const proprio = x => !x.base ? 'own' : 'jogo';
   const nomeTipo = cls => (TIPOS_ITEM.find(([k]) => doTipoItem({ cls }, k)) || [, cls.replace('Model', '')])[1];
   switch (abaF) {
     case 'monstros': return b.monstros.map(x => ({ x, nome: x.nome || '(no name)', img: retratoDoMonstro(x), sub: '', origem: proprio(x) }));
@@ -630,7 +630,7 @@ function sonsExportados(m) {
 function fichaMonstro(c, m) {
   const orig = monstroOriginal(m);
   const cab = `<div class="cabF"><h2>${esc(m.nome)} <span class="etq ${orig ? '' : 'custom'}">${orig ? 'original of the game' : 'custom'}</span></h2><div class="botoes"><button class="sm ${orig ? 'primario' : ''}" id="fm_dup">Duplicate</button><button class="sm perigo" id="fm_apaga">Delete</button></div></div>`
-    + (orig ? '<p class="ajuda aviso">An original of the game: its name, numbers, activations, tactics and defense stay as in the game. Duplicate it (with another name) to make a monster of your own from it. The pictures, the loot and the sounds may change here.</p>' : '');
+    + (orig ? avisoOficial(m.custom ? 'This original was changed by an older version of the editor: those changes stay out of the game.' : '', '') : '');
   const variantes = CAT.monstros.filter(z => monstroDeEscolha(z) && TIPOS_MONSTRO[z.Type] === m.tipo && z.name_en && !/^ENEMY_/.test(z.name_en));
   c.innerHTML = cab + `<div class="folha">
     <div class="col">
@@ -781,6 +781,8 @@ function fichaMonstro(c, m) {
     el.querySelector('[data-lootmais]').onclick = () => abrirEscolhaDeItem(null, id => { if (!m.loot.includes(id)) m.loot.push(id); marcar(m, c); loot(); }, { soItens: true });
     el.querySelectorAll('[data-ld]').forEach(x => x.onclick = () => { m.loot.splice(+x.dataset.ld, 1); marcar(m, c); loot(); }); };
   loot();
+  // (v255: an original only shows: every field and button of its sheet is shut; the activations can still go to the roll)
+  if (orig) travarOficial(c, '[data-arol]');
 }
 /* soNomes: only the names changed (typing a name): the thumbnails are left alone */
 function renderFichasLista(soNomes) { const l = $('#f_lista'); if (!l) return; const lista = abaF === 'itens' ? bestiario().itens.filter(x => tipoItem && doTipoItem(x, tipoItem)) : bestiario()[abaF]; if (!Array.isArray(lista)) return; l.querySelectorAll('.no[data-id]').forEach(d => { const x = lista.find(y => y.id === d.dataset.id); if (!x) return; d.querySelector('div > div').textContent = x.nome || '(no name)'; if (soNomes) return; const img = d.querySelector('img.face'); if (img && abaF === 'pecas' && defPeca(x.id)) img.src = miniatura(defPeca(x.id), x); if (img && abaF === 'objetos') img.src = iconeObj(x.id); const sm = d.querySelector('small'); if (sm && !x.clone && (abaF === 'pecas' || abaF === 'objetos')) sm.textContent = (x.cells || []).length + ' square(s) · ' + extensao(x.cells || [[0, 0]]).join('×'); }); }
@@ -832,7 +834,7 @@ function fichaPersonagem(c, p) {
   const herois = CAT.herois.filter(h => h._cls === 'HeroModel');
   const orig = !!p.base, mudado = orig && !!(p.nomeJogo ? p.nome !== p.nomeJogo : false);
   c.innerHTML = `<div class="cabF"><h2>${esc(p.nome)} <span class="etq ${orig ? '' : 'custom'}">${orig ? 'original of the game' : 'custom'}</span></h2><div class="botoes">${orig ? '<button class="sm primario" id="fp_dup">⧉ Duplicate</button>' : ''}${mudado ? '<button class="sm" id="fp_volta">↺ Back to the game’s</button>' : ''}<button class="sm perigo" id="fp_apaga">Delete</button></div></div>
-    ${orig ? avisoOficial('', 'The portrait and your notes may change here.') : ''}<div class="folha"><div class="col">
+    ${orig ? avisoOficial('', '') : ''}<div class="folha"><div class="col">
     ${retratoCampo(p, 'Portrait in the story boxes (speaker and cast). Transparent PNG of the bust, 512 px or more, looks best.')}
     <label class="campo">Name <input data-c="nome" value="${esc(p.nome)}"></label>
     ${ehHeroiDaCaixa(p.base) ? '<p class="ajuda">A hero of the box used as an NPC: it only speaks in dialogues. To change the playable hero, use the Heroes tab.</p>' : ''}
@@ -842,7 +844,7 @@ function fichaPersonagem(c, p) {
   liga(c, p, k => { if (k === 'nome') { c.querySelector('h2').firstChild.textContent = p.nome + ' '; renderFichasLista(true); } });
   $('#fp_apaga').onclick = () => apagarFicha(p);
   if (!orig) return;
-  travarOficial(c, '.retrato, [data-c=desc]');
+  travarOficial(c, '');
   $('#fp_dup').onclick = () => { const nome = nomeDaCopia(p.nome, PERSONAGENS_B().map(z => z.nome)); if (!nome) return;
     const d = clone(p); d.id = 'B_' + uid(); d.nome = nome; d.custom = true; d.base = null; delete d.nomeJogo;
     PERSONAGENS_B().push(d); fichaSel = d.id; renderFichas(); aviso(tr('Duplicated: this one is yours to change.')); };
@@ -856,7 +858,7 @@ function fichaItem(c, i) {
   const receitas = (oficina().receitas || []).filter(r => r.item === i.id);
   const orig = !!i.base, mudado = orig && itemMudou(i);
   c.innerHTML = `<div class="cabF"><h2>${esc(i.nome)} <span class="etq ${orig ? '' : 'custom'}">${orig ? (mudado ? 'original of the game, changed' : 'original of the game') : 'custom'}</span></h2><div class="botoes">${orig ? '<button class="sm primario" id="fi_dup">⧉ Duplicate</button>' : ''}${mudado ? '<button class="sm" id="fi_volta">↺ Back to the game’s</button>' : ''}<button class="sm perigo" id="fi_apaga">Delete</button></div></div>
-    ${orig ? avisoOficial(mudado ? 'This original was changed by an older version of the editor: “↺ Back to the game’s” undoes it.' : '', 'The picture may change here.') : ''}<div class="folha"><div class="col">
+    ${orig ? avisoOficial(mudado ? 'This original was changed by an older version of the editor: “↺ Back to the game’s” undoes it.' : '', '') : ''}<div class="folha"><div class="col">
     ${retratoCampo(i, mat ? 'The material’s picture in the app. Square, 256 px or more.' : 'Card art shown in the app. Square, 256 px or more.')}
     <label class="campo">Name <input data-c="nome" value="${esc(i.nome)}"></label>
     <div data-descricao></div>
@@ -884,7 +886,7 @@ function fichaItem(c, i) {
     fu.querySelectorAll('[data-usa]').forEach(a => a.onclick = ev => { ev.preventDefault(); const r = usam[+a.dataset.usa]; const ids = [r.item, semMais(r.item)]; const x = ITENS_B().find(z => ids.some(id => z.id === id || (z.base && z.base === id))); if (!x) return aviso(tr('The item of this recipe is not in the Workshop.')); abrirFichas('itens', x.id); }); }
   $('#fi_apaga').onclick = () => apagarFicha(i);
   if (!orig) return;
-  travarOficial(c, '.retrato, #fi_receitas');
+  travarOficial(c, '#fi_receitas');
   $('#fi_dup').onclick = () => { const nome = nomeDaCopia(i.nome, ITENS_B().map(z => z.nome)); if (!nome) return;
     const d = clone(i); d.id = 'B_' + uid(); d.nome = nome; d.custom = true; d.efeitoBase = i.efeitoBase || i.base; d.base = null; delete d.nomeJogo;
     ITENS_B().push(d); fichaSel = d.id; renderFichas(); aviso(tr('Duplicated: this one is yours to change.')); };
@@ -1180,7 +1182,7 @@ document.addEventListener('pointerdown', e => {
   if (e.target.closest(TRAVADO_SEL) || [...caixa.querySelectorAll(TRAVADO_SEL)].some(x => { if (!x.getClientRects().length) return false; const r = x.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; }))
     aviso(tr('An original of the game does not change here: “Duplicate” it (with another name) and change the copy.'));
 }, true);
-const avisoOficial = (oque, livre) => `<p class="ajuda aviso">${esc(tr(oque))} ${esc(tr('An original of the game stays as in the game (a party that continues from a saved game carries it). Duplicate it, with another name, to make one of your own from it.'))}${livre ? ' ' + esc(tr(livre)) : ''}</p>`;
+const avisoOficial = (oque, livre) => `<p class="ajuda aviso">${oque ? esc(tr(oque)) + ' ' : ''}${esc(tr('An original of the game: in the game, the game’s own enters, in the language the game is played in, and this sheet only shows it (nothing changes here). Duplicate it, with another name, to make one of your own from it.'))}${livre ? ' ' + esc(tr(livre)) : ''}</p>`;
 /* the name of a copy: asked, different from every name in `nomes` */
 function nomeDaCopia(nome, nomes, pergunta) {
   const usados = new Set(nomes.map(n => (n || '').trim().toLowerCase()));

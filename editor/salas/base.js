@@ -80,12 +80,19 @@ function murosDaPeca0(q, h) {
 /* the level of a square of a tile: its level, or its level plus the walls on the ring of a walled tile */
 const nivelNaPeca = (q, x, y) => { const m = murosDaPeca(q); return (q.level || 0) + (m && m.chaves.has(x + ',' + y) ? m.altura : 0); };
 const ehCaixa = id => !!CAIXAS[id];
-const CAIXA_ALFOMBRAS = 3;                                                // underlay cards in the box for each pair of faces
-/* each underlay card is printed on both sides: water / spikes and embers / fetid water share the same 3 cards */
+/* underlay cards for each pair of faces, per box (v261: the Act II box brings one more card of each pair) */
+const ALFOMBRAS_POR_ATO = { 1: 3, 2: 1 };
+const CAIXA_ALFOMBRAS = ALFOMBRAS_POR_ATO[1];                              // (the Act I box alone)
+/* each underlay card is printed on both sides: water / spikes and embers / fetid water share the same cards (3 in the Act I box, 4 with the Act II box) */
 const VERSO_ALFOMBRA = { 'underlay-water': 'underlay-spikes', 'underlay-spikes': 'underlay-water', 'underlay-embers': 'underlay-fetidwater', 'underlay-fetidwater': 'underlay-embers' };
 const nomeAlfombra = id => varPeca(id) ? (varPeca(id).nome || 'Workshop underlay') : (id || '').replace('underlay-', '').replace('fetidwater', 'fetid water');
-/* copies of an underlay: the game's share 3 double-sided cards; a workshop underlay has the copies you say (1 by default) */
-const caixaAlfombra = id => varPeca(id) ? Math.max(1, +varPeca(id).copias || 1) : CAIXA_ALFOMBRAS;
+/* copies of an underlay: the game's are double-sided cards shared by a pair of faces, 3 in the Act I box and 1 more in the
+   Act II box (or the count the user gives in Settings › Terrain in your boxes); a workshop underlay has the copies you say
+   (1 by default) */
+const parDaAlfombra = id => [id, VERSO_ALFOMBRA[id]].filter(Boolean).sort()[0];
+const caixaAlfombra = (id, atos = ATOS.get()) => { if (varPeca(id)) return Math.max(1, +varPeca(id).copias || 1);
+  const proprio = terrenoProprio(); const k = 'alfombra:' + parDaAlfombra(id); if (proprio && proprio[k] !== undefined && proprio[k] !== '') return +proprio[k];
+  return [1, 2].reduce((n, a) => n + (a <= atos ? ALFOMBRAS_POR_ATO[a] : 0), 0); };
 /* cards of that pair on the map (this face and its back) */
 const usoAlfombra = id => projeto.salas.reduce((k, sl) => k + sl.pecas.filter(p => p.tile === id || p.tile === VERSO_ALFOMBRA[id]).length, 0);
 const OBJETOS = DADOS.interactables.filter(o => !['PillarShort', 'PillarTall', 'Pillar'].includes(o.id))
@@ -223,7 +230,7 @@ function avisoLongo(t, ms) { aviso(t, true); avisoT = setTimeout(() => $('#aviso
 /* the Workshop: one for everything (every map and campaign), kept in a package of its own (in the app, a file in Pacotes;
    in a browser, in the browser). The maps and campaigns still hold it under the old key `bestiario`: each of them points
    to this same one, and a Workshop that came inside an older work (or a file opened) joins it (what it has that this one
-   lacks, by id). The entries of the other packages of the folder are in it too, marked `_doPacote` (read only). */
+   lacks, by id). The entries of the other packages of the folder are in it too, marked `_doPacote` (v256: they change in place and, changed, become one's own). */
 let _oficina = null;
 const LISTAS_DA_OFICINA = ['monstros', 'personagens', 'itens', 'pecas', 'objetos', 'herois', 'armas', 'maos', 'receitas', 'facanhas', 'poolFacanhas', 'pericias', 'categoriasArmas'];
 function absorverOficina(b) {
@@ -404,8 +411,26 @@ function original(s) { if (!ehLeve(s)) return s; const h = hashDaLeve(s), o = _o
 /* (the light copies whose original was asked for and was not in memory: read from the database, and the text made again) */
 const _faltamOriginais = new Set();
 const trocarOriginais = (k, v) => ehLeve(v) ? original(v) : v;
+/* v264: the "card" of a .dmap / .dcamp at the head of the file: the mod's list of community maps reads only the start of
+   each file (the meta, then this) and stops, instead of reading tens of MB of rooms, pictures and the editor's copy. It
+   holds what the list shows and checks: the act, the packages required, the languages and the translations of the meta's
+   texts, the counts of the summary (tiles, enemies, triggers) and, for a campaign, its nodes come right after it. The keys
+   of the file go in this order: format, version, meta, ficha, [nodes], then the rest */
+function comFicha(d) {
+  if (!d || typeof d !== 'object' || Array.isArray(d) || (d.format !== 'dmap' && d.format !== 'dcamp')) return d;
+  const textosDaMeta = new Set(); const anda = v => { if (typeof v === 'string') { if (v.trim()) textosDaMeta.add(v); } else if (Array.isArray(v)) v.forEach(anda); else if (v && typeof v === 'object') Object.values(v).forEach(anda); };
+  anda(d.meta);
+  const traducoes = {}; Object.entries(d.translations || {}).forEach(([l, t]) => { const m = {}; Object.entries(t || {}).forEach(([k, v]) => { if (textosDaMeta.has(k)) m[k] = v; }); traducoes[l] = m; });
+  const ficha = { requires: d.requires || [], languages: d.languages || [], translations: traducoes,
+    counts: d.format === 'dmap' ? { tiles: (d.board && d.board.tiles || []).length, enemies: (d.spawns && d.spawns.enemies || []).length, triggers: (d.triggers || []).length }
+      : { nodes: (d.nodes || []).length } };
+  const o = { format: d.format, version: d.version, meta: d.meta, ficha };
+  if (d.format === 'dcamp') o.nodes = d.nodes;
+  Object.keys(d).forEach(k => { if (!(k in o)) o[k] = d[k]; });
+  return o;
+}
 /* the text of what goes out to a file: the originals in place of the light copies */
-const jsonOriginal = (x, esp) => JSON.stringify(x, trocarOriginais, esp);
+const jsonOriginal = (x, esp) => JSON.stringify(comFicha(x), trocarOriginais, esp);
 async function buscarFaltantes() {
   if (!_faltamOriginais.size || typeof Config === 'undefined') return false;
   const hs = [..._faltamOriginais]; _faltamOriginais.clear(); let veio = false;
@@ -884,12 +909,15 @@ function normalizar(p) {
   // tiles placed from a first-version workshop tile whose cells did not start at 0,0: keep them where they were
   p.salas.forEach(s => s.pecas.forEach(q => { const v = p.bestiario.pecas.find(x => x.id === q.tile) || (campanha?.bestiario?.pecas || []).find(x => x.id === q.tile); if (v && v.desloc && !q.deslocado) { const [dx, dy] = girar(v.desloc, q.rot || 0); q.pos = [q.pos[0] + dx, q.pos[1] + dy]; q.deslocado = true; } }));
   p.campanha = p.campanha || { chegada: '', conclusao: '' };
+  const foraDoInicio = [];
   p.salas.forEach((s, si) => {
     s.objetivos = s.objetivos || []; s.inimigos = s.inimigos || []; s.herois = s.herois || [];
     if (Array.isArray(s.reserva)) s.reserva = { add: s.reserva, remove: [] }; s.reserva = s.reserva || { add: [], remove: [] };
     if (s.abertaPor && !Array.isArray(s.abertaPor)) s.abertaPor = [s.abertaPor]; s.abertaPor = s.abertaPor || [];
     s.pecas.forEach(q => { q.level = q.level || 0; q.pilares = q.pilares || []; if (ehCaixa(q.tile)) { q.level = q.tile === 'platform' && [2, 5].includes(q.level) ? q.level : CAIXAS[q.tile]; q.pilares = []; } if (q.tile === 'vault' && ![0, 3].includes(q.level)) q.level = 0; });
     s.herois.forEach(h => { if (h.length < 3) h.push(0); });
+    // hero spaces belong to the starting room only (the game reads only those): a second "starting room" placed later keeps none
+    if (si > 0 && s.herois.length) { foraDoInicio.push(si + 1); s.herois = []; }
     // old projects: vertex pillars as objects become pillars of the tile they hold up
     const soltos = s.objetos.filter(o => o.anchor === 'vertex' || ['PillarShort', 'PillarTall'].includes(o.type) || (o.type === 'Pillar' && o.anchor === 'vertex'));
     soltos.forEach(o => { const alvo = s.pecas.find(q => !ehAlfombra(q.tile) && q.level > 0 && cantosDaPeca(q).has(o.pos.join(','))); if (alvo) alvo.pilares.push({ pos: [o.pos[0], o.pos[1]], type: SUPORTES[o.type] ? o.type : 'PillarShort' }); });
@@ -929,6 +957,7 @@ function normalizar(p) {
   if (p.objetivo && (p.objetivo.tipo || p.salas.some(s => s.objetivos.some(o => o.wasFinal)))) { /* older final objectives: the final mission of the map */ }
   delete p.objetivo;
   limparAbridores();
+  if (foraDoInicio.length) setTimeout(() => avisoLongo(L2('Hero spaces outside the starting room were removed (the game uses only those of the starting room): room ' + foraDoInicio.join(', ') + '. If that room was a second starting room, the 🗑 in the list of rooms removes it.', 'Os espaços de herói fora da sala inicial foram tirados (o jogo usa só os da sala inicial): sala ' + foraDoInicio.join(', ') + '. Se essa sala era uma segunda sala inicial, a 🗑 na lista de salas a remove.'), 12000), 0);
   return p;
 }
 function trocarMissao(i) {
@@ -1059,7 +1088,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) _adot
 /* ------------------------------------------------------------ the Workshop kept: a package of its own
    In the Bigorna Editor app: Pacotes/<id>/pacote.bigorna (the one marked "oficina"), written as it changes; every other
    package of that folder (imported, or brought from the community library, by the editor or by the mod) is read when the
-   editor opens, and its entries come into the Workshop marked `_doPacote` (they change in a copy). In a browser: the
+   editor opens, and its entries come into the Workshop marked `_doPacote` (v256: changed in place, they become one's own). In a browser: the
    browser's database and the small storage (key bigorna-oficina; the newer of the two). */
 const CHAVE_OFICINA = 'bigorna-oficina';
 const MEU_PACOTE = { id: '', nome: '', edicao: 1, criado: '' };

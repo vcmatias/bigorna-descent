@@ -287,6 +287,18 @@ const TEMAS_SALA = {
 };
 
 const novaSemente = () => Math.random().toString(36).slice(2, 8);
+/* v266: the map seed that is enough on its own: 7 characters, the first one (a to r) says the length, the difficulty and the
+   boxes of the map generator (3 x 3 x 2), the other six are the draw. With it, the same map comes out again without
+   choosing anything (the mod's one-shot map and the editor's map generator read it). A seed in another shape (the old 6
+   characters, or any text) keeps working with the options chosen on screen. */
+const SEMENTE_DUR = ['curta', 'media', 'longa'], SEMENTE_DIF = ['facil', 'normal', 'dificil'];
+function codigoDaSemente(duracao, dificuldade, atos) { const d = Math.max(0, SEMENTE_DUR.indexOf(duracao)), f = Math.max(0, SEMENTE_DIF.indexOf(dificuldade)); return String.fromCharCode(97 + d * 6 + f * 2 + (+atos === 1 ? 0 : 1)); }
+function sementeCompleta(duracao, dificuldade, atos, sorteio) { let r = String(sorteio || ''); while (r.length < 6) r += Math.random().toString(36).slice(2); return codigoDaSemente(duracao, dificuldade, atos) + r.slice(0, 6).toLowerCase(); }
+function lerSemente(s) {
+  const m = /^([a-r])([0-9a-z]{6})$/i.exec(String(s || '').trim()); if (!m) return null;
+  const k = m[1].toLowerCase().charCodeAt(0) - 97;
+  return { duracao: SEMENTE_DUR[Math.floor(k / 6)], dificuldade: SEMENTE_DIF[Math.floor(k / 2) % 3], atos: k % 2 ? 2 : 1, semente: String(s).trim().toLowerCase(), sorteio: m[2].toLowerCase() };
+}
 
 /* an object kind of the chosen boxes */
 const daCaixa = (tipo, atos) => (OBJETO[baseObj(tipo)]?.act || 1) <= atos;
@@ -419,7 +431,7 @@ const nomeDirecao = d => d[1] < 0 ? L2('north', 'norte') : d[1] > 0 ? L2('south'
 function gerarSala(opts) {
   const rng = rngDe(opts.semente);
   const arq = ARQUETIPO_SALA(opts.arquetipo) || ARQUETIPOS_SALA[0];
-  const p = opts.projeto || projeto; const idx = p.salas.length;
+  const p = opts.projeto || projeto; const idx = p.salas.length; const ehInicio = idx === 0 || !!opts.inicial;   // (inicial: the starting room of a map whose rooms have no hero spaces; it goes in as room 1)
   const tema = opts.tema || 'qualquer'; const temaObj = TEMAS_SALA[tema] || TEMAS_SALA.qualquer; const atos = opts.atos === 1 ? 1 : 2;
   const base = opts.base || null; const trava = opts.travas || {};
   const ocup = casasOcupadas(p, -1);
@@ -860,7 +872,7 @@ function gerarSala(opts) {
     for (const t of escolhidos) { if (!daCaixa(t, atos)) continue; if (lutaPrevista && ehCobertura(t)) { cobertura.push(t); continue; }
       if (objetoLivre(pTemp(), naMesa, t, atos) <= 0) continue; const o = porObjeto(t, sala, idx, entrada, rng, pTemp); if (o) sala.objetos.push(o); }
     if (arq.id !== 'abertura') noAlto(sala, idx, entrada, rng, pTemp, naMesa, atos);   // (the opening room stays bare)
-    textosDosObjetos(sala, arq, rng, p, idx > 0 && !lig && (opts.inimigos || 'balanceado') !== 'nenhum', opts.tagsRoupas || { t: tema !== 'qualquer' ? tema : null, a: atos });
+    textosDosObjetos(sala, arq, rng, p, !ehInicio && !lig && (opts.inimigos || 'balanceado') !== 'nenhum', opts.tagsRoupas || { t: tema !== 'qualquer' ? tema : null, a: atos });
   }
   // 6. the monsters
   const modoIni = opts.inimigos || 'balanceado';
@@ -876,7 +888,7 @@ function gerarSala(opts) {
       const chefe = pool.map(monstro).filter(m => m && (m.act || 0) < atos).sort((a, b) => (b.villain ? 2 : 0) + (b.named ? 1 : 0) + (b.tiers?.length || 0) * 0.1 - ((a.villain ? 2 : 0) + (a.named ? 1 : 0) + (a.tiers?.length || 0) * 0.1))[0];
       const c = casas[casas.length - 1]; if (chefe && modoIni !== 'escolhidos') lista[lista.length - 1] = { enemy: chefe.id, pos: [c.x, c.y], level: c.nivel, tier: Math.max(2, Math.min(4, Math.round((opts.intensidade || 6) / 2.5))) };
     }
-    if (arq.inimigos.como === 'armadilha' && idx > 0) {
+    if (arq.inimigos.como === 'armadilha' && !ehInicio) {
       // the trap: the monsters come from the sides a round after the room opens (the opener counts the round); a room
       // with no opener of its own: its token (the bait) brings them
       const spawn = { uid: uid(), tipo: 'spawn', fonte: lista.every(e => ehPool(e.enemy)) ? 'pool' : 'list', cells: lista.filter(e => ehPool(e.enemy)).map(e => [e.pos[0], e.pos[1], e.level || 0]), inimigos: lista.filter(e => !ehPool(e.enemy)), intensidade: opts.intensidade || 0, requisitos: [] };
@@ -951,9 +963,9 @@ function gerarSala(opts) {
     }
   }
   // 7. texts and triggers
-  const lugar = (temaObj.lugar || TEMAS_SALA.qualquer.lugar)[LP()];
-  const txts = (arq.textos || {})[LP()] || (arq.textos || {}).en || [''];
-  sala.texto = idx > 0 ? rng.pick(txts).replace('{tema}', lugar).replace('{Tema}', lugar.charAt(0).toUpperCase() + lugar.slice(1)) : '';
+  const lugar = TXT(temaObj.lugar || TEMAS_SALA.qualquer.lugar);
+  const txts = EM(arq.textos || {}).length ? EM(arq.textos || {}) : [''];
+  sala.texto = !ehInicio ? rng.pick(txts).replace('{tema}', lugar).replace('{Tema}', lugar.charAt(0).toUpperCase() + lugar.slice(1)) : '';
   sala.nome = (L2(arq.nome, tr(arq.nome)) || arq.id);
   sala.textoDepois = textoDepoisDe(sala); sala.objetos.forEach(o => { delete o._revela; delete o._isca; });
   if (abridor) abridor.objeto.gatilhos = [{ uid: uid(), tipo: 'open_room', sala: idx, requisitos: [] }].concat(abridor.objeto.type === 'SightToken' ? [autoRemocao()] : []);
@@ -1378,7 +1390,7 @@ const TEXTOS_OLHAR = {
   DragonArch: { en: ['The bones of a dragon arch over the way.'], pt: ['Os ossos de um dragão formam um arco sobre o caminho.'] },
   Wagon: { en: ['An abandoned wagon. A hero can spend an action to search it.'], pt: ['Uma carroça abandonada. Um herói pode gastar uma ação para revistá-la.'] }
 };
-function textoDeOlhar(tipo, rng) { if (baseObj(tipo) === 'SightToken') return ''; const t = TEXTOS_OLHAR[baseObj(tipo)]; if (!t) return L2('Something of note.', 'Algo que chama a atenção.'); const l = t[LP()] || t.en; return rng ? rng.pick(l) : l[0]; }
+function textoDeOlhar(tipo, rng) { if (baseObj(tipo) === 'SightToken') return ''; const t = TEXTOS_OLHAR[baseObj(tipo)]; if (!t) return L2('Something of note.', 'Algo que chama a atenção.'); const l = EM(t); return rng ? rng.pick(l) : l[0]; }
 /* the score (0–100): how close each measure is to the archetype's range */
 function notaDaSala(m, arq) {
   let s = 0, w = 0;
@@ -1449,10 +1461,18 @@ function desenharCandidato(cv, c, p = projeto) {
 }
 /* Generate room: the starting room right away; any other room is opened by an object or monster of the map, clicked
    first (it gets the trigger "Open a room" when a generated room is used) */
+/* no hero spaces on the map yet (rooms built, heroes not placed): the generator makes the starting room, which goes in as
+   room 1 (the rooms already there move down one number) */
+const salasReais = () => projeto.salas.filter(s => !s._previa);
+const semHeroisNoMapa = () => salasReais().length > 0 && !salasReais().some(s => (s.herois || []).length);
+const gerandoInicial = () => !salasReais().length || semHeroisNoMapa();
+/* a free place to the right of the map, for a room with no door to the others */
+function origemAoLadoDoMapa() { const cs = salasReais().flatMap(s => s.pecas.flatMap(casasDaPeca).concat(s.objetos.flatMap(casasDoObjeto))); if (!cs.length) return [0, 0];
+  return [Math.max(...cs.map(c => c[0])) + 6, Math.min(...cs.map(c => c[1]))]; }
 function iniciarGerador() {
   descartarPrevia(); const j = $('#janelaGerador'); if (j) j.hidden = true;
-  if (!projeto.salas.length) { GER.dono = null; return abrirGerador(); }
-  pedirClique({ modo: 'object', texto: tr('Click the object or monster that will open the new room: it gets the trigger “Open a room”. Esc cancels.'), cb: (x, y, q) => {
+  if (gerandoInicial()) { GER.dono = null; return abrirGerador(); }
+  pedirClique({ modo: 'object', objetoNovo: true, texto: tr('Click the object or monster that will open the new room, or place a new object with Objects (O): it gets the trigger “Open a room”. Esc cancels.'), cb: (x, y, q) => {
     const d = donoDoClique(q); if (!d) { aviso(tr('Click an object or a monster of the map (staircases and bridges are floor).')); return false; }
     GER.dono = d; setTimeout(abrirGerador, 0); return true; } });
 }
@@ -1467,12 +1487,15 @@ function abrirGerador() {
   const d = painelFlutuante('janelaGerador', tr('Generate a room'), () => { descartarPrevia(); d.hidden = true; tudo(); });
   d.hidden = false; const corpo = d.querySelector('.corpo');
   const o = GER.opcoes = GER.opcoes || { atos: ATOS.get(), arquetipo: 'random', tamanho: 'M', intensidade: 5, tema: 'qualquer', objetos: 'normal', inimigos: 'balanceado', escolhidos: [], funcao: '', semente: novaSemente(), ponto: 'random', abridor: 'random' };
-  const dono = projeto.salas.length ? GER.dono : null;
+  const inicial = gerandoInicial(), dono = inicial ? null : GER.dono;
+  // the candidates on show belong to the map, the rooms and the opener they were made for: with another, they go
+  const para = { p: projeto, n: projeto.salas.filter(x => !x._previa).length, h: dono?.holder || null };
+  const r0 = GER.resultadoPara; if (GER.resultado && !(r0 && r0.p === para.p && r0.n === para.n && r0.h === para.h)) { GER.resultado = null; GER.escolhido = -1; }
   const perto = pt => Math.min(...dono.casas.map(([x, y]) => Math.abs(x - pt.casa[0]) + Math.abs(y - pt.casa[1])));
-  const pontos = !projeto.salas.length ? [] : dono ? pontosDeLigacao().filter(pt => pt.sala === dono.sala).sort((a, b) => perto(a) - perto(b)) : pontosDeLigacao();
+  const pontos = inicial ? [] : dono ? pontosDeLigacao().filter(pt => pt.sala === dono.sala).sort((a, b) => perto(a) - perto(b)) : pontosDeLigacao();
   const arqs = todosArquetipos().filter(a => a.id !== 'niveis');   // (height is a trait of any room, not a kind of its own)
   const sel = (id, lista, v) => `<select id="${id}">${lista.map(([k, t]) => `<option value="${esc(k)}" ${String(v) === String(k) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
-  corpo.innerHTML = `${dono ? `<p class="linha">Opened by: <b data-sem-traducao>${esc(dono.rotulo)}</b> (room ${dono.sala + 1}) <button class="sm" id="gr_outro">Pick another</button></p>` : ''}<p class="ajuda">${dono ? 'The new room starts at an edge of that room, near it (in front of it, when it is a door at the edge). Used, it gets the trigger “Open a room”.' : projeto.salas.length ? 'The new room starts at the edge you pick, behind a door or a token of that room that opens it.' : 'The map is empty: the room will be the starting room, with the hero spaces.'} Each click on Generate makes three new candidates, each with its score (how close its measures are to the archetype) and what it does well. The one you pick appears on the board, framed and marked “preview” in the list of rooms, so you see it in place. It becomes a room of the map only with “Use this”.</p>
+  corpo.innerHTML = `${dono ? `<p class="linha">Opened by: <b data-sem-traducao>${esc(dono.rotulo)}</b> (room ${dono.sala + 1}) <button class="sm" id="gr_outro">Pick another</button></p>` : ''}<p class="ajuda">${dono ? 'The new room starts at an edge of that room, near it (in front of it, when it is a door at the edge). Used, it gets the trigger “Open a room”.' : !inicial ? 'The new room starts at the edge you pick, behind a door or a token of that room that opens it.' : !salasReais().length ? 'The map is empty: the room will be the starting room, with the hero spaces.' : 'No hero spaces on the map yet: the room will be the starting room (room 1), with the hero spaces, beside the map. The rooms already on the map move down one number; give the old room 1 an object that opens it.'} Each click on Generate makes three new candidates, each with its score (how close its measures are to the archetype) and what it does well. The one you pick appears on the board, framed and marked “preview” in the list of rooms, so you see it in place. It becomes a room of the map only with “Use this”.</p>
     <div class="geradorOpcoes">
       <label class="campo">Archetype ${sel('gr_arq', [['random', 'Random']].concat(arqs.map(a => [a.id, tr(a.nome)])), o.arquetipo)}</label>
       <label class="campo">Size ${sel('gr_tam', [['P', 'Small'], ['M', 'Medium'], ['G', 'Large']], o.tamanho)}</label>
@@ -1487,6 +1510,7 @@ function abrirGerador() {
     <div id="gr_escolhidos" ${o.inimigos === 'escolhidos' ? '' : 'hidden'}><div class="sub">Monsters of the room</div><div class="linha" style="flex-wrap:wrap">${MONSTROS().map(m => `<label class="chk"><input type="checkbox" data-m="${m.id}" ${o.escolhidos.includes(m.id) ? 'checked' : ''}> ${esc(m.nome)}</label>`).join('') || '<span class="ajuda">No monster in the Workshop yet.</span>'}</div></div>
     ${pontos.length ? `<div class="linha" style="flex-wrap:wrap"><label class="campo">Where it starts ${sel('gr_pto', [['random', dono ? 'The edges nearest to it' : 'Random edge']].concat(pontos.map((pt, i) => [i, (pt.sala + 1) + ' · ' + projeto.salas[pt.sala].nome + ' · ' + nomeDirecao(pt.dir) + ' (' + pt.casa.join(',') + ')'])), pontos[+o.ponto] ? o.ponto : 'random')}</label>
       ${dono ? '' : `<label class="campo">Opened by ${sel('gr_abr', [['random', 'Random'], ['Door', 'A door'], ['SightToken', 'A point of interest (passage)'], ['Archway', 'An archway, with a point of interest in it']], o.abridor)}</label>`}</div>` : dono ? '<p class="ajuda aviso">That room has no free edge for a new room: pick an object of another room.</p>' : ''}
+    <p class="ajuda" id="gr_dica" data-sem-traducao style="min-height:2.6em"></p>
     <div class="linha"><button class="primario" id="gr_gerar">✦ Generate</button><button class="sm" id="gr_arqs" title="Write your own archetypes">Archetypes…</button><span class="ajuda" id="gr_info"></span></div>
     <div id="gr_cands" class="geradorCands"></div>
     <div id="gr_lugar" hidden><div class="linha" style="flex-wrap:wrap"><span class="rotuloTx">Place it on the board</span><button class="sm" data-mv="-1,0" title="Left">←</button><button class="sm" data-mv="0,-1" title="Up">↑</button><button class="sm" data-mv="0,1" title="Down">↓</button><button class="sm" data-mv="1,0" title="Right">→</button><button class="sm" id="gr_gira">⟳ Rotate (R)</button><span id="gr_lugarInfo" class="ajuda"></span></div>
@@ -1495,12 +1519,13 @@ function abrirGerador() {
   const ler = () => { o.arquetipo = $('#gr_arq').value; o.tamanho = $('#gr_tam').value; o.intensidade = Math.max(1, Math.min(10, +$('#gr_int').value || 5)); o.tema = $('#gr_tema').value; o.objetos = $('#gr_obj').value; o.inimigos = $('#gr_ini').value; o.funcao = $('#gr_fun').value; o.semente = $('#gr_sem').value.trim() || novaSemente(); o.atos = +$('#gr_atos').value === 1 ? 1 : 2; ATOS.set(o.atos);
     o.escolhidos = [...corpo.querySelectorAll('[data-m]:checked')].map(c => c.dataset.m); if ($('#gr_pto')) o.ponto = $('#gr_pto').value; if ($('#gr_abr')) o.abridor = $('#gr_abr').value; };
   $('#gr_ini').onchange = () => { $('#gr_escolhidos').hidden = $('#gr_ini').value !== 'escolhidos'; };
+  dicasDoGerador(arqs, dono, pontos);
   $('#gr_arqs').onclick = () => editarArquetipos();
   const outro = $('#gr_outro'); if (outro) outro.onclick = () => iniciarGerador();
   corpo.querySelectorAll('[data-mv]').forEach(b => b.onclick = () => { const [dx, dy] = b.dataset.mv.split(',').map(Number); moverPrevia(dx, dy); });
   $('#gr_gira').onclick = () => girarPrevia();
-  const optsDe = (base, travas) => { const rng = rngDe(o.semente + '#opts'); const arq = o.arquetipo === 'random' ? rng.pick(arqs.filter(a => !(projeto.salas.length === 0 && a.id === 'chefe') && a.id !== 'abertura')).id : o.arquetipo;
-    return { arquetipo: arq, tamanho: o.tamanho, intensidade: o.intensidade, tema: o.tema, objetos: o.objetos, inimigos: o.inimigos, escolhidos: o.escolhidos, funcao: o.funcao, semente: o.semente, atos: o.atos, ligacao: null, abridor: o.abridor, dono: dono ? { sala: dono.sala, casas: dono.casas } : null, base, travas }; };
+  const optsDe = (base, travas) => { const rng = rngDe(o.semente + '#opts'); const arq = o.arquetipo === 'random' ? rng.pick(arqs.filter(a => !(inicial && a.id === 'chefe') && a.id !== 'abertura')).id : o.arquetipo;
+    return { arquetipo: arq, tamanho: o.tamanho, intensidade: o.intensidade, tema: o.tema, objetos: o.objetos, inimigos: o.inimigos, escolhidos: o.escolhidos, funcao: o.funcao, semente: o.semente, atos: o.atos, ligacao: null, abridor: o.abridor, dono: dono ? { sala: dono.sala, casas: dono.casas } : null, base, travas, ...(inicial && salasReais().length ? { inicial: true, origem: origemAoLadoDoMapa() } : {}) }; };
   // the edges to try: the one picked, or all of them shuffled (the edge of the last generation last), until one gives rooms
   const gerarNasBordas = op => {
     if (!pontos.length) return gerarCandidatos(op);
@@ -1531,14 +1556,75 @@ function abrirGerador() {
     const faltas = faltasDaOficina(o.atos, precisa); if (faltas.length) { descartarPrevia(); GER.resultado = null; GER.escolhido = -1; $('#gr_travas').hidden = true; tudo(); return mostrarFaltas($('#gr_cands'), faltas, o.atos, precisa, () => $('#gr_gerar').click()); }
     comEspera($('#gr_gerar'), () => { descartarPrevia(); GER.escolhido = -1; GER.resultado = gerarNasBordas(optsDe());
       if (typeof Tutorial !== 'undefined' && Tutorial.ativo() && Tutorial.umCandidato()) GER.resultado.candidatos = GER.resultado.candidatos.slice(0, 1);   // (the tutorial: one room to place)
-      tudo(); if (GER.resultado.candidatos.length) escolher(0); else mostrar(); }); };
+      GER.resultadoPara = para; tudo(); if (GER.resultado.candidatos.length) escolher(0); else mostrar(); }); };
   $('#gr_regerar').onclick = () => { ler(); const base = GER.resultado?.candidatos[GER.escolhido]; if (!base) return aviso(tr('Pick a candidate first.'));
     const trv = { pecas: $('#gr_tp').checked || $('#gr_to').checked || $('#gr_ti').checked, objetos: $('#gr_to').checked, inimigos: $('#gr_ti').checked };
     o.semente = novaSemente(); $('#gr_sem').value = o.semente; GER.sementeUsada = o.semente; descartarPrevia();
     const op = optsDe(base, trv); op.arquetipo = base.arquetipo;
     comEspera($('#gr_regerar'), () => { GER.resultado = trv.pecas ? gerarCandidatos({ ...op, ligacao: base.ligacao }) : base.ligacao ? gerarCandidatos({ ...op, ligacao: base.ligacao }) : gerarNasBordas(op);
-      GER.escolhido = -1; tudo(); if (GER.resultado.candidatos.length) escolher(0); else mostrar(); }); };
+      GER.resultadoPara = para; GER.escolhido = -1; tudo(); if (GER.resultado.candidatos.length) escolher(0); else mostrar(); }); };
   mostrar();
+}
+/* what the option chosen in each field of the room generator means (as in the map generator): in the field's tooltip and in
+   the line under the fields while the mouse is on one of them (or after a change). Some explanations follow other fields
+   (the size and the objects give the archetype's numbers; the intensity says what it does for the monsters chosen) */
+const FUNCOES_EXPLICADAS = {
+  gancho: ['Why the heroes are here: the room that starts the story or brings a new lead.', 'Por que os heróis estão aqui: a sala que começa a história ou traz uma pista nova.'],
+  exploracao: ['Searching and finding: points of interest, clues, few fights.', 'Procurar e achar: pontos de interesse, pistas, poucas lutas.'],
+  tensao: ['The danger grows: a fight on the way, the feeling that worse is coming.', 'O perigo cresce: uma luta no caminho, a sensação de que vem coisa pior.'],
+  confronto: ['A fight that matters in the middle of the map.', 'Uma luta que pesa, no meio do mapa.'],
+  respiro: ['A pause to rest, heal and talk before what comes next.', 'Uma pausa para descansar, curar e conversar antes do que vem.'],
+  recompensa: ['The prize: chests, items, what the heroes came for or found on the way.', 'O prêmio: baús, itens, o que os heróis vieram buscar ou acharam no caminho.'],
+  climax: ['The final fight, where the map is decided.', 'A luta final, onde o mapa se decide.'],
+  fuga: ['Getting out: the way back or the run for the exit.', 'Sair: o caminho de volta ou a corrida para a saída.']
+};
+function dicasDoGerador(arqs, dono, pontos) {
+  const v = id => $('#' + id)?.value;
+  const arqDe = () => v('gr_arq') === 'random' ? null : ARQUETIPO_SALA(v('gr_arq'));
+  const faixa = ([a, b], [f0, f1]) => [Math.round(a + (b - a) * f0), Math.round(a + (b - a) * f1)];
+  const nomeArq = a => tr(a.nome || a.id);
+  const DICAS = {
+    gr_arq: x => { if (x === 'random') return L2('An archetype is drawn for each Generate (the opening room stays out, and the boss arena too when the map is empty).', 'Um arquétipo é sorteado a cada Gerar (a sala de abertura fica de fora, e a arena do chefe também quando o mapa está vazio).');
+      const a = ARQUETIPO_SALA(x); if (!a) return ''; return (a.resumo ? tr(a.resumo) + ' ' : '') + L2('Its measures (sight, cover, chokepoints, routes, distance to the monsters) give each candidate its score.', 'As medidas dele (visão, cobertura, gargalos, rotas, distância até os monstros) dão a nota de cada candidata.'); },
+    gr_tam: x => { const f = PASSOS_TAMANHO[x] || PASSOS_TAMANHO.M, a = arqDe();
+      const base = ({ P: L2('The smaller end of the archetype\'s floor area.', 'A ponta menor da área de chão do arquétipo.'), M: L2('The middle of the archetype\'s floor area.', 'O meio da área de chão do arquétipo.'), G: L2('The larger end of the archetype\'s floor area.', 'A ponta maior da área de chão do arquétipo.') })[x] || '';
+      if (!a || !a.area) return base + L2(' Each archetype has its own range.', ' Cada arquétipo tem a sua faixa.');
+      const [m, n] = faixa(a.area, f); return base + ' ' + nomeArq(a) + ': ' + L2('about ' + m + ' to ' + n + ' squares.', 'cerca de ' + m + ' a ' + n + ' casas.'); },
+    gr_int: x => { const n = Math.max(1, Math.min(10, +x || 5)), modo = v('gr_ini'), a = arqDe();
+      if (modo === 'nenhum') return L2('From 1 to 10. With no monsters, the room ignores it.', 'De 1 a 10. Sem monstros, a sala não usa a intensidade.');
+      if (modo === 'escolhidos') return L2('From 1 to 10. The monsters you pick enter at tier ' + Math.max(1, Math.min(4, Math.round(n / 3))) + ' (intensity ÷ 3).', 'De 1 a 10. Os monstros que você escolhe entram no tier ' + Math.max(1, Math.min(4, Math.round(n / 3))) + ' (intensidade ÷ 3).');
+      return L2('From 1 to 10: the strength of the balanced group. When the room opens, the game spends intensity ÷ 10 × heroes × 1.5 × progression points on the monsters of the pool: higher brings more monsters or stronger tiers.', 'De 1 a 10: a força do grupo balanceado. Quando a sala abre, o jogo gasta intensidade ÷ 10 × heróis × 1,5 × progressão pontos com os monstros do pool: mais alta traz mais monstros ou tiers mais fortes.')
+        + (a && a.inimigos?.chefe ? L2(' In the boss arena the boss enters at tier ' + Math.max(2, Math.min(4, Math.round(n / 2.5))) + '.', ' Na arena do chefe, o chefe entra no tier ' + Math.max(2, Math.min(4, Math.round(n / 2.5))) + '.') : ''); },
+    gr_tema: x => x === 'qualquer' ? L2('The generator mixes the floors and objects of every place.', 'O gerador mistura os pisos e objetos de todos os lugares.') : L2('The floors, objects and openers of this kind of place, and its name in the texts of the room: ', 'Os pisos, os objetos e as aberturas deste tipo de lugar, e o nome dele nos textos da sala: ') + tr(TEMAS_SALA[x]?.nome || x) + ' (' + TXT(TEMAS_SALA[x]?.lugar || '') + ').',
+    gr_obj: x => { const k = { poucos: 0.6, normal: 1, muitos: 1.5 }[x] || 1, a = arqDe();
+      const base = ({ poucos: L2('About 60% of the objects the archetype usually has.', 'Cerca de 60% dos objetos que o arquétipo costuma ter.'), normal: L2('The objects the archetype usually has.', 'Os objetos que o arquétipo costuma ter.'), muitos: L2('About 150% of the objects the archetype usually has.', 'Cerca de 150% dos objetos que o arquétipo costuma ter.') })[x] || '';
+      const t = a?.objetos?.total; return base + L2(' The archetype\'s own objects (the chests of the treasure room, the points of interest of the exploration room) always come.', ' Os objetos próprios do arquétipo (os baús da sala do tesouro, os pontos de interesse da sala de exploração) vêm sempre.') + (t ? ' ' + nomeArq(a) + ': ' + L2('about ' + Math.round(t[0] * k) + ' to ' + Math.round(t[1] * k) + ' objects.', 'cerca de ' + Math.round(t[0] * k) + ' a ' + Math.round(t[1] * k) + ' objetos.') : ''); },
+    gr_ini: x => { const a = arqDe(), e = a?.inimigos?.espacos;
+      if (x === 'nenhum') return L2('The room comes with no monsters.', 'A sala vem sem monstros.');
+      if (x === 'escolhidos') return L2('Exactly the monsters ticked below, one space each, at the tier the intensity gives.', 'Exatamente os monstros marcados abaixo, uma casa para cada, no tier que a intensidade dá.');
+      return L2('Balanced spaces that the game fills when the room opens, with monsters of the room\'s pool (the map\'s pool, or the Workshop when it is empty) and the strength of the intensity.', 'Casas balanceadas que o jogo preenche quando a sala abre, com monstros do pool da sala (o pool do mapa, ou a Oficina quando ele está vazio) e a força da intensidade.')
+        + (a && e ? ' ' + nomeArq(a) + ': ' + (e[1] ? L2(e[0] + ' to ' + e[1] + ' spaces', e[0] + ' a ' + e[1] + ' casas') + (a.inimigos.como === 'armadilha' ? L2(', brought by a token of the room a round after it opens.', ', trazidas por um marcador da sala uma rodada depois que ela abre.') : '.') : L2('no monsters, whatever is chosen here.', 'sem monstros, seja o que for escolhido aqui.')) : ''); },
+    gr_fun: x => { const a = arqDe(), f = x || (a?.funcoes || [])[0];
+      const nome = f ? tr((FUNCOES_SALA.find(z => z[0] === f) || [])[1] || f) : '';
+      const oque = f && FUNCOES_EXPLICADAS[f] ? L2(...FUNCOES_EXPLICADAS[f]) : '';
+      return (x ? '' : (a ? nome + '. ' : L2('Each archetype has its own. ', 'Cada arquétipo tem a sua. '))) + (oque ? (x ? '' : nome + ': ') + oque + ' ' : '')
+        + L2('It marks the room\'s part in the story: kept on the room, read by the map generator and the simulator; the room itself comes out the same.', 'Marca o papel da sala na história: fica guardada na sala, e o gerador de mapas e o simulador a leem; a sala em si sai igual.'); },
+    gr_atos: x => +x === 1 ? L2('Tiles, objects and monsters of the first box only.', 'Só peças, objetos e monstros da primeira caixa.') : L2('The room may use tiles, objects and monsters of the second box.', 'A sala pode usar peças, objetos e monstros da segunda caixa.'),
+    gr_sem: () => L2('The seed of the draw. Each Generate uses a new one; to see a room again, type its seed here before generating.', 'A semente do sorteio. Cada Gerar usa uma nova; para ver uma sala de novo, digite a semente dela aqui antes de gerar.'),
+    gr_pto: x => x === 'random' ? (dono ? L2('The generator tries the three nearest edges of that room, in a drawn order, then the others, until one gives rooms.', 'O gerador tenta as três bordas mais próximas daquela sala, numa ordem sorteada, e depois as outras, até uma dar salas.') : L2('The generator tries the free edges of the map in a drawn order until one gives rooms.', 'O gerador tenta as bordas livres do mapa numa ordem sorteada até uma dar salas.'))
+      : (() => { const pt = pontos[+x]; return pt ? L2('The new room starts at this edge: room ' + (pt.sala + 1) + ', ' + nomeDirecao(pt.dir) + ' side, square ' + pt.casa.join(',') + '.', 'A sala nova começa nesta borda: sala ' + (pt.sala + 1) + ', lado ' + nomeDirecao(pt.dir) + ', casa ' + pt.casa.join(',') + '.') : ''; })(),
+    gr_abr: x => ({ random: L2('Drawn by the terrain (dungeons and keeps favour doors, caves and the wilds points of interest).', 'Pelo terreno (masmorras e fortalezas preferem portas; cavernas e ermos, pontos de interesse).'), Door: L2('A door at the edge, between the two rooms: opening it opens the new room.', 'Uma porta na borda, entre as duas salas: abri-la abre a sala nova.'), SightToken: L2('A point of interest at the edge, a passage with no door: the heroes use it to go on.', 'Um ponto de interesse na borda, uma passagem sem porta: os heróis o usam para seguir.'), Archway: L2('An archway at the edge with a point of interest in it: the passage is framed by the arch.', 'Um arco na borda com um ponto de interesse dentro: a passagem fica emoldurada pelo arco.') })[x] + L2(' From a raised edge it is always a point of interest: the heroes jump down.', ' De uma borda elevada é sempre um ponto de interesse: os heróis saltam para baixo.')
+  };
+  const ROTULOS = { gr_arq: L2('Archetype', 'Arquétipo'), gr_tam: L2('Size', 'Tamanho'), gr_int: L2('Intensity', 'Intensidade'), gr_tema: L2('Terrain and theme', 'Terreno e tema'), gr_obj: L2('Objects', 'Objetos'), gr_ini: L2('Monsters', 'Monstros'), gr_fun: L2('Story function', 'Função na história'), gr_atos: L2('Boxes', 'Caixas'), gr_sem: L2('Seed', 'Semente'), gr_pto: L2('Where it starts', 'Onde começa'), gr_abr: L2('Opened by', 'Aberta por') };
+  const dica = id => { const el = $('#' + id); if (!el) return ''; const t = DICAS[id](el.value) || ''; const nome = el.selectedOptions && el.selectedOptions[0] ? el.selectedOptions[0].textContent : el.value; return t ? ROTULOS[id] + ' · ' + nome + ': ' + t : ''; };
+  const titulos = () => Object.keys(DICAS).forEach(id => { const el = $('#' + id); if (!el) return; const t = dica(id); (el.closest('label') || el).title = t; el.title = t; });
+  let ultimo = null; const linha = id => { ultimo = id; $('#gr_dica').textContent = dica(id); };
+  Object.keys(DICAS).forEach(id => { const el = $('#' + id); if (!el) return; const campo = el.closest('label') || el;
+    const mudou = () => { titulos(); linha(id); };
+    el.addEventListener('change', mudou); if (el.tagName === 'INPUT') el.addEventListener('input', mudou);
+    campo.addEventListener('mouseenter', () => linha(id)); el.addEventListener('focus', () => linha(id)); });
+  titulos();
+  return () => { titulos(); if (ultimo) linha(ultimo); };
 }
 /* the candidate on the board, as a room of the map, until another is picked or the window closes. The user may drag it,
    move it with the arrows and turn it (R) before using it */
@@ -1603,6 +1689,8 @@ function renderLugarPrevia() {
 /* the room on the board becomes a room of the map. Placed apart from the map, the heroes are moved there: the user clicks
    the spaces where they appear */
 function usarCandidato(c) {
+  // a starting room (hero spaces, no opener) is made only for an empty map: the map has one starting room
+  if ((c.sala.herois || []).length && projeto.salas.some(x => !x._previa) && !semHeroisNoMapa()) { aviso(tr('This candidate is a starting room, made when the map was empty. The map already has its starting room: Generate again for a room of this map.')); return false; }
   if (GER.previaDe !== c || GER.previa == null) mostrarPrevia(c);
   const nova = GER.previa; const s = projeto.salas[nova]; const st = situacaoDaSala(nova);
   if (st.choca) { aviso(tr('It overlaps another room: move it.')); return false; }
@@ -1610,12 +1698,22 @@ function usarCandidato(c) {
   let dono = null;
   if (GER.gatPrevia) { dono = GER.gatPrevia.h; GER.gatPrevia = null; }
   else if (c.abridor) dono = projeto.salas[c.abridor.sala].objetos.find(o => todosGatilhos(o).some(g => g.tipo === 'open_room' && g.sala === nova)) || null;
-  GER.previa = null; GER.previaDe = null; GER.dono = null;
+  GER.previa = null; GER.previaDe = null; GER.dono = null; GER.resultado = null; GER.escolhido = -1;   // (the other candidates were alternatives for this same place)
   // the chests and searches of the room draw from the item pool, the balanced spaces from the monster pool: from the Workshop when empty
   const atosC = c.opcoes?.atos || ATOS.get(); const avisos = [];
   if (donosDaSala(s).some(({ o }) => todosGatilhos(o).some(g => g.tipo === 'give_item' && g.modo === 'random'))) { const n = prepararItens(projeto, atosC); if (n) avisos.push(tr('The item pool of the map now has the items and materials of the Workshop') + ' (' + n + ')'); }
   const usaReserva = s.inimigos.some(e => ehPool(e.enemy)) || donosDaSala(s).some(({ o }) => todosGatilhos(o).some(g => g.tipo === 'spawn' && g.fonte === 'pool'));
   if (usaReserva) { const n = prepararReserva(projeto, atosC, rngDe(novaSemente())); if (n) avisos.push(tr('The monster pool of the map now has monsters of the Workshop') + ' (' + n + ')'); }
+  // the starting room of a map with no hero spaces yet: it goes in as room 1, and the rooms already there move down one
+  // number (an empty room 1, with nothing on it, gives its place)
+  if ((s.herois || []).length && nova > 0) {
+    const velha = projeto.salas[0], vazia = !velha.pecas.length && !velha.objetos.length && !(velha.inimigos || []).length;
+    s.texto = ''; levarSalaParaInicio(nova); if (vazia) removerSala(1);
+    salaAtual = 0; sel = null; destaqueSala = null; limparAbridores(); tudo(); renderConferencia();
+    avisoLongo((vazia ? L2('Starting room added as room 1, with the hero spaces (in place of the empty room 1).', 'Sala inicial adicionada como sala 1, com os espaços de herói (no lugar da sala 1 vazia).')
+      : L2('Starting room added as room 1, with the hero spaces. The rooms already on the map moved down one number: give room 2 an object that opens it.', 'Sala inicial adicionada como sala 1, com os espaços de herói. As salas que já estavam no mapa desceram um número: dê à sala 2 um objeto que a abra.')) + (avisos.length ? ' ' + avisos.join('. ') + '.' : ''), 10000);
+    return true;
+  }
   salaAtual = nova; sel = null; limparAbridores(); tudo(); renderConferencia();
   aviso(tr('Room added') + ': ' + (nova + 1) + ' · ' + s.nome); if (avisos.length) avisoLongo(avisos.join('. ') + '.');
   if (nova > 0 && !st.toca && dono) pedirTransferencia(nova, dono);

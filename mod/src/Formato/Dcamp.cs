@@ -156,11 +156,21 @@ namespace Bigorna.Formato
         [JsonIgnore] public List<string> Linguas = new List<string>();
         [JsonIgnore] public string LinguaEmUso;
 
-        public static Dcamp Carregar(string caminho)
+        public static Dcamp Carregar(string caminho) => Montar(File.ReadAllText(caminho), null, caminho);
+
+        /// <summary>v264: so a ficha da campanha, para a lista (a meta, a ficha e os nos, no comeco do arquivo), sem os
+        /// dialogos, o conteudo e a copia do editor; um arquivo de antes da ficha e lido inteiro. Para jogar, ela e lida
+        /// inteira (Campanha.Comecar).</summary>
+        public static Dcamp CarregarFicha(string caminho)
         {
-            var texto = File.ReadAllText(caminho);
-            bool exige = Acervo.Pacotes.ExigePacotes(texto), traduz = Traducao.TemTraducoes(texto);
-            var j = exige || traduz ? Acervo.Pacotes.LerJson(texto) : null;
+            JObject h = null; try { h = Dmap.Cabeca(caminho, true); } catch { h = null; }
+            return h == null ? Carregar(caminho) : Montar(null, Dmap.DaCabeca(h), caminho);
+        }
+
+        static Dcamp Montar(string texto, JObject j0, string caminho)
+        {
+            bool exige = j0 != null ? j0["requires"] != null : Acervo.Pacotes.ExigePacotes(texto), traduz = j0 != null ? j0["translations"] != null || j0["languages"] != null : Traducao.TemTraducoes(texto);
+            var j = j0 ?? (exige || traduz ? Acervo.Pacotes.LerJson(texto) : null);
             var (linguas, lingua) = Dmap.Traduzir(j, traduz, caminho);
             var faltam = exige ? Acervo.Pacotes.Juntar(j) : new List<Acervo.Requisito>();
             var d = j != null ? j.ToObject<Dcamp>(JsonSerializer.CreateDefault()) : JsonConvert.DeserializeObject<Dcamp>(texto);
@@ -180,7 +190,8 @@ namespace Bigorna.Formato
         }
 
         /// <summary>Todas as campanhas da pasta de mapas: um .dcamp na raiz ou em cada subpasta.</summary>
-        public static List<Dcamp> CarregarTodas(string pasta)
+        /// <summary>As campanhas da pasta (e das subpastas), as ja lidas sem ler de novo (Dmap.Lembrado).</summary>
+        public static List<Dcamp> CarregarTodas(string pasta, string extra = "", bool soFicha = false)
         {
             var lista = new List<Dcamp>();
             if (!Directory.Exists(pasta)) return lista;
@@ -188,7 +199,7 @@ namespace Bigorna.Formato
             foreach (var sub in Directory.GetDirectories(pasta)) arquivos.AddRange(Directory.GetFiles(sub, "*.dcamp"));
             foreach (var arq in arquivos.OrderBy(x => x))
             {
-                try { lista.Add(Carregar(arq)); }
+                try { lista.Add(soFicha ? Dmap.Lembrado(arq, extra, CarregarFicha, "ficha") : Dmap.Lembrado(arq, extra, Carregar)); }
                 catch (Exception ex) { Log.Info("campanha ilegível " + Path.GetFileName(arq) + ": " + ex.Message); }
             }
             return lista;

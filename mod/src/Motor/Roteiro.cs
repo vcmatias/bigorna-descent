@@ -105,6 +105,53 @@ namespace Bigorna.Motor
             AgendarTemporizadores();
         }
 
+        /// <summary>v265: o roteiro de uma partida retomada (mapa oneshot em andamento): como estava quando o jogo gravou, sem a
+        /// introducao nem o "mapStart" (o mapa ja tinha comecado). A rodada vista e a da gravacao: a proxima que o jogo abrir
+        /// dispara "roundStart" como dispararia.</summary>
+        public static void Retomar(Dmap m, EstadoDoMapa e)
+        {
+            Parar(true);
+            Butim.NovoMapa();
+            Mapa = m;
+            if (m == null) return;
+            EmMarcha = true;
+            _principais.AddRange(m.Roteiro.Principais.Where(o => o != null));
+            _opcionais.AddRange(m.Roteiro.Opcionais.Where(o => o != null));
+            var r = e?.Roteiro ?? new EstadoDoMapa.RoteiroE();
+            foreach (var kv in r.Vars ?? new Dictionary<string, int>()) if (kv.Key != null) Vars[kv.Key] = kv.Value;
+            _disparados.UnionWith(r.Disparados ?? new List<string>());
+            foreach (var kv in r.Vezes ?? new Dictionary<string, int>()) if (kv.Key != null) _vezes[kv.Key] = kv.Value;
+            _desligados.UnionWith(r.Desligados ?? new List<string>());
+            _anunciadas.UnionWith(r.Anunciadas ?? new List<string>());
+            _niveis.UnionWith(r.Niveis ?? new List<string>());
+            foreach (var c in r.Cronometros ?? new List<EstadoDoMapa.CronometroE>()) if (c != null && !string.IsNullOrEmpty(c.Id)) _cronometros.Add(new Cronometro { Id = c.Id, Cada = Math.Max(1, c.Cada), Restam = c.Restam, Proxima = c.Proxima, Objeto = c.Objeto });
+            _atual = Mathf.Clamp(r.Atual, 0, Math.Max(0, _principais.Count - 1));
+            foreach (var i in r.OpcionaisFeitos ?? new List<int>()) if (i >= 0 && i < _opcionais.Count) _opcionaisFeitos.Add(i);
+            _vivos = new Dictionary<string, string>(r.Vivos ?? new Dictionary<string, string>());
+            Derrotados = r.Derrotados;
+            foreach (var kv in r.DerrotadosPorGrupo ?? new Dictionary<string, int>()) if (kv.Key != null) _derrotadosPorGrupo[kv.Key] = kv.Value;
+            foreach (var g in r.GruposVazios ?? new List<string>()) if (!string.IsNullOrEmpty(g)) _gruposVazios.Add(g);
+            Rodada = r.Rodada;
+            foreach (var kv in r.Saude ?? new Dictionary<string, int>()) if (kv.Key != null) _saudeVista[kv.Key] = (HeroHealth)kv.Value;
+            Objetos.AoUsar = AoUsarObjeto;
+            Escolta.Importar(e?.Escolta);
+            Butim.Importar(e?.Butim);
+            Log.Info("roteiro retomado: rodada " + Rodada + ", objetivo " + ObjetivoAtual + " de " + _principais.Count + ", " + _disparados.Count + " gatilho(s) já disparados, " + Vars.Count + " variável(is), " + Derrotados + " derrotado(s)");
+            AgendarTemporizadores();
+            Mesa.Atualizar();
+        }
+
+        /// <summary>v265: o estado do roteiro agora, para a partida em andamento.</summary>
+        public static EstadoDoMapa.RoteiroE Exportar() => new EstadoDoMapa.RoteiroE
+        {
+            Vars = new Dictionary<string, int>(Vars), Disparados = _disparados.ToList(), Vezes = new Dictionary<string, int>(_vezes), Desligados = _desligados.ToList(),
+            Anunciadas = _anunciadas.ToList(), Niveis = _niveis.ToList(),
+            Cronometros = _cronometros.Select(c => new EstadoDoMapa.CronometroE { Id = c.Id, Cada = c.Cada, Restam = c.Restam, Proxima = c.Proxima, Objeto = c.Objeto }).ToList(),
+            Atual = _atual, OpcionaisFeitos = _opcionaisFeitos.ToList(), Vivos = new Dictionary<string, string>(_vivos), Derrotados = Derrotados,
+            DerrotadosPorGrupo = new Dictionary<string, int>(_derrotadosPorGrupo), GruposVazios = _gruposVazios.ToList(), Rodada = Rodada,
+            Saude = _saudeVista.ToDictionary(kv => kv.Key, kv => (int)kv.Value)
+        };
+
         public static void Parar() => Parar(false);
 
         static void Parar(bool manterDestinos)

@@ -149,11 +149,21 @@ function renderObjeto(el, s, oi) {
   const nv = $('#o_nivel'); if (nv) nv.onchange = e => { const antes = o.level || 0, quer = +e.target.value; o.level = quer; if (escadaSemApoio(o)) { o.level = antes; e.target.value = antes; return aviso(AVISO_ESCADA(quer)); } tudo(); };
   renderGatilhos($('#o_gats'), s, oi, 'gatilhos');
 }
-function removerObjeto(si, oi, semPergunta, semRender) {
+/* depois: called once the object is really gone (the question below answers later, or never with Cancel) */
+function removerObjeto(si, oi, semPergunta, semRender, depois) {
   const s = projeto.salas[si]; const o = s.objetos[oi];
   const abre = (o.gatilhos || []).filter(g => g.tipo === 'open_room').map(g => g.sala).filter(x => abridoresDe(x).length === 1);
   if (abre.length && !semPergunta) {
-    if (confirm('This is the only object that opens room ' + abre.map(x => x + 1).join(', ') + '.\n\nOK: first move all its triggers to another object (you click it), then delete.\nCancel: delete anyway; the room stays without an opener until another object gets an “Open a room” trigger.')) { transferirGatilhos(si, oi, () => removerObjeto(si, oi, true)); return; }
+    // three ways out: OK moves the triggers first, Delete anyway, Cancel keeps the object
+    escolherOpcao('This is the only object that opens room ' + abre.map(x => x + 1).join(', ') + '.', [
+      { id: 'mover', titulo: 'OK', sub: 'First move all its triggers to another object (you click it), then delete.' },
+      { id: 'apagar', titulo: 'Delete anyway', classe: 'perigo', sub: 'The room stays without an opener until another object opens it.' }
+    ], id => {
+      const agora = projeto.salas[si]?.objetos.indexOf(o); if (agora == null || agora < 0) return;
+      if (id === 'mover') transferirGatilhos(si, agora, () => { const k = projeto.salas[si].objetos.indexOf(o); if (k >= 0) removerObjeto(si, k, true, semRender, depois); });
+      else removerObjeto(si, agora, true, semRender, depois);
+    });
+    return;
   }
   s.objetos.splice(oi, 1);
   s.objetos.forEach(x => { if (x.gemeo == null) return; if (x.gemeo === oi) delete x.gemeo; else if (x.gemeo > oi) x.gemeo--; });
@@ -165,6 +175,7 @@ function removerObjeto(si, oi, semPergunta, semRender) {
     [x, ...todosGatilhos(x)].flatMap(z => z.requisitos || []).forEach(r => { if (r.tipo === 'object_used' && r.sala === si) { if (r.objeto === oi) delete r.objeto; else if (r.objeto > oi) r.objeto--; } }); });
   limparAbridores();
   if (!semRender) { sel = null; tudo(); }
+  if (depois) depois();
 }
 function transferirGatilhos(si, oi, depois) {
   const s = projeto.salas[si]; const o = s.objetos[oi];
@@ -755,7 +766,7 @@ function escolherMonstroDoContador(c, depois) {
     el.querySelectorAll('[data-mm]').forEach(d => d.onclick = () => { if (d.dataset.mm) c.monstro = d.dataset.mm; else delete c.monstro; fechar(); depois(); });
   }, true);
 }
-const TEXTO_CONTADOR = { add: tr('You found a [count] ([n] of [total]).'), sub: tr('You lost a [count] ([n] of [total]).'), set: tr('[count]: [n] of [total].') };   // default messages, in the editor's language
+const TEXTO_CONTADOR = (t => ({ add: t('You found a [count] ([n] of [total]).'), sub: t('You lost a [count] ([n] of [total]).'), set: t('[count]: [n] of [total].') }))(OUTRA_LINGUA ? TRADZ : tr);   // default messages, in the editor's language
 const VAGAS_CONTADOR = { count: 'the name of the counter, highlighted', n: 'the count after this trigger', total: 'the number the counter’s objective waits for (Counts button)' };
 function totalDoContador(nome) {
   const c = (projeto.contadores || []).find(x => x.nome === nome); if (c) return metaDoContador(c);

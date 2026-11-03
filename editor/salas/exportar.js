@@ -1,7 +1,10 @@
 /* Bigorna Rooms v2 — export (.dmap v3, .dcamp v2), open, import rooms, autosave, settings, start-up. */
 'use strict';
 
-const idExportado = id => { const m = monstro(id); return m ? (m.custom || !m.base ? m.id : m.base) : id; };
+/* v255: an original of the game (imported from it: it has a base) always enters the game as the game's own, by its id, in the
+   language the game is played in; its sheet in the Workshop only shows it. Only copies and creations go as content of their own */
+const ehOriginalDoJogo = x => !!(x && x.base);
+const idExportado = id => { const m = monstro(id); return m ? (m.base || m.id) : id; };
 /* the effects of a tactic, as the mod reads them (the monster of a reinforcement by the id the game knows) */
 /* the triggers of a trinket, for the mod: cause, chance, text and the effects that fit the cause */
 const disparosExportados = l => (l || []).filter(d => d && d.quando).map(d => ({ when: d.quando, chance: Math.max(1, Math.min(100, +d.chance || 100)), text: d.texto || '',
@@ -10,8 +13,8 @@ const disparosExportados = l => (l || []).filter(d => d && d.quando).map(d => ({
       ...(f.tipo === 'spawn' ? { mode: f.modo || 'reserva', ...(f.modo === 'outro' ? { enemy: idExportado(f.monstro) } : {}) } : {}), ...(f.tipo === 'table' ? { text: String(f.texto || '').trim() } : {}) })) }));
 const efeitosExportados = l => (l || []).map(f => f && f.tipo === 'spawn' ? { ...f, modo: f.modo || 'igual', monstro: f.modo === 'outro' && f.monstro ? idExportado(f.monstro) : '' } : f);
 const varDesbloqueio = noId => 'unlock-' + noId;
-const idItemExportado = id => { if (typeof id === 'string' && id.startsWith('RECEITA:')) return idReceitaExportada(id.slice(8)); if (typeof id === 'string' && id.startsWith('RUNA:')) return 'BIGORNA_RUNE_' + id.slice(5) + '_A'; const i = ITENS_B().find(x => x.id === id); return i ? (i.custom || !i.base ? i.id : i.base) : id; };
-const idPersonagemExportado = id => { const p = PERSONAGENS_B().find(x => x.id === id); return p ? (p.custom || !p.base ? p.id : p.base) : id; };
+const idItemExportado = id => { if (typeof id === 'string' && id.startsWith('RECEITA:')) return idReceitaExportada(id.slice(8)); if (typeof id === 'string' && id.startsWith('RUNA:')) return 'BIGORNA_RUNE_' + id.slice(5) + '_A'; const i = ITENS_B().find(x => x.id === id); return i ? (i.base || i.id) : id; };
+const idPersonagemExportado = id => { const p = PERSONAGENS_B().find(x => x.id === id); return p ? (p.base || p.id) : id; };
 /* the custom sheets the mod must inject: every bestiary entry that is custom (edited, created or with its own portrait) */
 /* the top of a block goes to the game as PNG: a drawn icon (SVG) is rasterised beforehand and kept here */
 const TOPOS = {};
@@ -54,18 +57,18 @@ function conteudoCustom() {
 }
 function conteudoCustomDe(b) {
   return {
-    enemies: b.monstros.filter(m => m.custom || !m.base).map(m => ({ id: m.id, base: m.base || '', behaviour: m.comportamento || m.base || '', type: m.tipo, name: m.nome, plural: m.plural || m.nome, description: m.desc || '', size: m.size || 0, named: !!m.named, villain: !!m.villain,
+    enemies: b.monstros.filter(m => !ehOriginalDoJogo(m)).map(m => ({ id: m.id, base: m.base || '', behaviour: m.comportamento || m.base || '', type: m.tipo, name: m.nome, plural: m.plural || m.nome, description: m.desc || '', size: m.size || 0, named: !!m.named, villain: !!m.villain,
       tiers: (m.tiers || []).map(t => ({ tier: t.tier, health: t.hp, defense: t.def, attack: t.atk })), mechanical: m.mec || [], theme: m.tema || [], strength: m.strength || 0,
       weaknesses: (m.wr || []).map(w => ({ damage: w.dano, kind: w.tipo, when: w.quando || 'always' })), immune: m.imune || [],
       activations: (m.ativacoes || []).map(a => ({ ...a })), tactics: (m.taticas || []).map(a => ({ ...a, ...(a.efeitos ? { efeitos: efeitosExportados(a.efeitos) } : {}) })), loot: (m.loot || []).map(idItemExportado), sounds: sonsExportados(m), portrait: m.retrato || '', ...defesaExportada(m), ...efeitoDefesaExportado(m),
       ...(m.figura === 'standee' && standeeDoMonstro(m) ? { standee: standeeDoMonstro(m), standeeScale: m.escalaStandee || 1 } : {}), ...(m.figura === 'modelo' && m.modelo ? { model: m.modelo.arquivo, modelTexture: m.modeloTex || '', modelScale: m.escalaModelo || 1, modelTurn: m.giroModelo || 0 } : {}), ...(m.arteModo === 'imagem' && m.arte ? { art: m.arte, artScale: m.arteEscala ?? 1, artRaise: m.arteAltura ?? 0, artShift: m.arteLado ?? 0 } : {}) })),
-    items: b.itens.filter(i => i.custom || !i.base).map(i => ({ id: i.id, base: i.efeitoBase || i.base || '', kind: i.cls, name: comGlifoDoJogo(i.nome), description: i.desc || '', rarity: i.raridade || 1, value: i.valor || 0, unique: !!i.unico, weaponClass: i.classe || '', slot: i.slot || '', traits: i.traits || [], damage: i.dano || 0, ability: i.habilidade === '-' ? '' : i.habilidade || '', ...(i.cls === 'WeaponPartsModel' && !i.habilidade && i.habTexto ? { abilityText: i.habTexto, abilityChance: i.slot === 'A' ? 0 : (i.habChance ?? 30) } : {}), ...(i.cls === 'WeaponPartsModel' && i.habilidade === '-' ? { noAbility: true } : {}), ...(i.cls === 'CraftingMaterialModel' ? { materialType: +i.tipoMaterial || 0 } : {}), ...(layoutDaPecaPropria(i) ? { layout: layoutDaPecaPropria(i) } : {}), ...(i.cls === 'TrinketModel' && (i.disparos || []).length ? { triggers: disparosExportados(i.disparos) } : {}), portrait: i.retrato || '' })),
+    items: b.itens.filter(i => !ehOriginalDoJogo(i)).map(i => ({ id: i.id, base: i.efeitoBase || i.base || '', kind: i.cls, name: comGlifoDoJogo(i.nome), description: i.desc || '', rarity: i.raridade || 1, value: i.valor || 0, unique: !!i.unico, weaponClass: i.classe || '', slot: i.slot || '', traits: i.traits || [], damage: i.dano || 0, ability: i.habilidade === '-' ? '' : i.habilidade || '', ...(i.cls === 'WeaponPartsModel' && !i.habilidade && i.habTexto ? { abilityText: i.habTexto, abilityChance: i.slot === 'A' ? 0 : (i.habChance ?? 30) } : {}), ...(i.cls === 'WeaponPartsModel' && i.habilidade === '-' ? { noAbility: true } : {}), ...(i.cls === 'CraftingMaterialModel' ? { materialType: +i.tipoMaterial || 0 } : {}), ...(layoutDaPecaPropria(i) ? { layout: layoutDaPecaPropria(i) } : {}), ...(i.cls === 'TrinketModel' && (i.disparos || []).length ? { triggers: disparosExportados(i.disparos) } : {}), portrait: i.retrato || '' })),
     heroes: heroisExportados(),
     weapons: armasExportadas(),
     recipes: receitasExportadas(),
     skills: periciasExportadas(), feats: facanhasExportadas(), featPool: poolFacanhasExportado(),
     heroWeapons: (b.maos || []).map(x => ({ hero: x.id, weapons: x.classes.map(k => armaDaClasse(k)?._id).filter(Boolean) })).filter(x => x.weapons.length === 2),
-    characters: b.personagens.filter(p => p.custom || !p.base).map(p => { const cena = fonteDaCena(p, b);   // (v251: the picture in the scenes)
+    characters: b.personagens.filter(p => !ehOriginalDoJogo(p)).map(p => { const cena = fonteDaCena(p, b);   // (v251: the picture in the scenes)
       return { id: p.id, base: p.base || '', role: 'npc', name: p.nome, portrait: p.retrato || '', ...(cena ? { sceneArt: cena.img, sceneCrop: Math.round(cena.corte * 100) / 100 } : {}) }; }),
     // workshop tiles and objects: the squares (tile: relative to pos, turned by rot like a game tile; object: its footprint is also written on each placement) and the colour
     tiles: (b.pecas || []).map(v => ({ id: v.id, name: v.nome || 'Tile', cells: (v.cells || [[0, 0]]).map(c => [c[0], c[1]]), colour: v.cor || '#8a7a66',
@@ -124,7 +127,7 @@ const PODA_BESTIARIO = { pecas: 'tiles', objetos: 'objects', monstros: 'enemies'
 function podarBestiario(b, custom) {
   if (!b || !custom) return;
   Object.entries(PODA_BESTIARIO).forEach(([k, c]) => { if (!Array.isArray(b[k])) return; const ids = new Set((custom[c] || []).map(x => x && x.id));
-    b[k] = b[k].filter(x => !x || x.clone || !(x.custom || !x.base) || ids.has(x.id)); });
+    b[k] = b[k].filter(x => !x || x.clone || ehOriginalDoJogo(x) || ids.has(x.id)); });
 }
 function podarCustom(custom, docs) {
   if (!custom) return custom;
@@ -146,12 +149,37 @@ function podarCustom(custom, docs) {
 }
 /* the box a map needs: 2 when it uses a tile, an object or a monster of the Act II box, or more pieces of a kind than the
    Act I box holds (the menu of the game shows the box of the act on the map's card) */
+/* v261: the most pieces of each kind of terrain on the table at once (what the boxes must hold): when each room opens, the
+   rooms opened up to it (in their order; a room not yet open is still in the box) that are still on the table, and their
+   objects still there, without the marks of
+   "Move an object" (the same piece) and counting once the same piece in several states on one square. Before, the whole
+   map was counted, and a generated Act I map that reuses its pieces room after room asked for Act II */
+function terrenoNoPico(p) {
+  return comProjeto(p, () => { try { limparAbridores(); } catch { }
+    const fora = p.salas.map((s, si) => removidosAntes(si)); let mk = { objetos: new Set() }; try { mk = marcasDoMapa(p); } catch { }
+    const pico = {};
+    p.salas.forEach((s, si) => { const conta = {};
+      p.salas.forEach((x, j) => { if (j > si || fora[si].salas.has(j)) return; const vistos = new Set();
+        (x.objetos || []).forEach((o, oi) => { if (mk.objetos.has(j + ':' + oi) || fora[si].objetos.has(j + ':' + oi)) return; const g = grupoDoTerreno(o.type);
+          const k = g + '@' + (o.pos || []).join(',') + ':' + (o.level || 0); if (vistos.has(k)) return; vistos.add(k); conta[g] = (conta[g] || 0) + 1; }); });
+      Object.entries(conta).forEach(([g, n]) => { pico[g] = Math.max(pico[g] || 0, n); }); });
+    return pico; });
+}
 function atoNecessario(p) {
   const pecas = p.salas.flatMap(s => s.pecas || []); const objs = p.salas.flatMap(s => s.objetos || []);
   if (pecas.some(q => (PECA[q.tile]?.act || 1) > 1 || (q.pilares || []).some(x => x && x.type === 'PillarTall'))) return 2;
   if (objs.some(o => (OBJETO[baseObj(o.type)]?.act || 1) > 1)) return 2;
-  const conta = {}; objs.forEach(o => { const g = grupoDoTerreno(o.type); conta[g] = (conta[g] || 0) + 1; });
+  // (a map the generator made with the Act I box alone kept to its pieces, by its own count of what is on the table at once)
+  const soAto1 = !!(p.meta && p.meta.gerado && p.meta.gerado.atos === 1);
+  const conta = soAto1 ? {} : terrenoNoPico(p);
   if (Object.entries(conta).some(([g, n]) => { const c = TERRENO_POR_ATO[1][g]; return c !== undefined && n > c; })) return 2;
+  // (v261: more underlay cards of a pair than the Act I box has: the 4th card is in the Act II box. The cards that come and
+  // go by triggers, as the rising tide's, the generator counts at once on the table, and marks the map: alfombrasDoAto2)
+  if (p.meta && p.meta.alfombrasDoAto2) return 2;
+  const vemEVai = new Set(); p.salas.flatMap(s => s.objetos.concat(s.inimigos || [], s.grupoPool ? [s.grupoPool] : [])).concat(p.contadores || [], p.eventos || [])
+    .forEach(o => todosGatilhos(o).forEach(g => { if (g.tipo === 'add_tile' && g.peca !== undefined) vemEVai.add(g.sala + ':' + g.peca); }));
+  const alfs = {}; p.salas.forEach((s, si) => (s.pecas || []).forEach((q, pi) => { if (PECA[q.tile]?.kind === 'underlay' && !varPeca(q.tile) && !vemEVai.has(si + ':' + pi)) { const k = parDaAlfombra(q.tile); alfs[k] = (alfs[k] || 0) + 1; } }));
+  if (!soAto1 && Object.values(alfs).some(n => n > ALFOMBRAS_POR_ATO[1])) return 2;
   const ids = p.salas.flatMap(s => (s.inimigos || []).map(e => e.enemy).concat(s.objetos.flatMap(o => todosGatilhos(o).filter(g => g.tipo === 'spawn').flatMap(g => (g.inimigos || []).map(e => e.enemy)))))
     .concat((p.eventos || []).flatMap(ev => Object.keys(ev).filter(k => Array.isArray(ev[k])).flatMap(k => ev[k]).filter(g => g && g.tipo === 'spawn').flatMap(g => (g.inimigos || []).map(e => e.enemy))), p.reserva || []);
   if (ids.some(id => { const m = monstro(id); return m && (m.act || 1) > 1; })) return 2;
@@ -777,6 +805,9 @@ function abrirTerrenoDasCaixas() {
   const nome = g => g === 'Fichas' ? tr('Explore / sight tokens') : tr(nomeObj(g));
   const objetos = grupos.sort((x, y) => nome(x).localeCompare(nome(y))).map(g => campo(g, nome(g), estimativa(g), partilhaDe(g) ? tr(NOTA_PARTILHA) : '')).join('');
   const pilares = Object.keys(SUPORTES).map(t => campo('pilar:' + t, tr(SUPORTES[t].nome), [1, 2].reduce((n, a) => n + (a <= atos ? PILARES_POR_ATO[a][t] || 0 : 0), 0), tr('level') + ' ' + SUPORTES[t].nivel)).join('');
+  // (v261) the underlay cards: one entry per pair of faces (both faces share the cards)
+  const pares = [...new Set(Object.keys(VERSO_ALFOMBRA).map(parDaAlfombra))];
+  const alfombras = pares.map(k => campo('alfombra:' + k, tr('Underlay cards') + ' ' + [k, VERSO_ALFOMBRA[k]].map(x => tr(nomeAlfombra(x))).join(' / '), [1, 2].reduce((n, a) => n + (a <= atos ? ALFOMBRAS_POR_ATO[a] : 0), 0))).join('');
   // the tiles: one entry per physical tile (its two sides)
   const porNum = new Map(); PECAS.filter(t => t.kind === 'tile' && !['platform', 'vault', 'gamebox'].includes(t.id)).forEach(t => { const n = numeroDaPeca(t.id); if (!porNum.has(n)) porNum.set(n, []); porNum.get(n).push(t); });
   const pecas = [...porNum.entries()].sort((x, y) => (parseInt(x[0]) || 999) - (parseInt(y[0]) || 999) || String(x[0]).localeCompare(String(y[0]))).map(([n, l]) => campo('peca:' + n, tr('Tile') + ' ' + l.map(t => nomePeca(t.id)).join(' / '), (l[0].act || 1) <= atos ? 1 : 0, (l[0].act || 1) === 2 ? 'Act II' : 'Act I')).join('');
@@ -784,7 +815,7 @@ function abrirTerrenoDasCaixas() {
   const b = bestiario() || {}; const doUsuario = (b.objetos || []).filter(o => !o.clone).map(o => campo(o.id, o.nome || tr('Workshop object'), null)).concat((b.pecas || []).map(q => campo('peca:' + q.id, q.nome || tr('Workshop tile'), Math.max(1, +q.copias || 1)))).join('');
   const secao = (t, corpo, aberta) => `<details ${aberta ? 'open' : ''} class="secaoTerreno"><summary><b>${esc(t)}</b></summary><div class="terrenoCaixas">${corpo}</div></details>`;
   modal(tr('Pieces in your boxes'), `<p class="ajuda">${tr('How many of each piece you have: the generators use only these, and the object buttons show how many are on the table while a room is open. A blank field keeps the count of the boxes chosen (shown faded); ∞ means no limit. Players who put boxes together (two Act I boxes…) or made pieces by hand raise the numbers here.')} (${tr('Boxes')}: ${atos === 1 ? tr('Act I') : tr('Acts I and II')})</p>
-    ${secao(tr('3D objects and tokens'), objetos, true)}${secao(tr('Pillars that hold tiles'), pilares)}${secao(tr('Map tiles'), pecas)}${doUsuario ? secao(tr('Workshop pieces'), doUsuario) : ''}
+    ${secao(tr('3D objects and tokens'), objetos, true)}${secao(tr('Pillars that hold tiles'), pilares)}${secao(tr('Underlay cards'), alfombras)}${secao(tr('Map tiles'), pecas)}${doUsuario ? secao(tr('Workshop pieces'), doUsuario) : ''}
     <div class="rodape"><button data-o="est">${tr('Use the counts of the boxes')}</button><button data-o="nao">${tr('Cancel')}</button><button class="primario" data-o="ok">${tr('Save')}</button></div>`, (el, fechar) => {
     el.querySelector('[data-o="nao"]').onclick = fechar;
     el.querySelector('[data-o="est"]').onclick = () => { try { localStorage.removeItem('bigorna-terreno'); } catch { } fechar(); tudo(); aviso(tr('Piece counts: those of the boxes chosen.')); };

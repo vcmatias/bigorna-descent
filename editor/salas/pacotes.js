@@ -12,14 +12,14 @@ const FORMATO_PACOTE = 'bigorna-pacote';
 /* the kinds of a package: the list of the Workshop, its name, and which entries count as made by the user (new, changed,
    or holding something of their own) */
 const CATEGORIAS_PACOTE = [
-  { k: 'monstros', nome: 'Monsters', proprio: x => x.custom || !x.base, rotulo: x => x.nome },
-  { k: 'personagens', nome: 'NPCs', proprio: x => x.custom || !x.base, rotulo: x => x.nome },
-  { k: 'itens', nome: 'Items', proprio: x => x.custom || !x.base, rotulo: x => x.nome },
-  { k: 'armas', nome: 'Weapons', proprio: x => armaMudou(x), rotulo: x => x.nome || (armaPorId(x.id)?.name_en) || x.id },
-  { k: 'receitas', nome: 'Recipes', proprio: x => x.custom || !x.base || x.inicio, rotulo: x => nomeReceita(x) },
-  { k: 'facanhas', nome: 'Feats', proprio: x => x.custom || !x.base, rotulo: x => nomeFacanha(x) },
-  { k: 'pericias', nome: 'Skills', proprio: x => x.custom || !x.base || (x.cartas || []).length, rotulo: x => nomePericia(x) },
-  { k: 'herois', nome: 'Heroes', proprio: x => heroiMudou(x), rotulo: x => nomeDoHeroi(x.id) },
+  { k: 'monstros', nome: 'Monsters', proprio: x => !x.base, rotulo: x => x.nome },
+  { k: 'personagens', nome: 'NPCs', proprio: x => !x.base, rotulo: x => x.nome },
+  { k: 'itens', nome: 'Items', proprio: x => !x.base, rotulo: x => x.nome },
+  { k: 'armas', nome: 'Weapons', proprio: x => armaMudou(x) && !!(x.runa || x.nova), rotulo: x => x.nome || (armaPorId(x.id)?.name_en) || x.id },
+  { k: 'receitas', nome: 'Recipes', proprio: x => !x.base || x.inicio, rotulo: x => nomeReceita(x) },
+  { k: 'facanhas', nome: 'Feats', proprio: x => !x.base, rotulo: x => nomeFacanha(x) },
+  { k: 'pericias', nome: 'Skills', proprio: x => !x.base || (x.cartas || []).length, rotulo: x => nomePericia(x) },
+  { k: 'herois', nome: 'Heroes', proprio: x => !!x.novo, rotulo: x => nomeDoHeroi(x.id) },
   { k: 'pecas', nome: 'Tiles', proprio: () => true, rotulo: x => x.nome || x.id },
   { k: 'objetos', nome: 'Objects', proprio: () => true, rotulo: x => x.nome || x.id }
 ];
@@ -364,38 +364,64 @@ function abrirPacotesDaPasta() {
   }, true);
 }
 
-/* an entry of another package, on its sheet: it is read, not changed; "Change a copy" makes it one's own (the same id: the
-   maps that use it get the copy) */
+/* an entry of another package, on its sheet (v256, v257): it opens like one's own, and at the first change the editor asks:
+   change it (a version of one's own, with a new id and the same name, that takes the edits) or make a clone (another name);
+   either way the package's entry stays as it is, keeps the creator's new editions, and what uses it keeps using it. Only the
+   originals of the game stay shut, on their own sheets. The sheet's Delete leaves: an entry of a package goes with its
+   package (📚 My packages) */
 function entradaAberta() {
   const b = oficina();
   if (abaF === 'herois') return (b.herois || []).find(x => x.id === heroiSel);
   if (abaF === 'armas') return (b.armas || []).find(x => x.id === armaSel);
   const l = b[abaF]; return Array.isArray(l) ? l.find(x => x && x.id === fichaSel) : null;
 }
-function travarDoPacote() {
+// (a weapon's `base` is the game rune a rune of one's own copies: only a weapon of the game itself is a showcase)
+const vitrineDoJogo = x => !!(x && (abaF === 'armas' ? !x.runa && !x.nova : abaF === 'herois' ? !x.novo : x.base));
+const nomeDoPacote = x => { const p = PACOTES_DA_PASTA.find(q => q.id === x._doPacote); return p ? p.nome : x._doPacote; };
+function avisoDoPacote() {
   const x = entradaAberta(), c = $('#centroF'); if (!x || !doPacote(x) || !c || c.querySelector('.avisoPacote')) return;
-  const p = PACOTES_DA_PASTA.find(q => q.id === x._doPacote); const nome = p ? p.nome : x._doPacote;
-  c.querySelectorAll('input, select, textarea').forEach(e => { e.disabled = true; e.dataset.travado = '1'; });
-  c.querySelectorAll('[contenteditable="true"]').forEach(e => { e.setAttribute('contenteditable', 'false'); e.dataset.travado = '1'; });
-  c.querySelectorAll('button, .botaoArquivo').forEach(e => { if (!e.closest('.avisoPacote')) e.style.display = 'none'; });
+  c.querySelectorAll('.cabF .perigo, [data-iapaga]').forEach(e => { e.style.display = 'none'; });
   const av = document.createElement('div'); av.className = 'avisoPacote';
-  av.innerHTML = `<p class="ajuda aviso">${esc(tr('From the package'))} “<span data-sem-traducao>${esc(nome)}</span>”: ${esc(tr('it is read here and comes as the package is. To change it, change a copy: it goes into your Workshop, with the same id (what uses it gets your copy).'))} <button class="sm primario" id="f_copiaPacote">${esc(tr('✎ Change a copy'))}</button></p>`;
+  av.innerHTML = `<p class="ajuda">${esc(tr('From the package'))} “<span data-sem-traducao>${esc(nomeDoPacote(x))}</span>”. ${esc(tr(vitrineDoJogo(x) ? 'An original of the game: it stays as the game has it.' : 'To change it, the editor makes a version of yours, with a new ID (it asks at the first change); the package’s stays as it is. To take it out, remove the package (📚 My packages).'))}</p>`;
   c.prepend(av);
-  av.querySelector('#f_copiaPacote').onclick = () => {
-    const k = Object.keys(oficina()).find(k => Array.isArray(oficina()[k]) && oficina()[k].includes(x)); if (!k) return;
-    const y = clone(x); delete y._doPacote; delete y.pacote; const l = oficina()[k]; l[l.indexOf(x)] = y;
-    renderFichas(); aviso(tr('Now it is yours: the changes go into your Workshop.'));
-  };
 }
-/* (each time a sheet is drawn, whatever the tab: the entry of a package is read only) */
+/* the first change on the sheet of a package's entry: the question comes before anything changes */
+function pedirVersaoDoPacote(ev) {
+  const c = $('#centroF'); if (!c || c.closest('[hidden]') || !c.contains(ev.target) || ev.target.closest('.avisoPacote, .cabF, [data-irarma], [data-rolp], [data-rolk], [data-arol], summary')) return;   // (what only goes elsewhere asks nothing)
+  const x = entradaAberta(); if (!x || !doPacote(x) || vitrineDoJogo(x)) return;
+  const t = ev.target.closest('input, select, textarea, button, label, [contenteditable="true"], .botaoArquivo, canvas'); if (!t) return;
+  ev.preventDefault(); ev.stopPropagation(); if (ev.type === 'focusin' && t.blur) t.blur();
+  if (document.querySelector('.modal[data-versaopacote]')) return;
+  const f = escolherOpcao(tr('This belongs to the package') + ' “' + nomeDoPacote(x) + '”', [
+    { id: 'alterar', titulo: tr('Change it: a version of yours, with a new ID'), sub: tr('Same name; the changes go into it. It will not get the changes the creator releases in new editions of the package. The maps and entries that use the package’s keep using it.') },
+    { id: 'clone', titulo: tr('Create a clone'), sub: tr('A copy of your own, with another name; the package’s stays as it is, with its updates.') }
+  ], id => versaoDoPacote(x, id === 'clone'), esc(tr('The package’s entry stays as the creator made it.')));
+  f.dataset.versaopacote = '1';
+}
+document.addEventListener('pointerdown', pedirVersaoDoPacote, true);
+document.addEventListener('focusin', pedirVersaoDoPacote, true);
+function versaoDoPacote(x, comoClone) {
+  const b = oficina(); const k = Object.keys(b).find(q => Array.isArray(b[q]) && b[q].includes(x)); if (!k) return;
+  const nomeDe = z => k === 'receitas' ? nomeReceita(z) : k === 'pericias' ? nomePericia(z) : k === 'facanhas' ? nomeFacanha(z) : k === 'armas' ? (z.nova && z.nova.nome) || z.nome || '' : z.nome || '';
+  let nome = null;
+  if (comoClone && k !== 'receitas') { nome = nomeDaCopia(nomeDe(x), b[k].map(nomeDe)); if (!nome) return; }
+  const y = clone(x); delete y._doPacote; delete y.pacote; y.id = (k === 'pericias' ? 'pr' : k === 'herois' ? 'HN_' : 'B_') + uid();
+  if (k === 'herois') delete y.perfil;   // (the profile stays with the package's hero)
+  if (nome) { if (k === 'armas' && y.nova) y.nova.nome = nome; else y.nome = nome; }
+  if (k !== 'armas' && k !== 'herois' && !y.base) y.custom = true;
+  const l = b[k]; l.splice(l.indexOf(x) + 1, 0, y);
+  if (k === 'herois') heroiSel = y.id; else if (k === 'armas') { armaSel = y.id; forja = null; } else fichaSel = y.id;
+  renderFichas(); aviso(tr(comoClone ? 'Clone made: it is yours to change.' : 'Now this version is yours, with a new ID: change it here.'));
+}
+/* (each time a sheet is drawn, whatever the tab: the entry of a package says where it came from) */
 (() => { const c = document.getElementById('centroF'); if (!c || typeof MutationObserver === 'undefined') return; let pend = false;
-  new MutationObserver(() => { if (pend) return; pend = true; queueMicrotask(() => { pend = false; try { travarDoPacote(); } catch (e) { console.warn('package entry', e); } }); }).observe(c, { childList: true }); })();
+  new MutationObserver(() => { if (pend) return; pend = true; queueMicrotask(() => { pend = false; try { avisoDoPacote(); } catch (e) { console.warn('package entry', e); } }); }).observe(c, { childList: true }); })();
 
 /* v241: the file the mod reads of each package of the Pacotes folder (pacote.json: the package's "custom", as a map carries
    it), made when it is not there or is of another edition; the pictures it names go into the package's "imagens" folder */
 /* the revision of what the editor writes in a package's pacote.json: a file of an older revision is written again (v251: the
    pictures of the NPCs in the scenes) */
-const REV_PACOTE_MOD = 2;
+const REV_PACOTE_MOD = 3;   // (v255: the game's originals go by their ids only)
 async function garantirPacotesDoMod(pacotes) {
   if (!Arquivos.ativo || (typeof REDEFININDO !== 'undefined' && REDEFININDO)) return;
   for (const pk of pacotes || []) {

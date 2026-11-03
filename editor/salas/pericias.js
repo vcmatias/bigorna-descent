@@ -228,7 +228,7 @@ function jpegDaCarta(url) {
 
 /* the skills for the mod: the game's changed (name, cost) and the new ones tied to a hero; never the pictures */
 function periciasExportadas() {
-  return (oficina().pericias || []).filter(p => p.heroi && (!p.base || p.custom)).map(p => ({ id: idPericiaExportada(p), ...(p.base ? { game: p.base } : {}), hero: p.heroi, name: nomePericia(p), cost: p.custo || 1 }));
+  return (oficina().pericias || []).filter(p => p.heroi && !p.base).map(p => ({ id: idPericiaExportada(p), ...(p.base ? { game: p.base } : {}), hero: p.heroi, name: nomePericia(p), cost: p.custo || 1 }));
 }
 
 /* v249: like the feats, the skills belong to the hero: on the hero's sheet, a square for each skill by its XP cost (each hero of

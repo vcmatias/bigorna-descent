@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using Bigorna.Encontro;
@@ -35,6 +36,8 @@ namespace Bigorna.Campanha
         /// campanha comecada, o grupo de onde ela veio).</param>
         public static string Comecar(Dcamp c, bool recomecar, Encontro.GrupoDoSave.Save grupo = null)
         {
+            // (v263: a lista guarda as campanhas lidas; a partida segue com uma cópia lida agora)
+            if (c != null && !string.IsNullOrEmpty(c.Caminho) && File.Exists(c.Caminho)) try { c = Dcamp.Carregar(c.Caminho); } catch (Exception ex) { Log.Info("relendo a campanha para jogar: " + ex.Message); }
             if (c.PacotesFaltando != null && c.PacotesFaltando.Count > 0) return Acervo.Acervo.TextoFaltam(c.PacotesFaltando);
             try
             {

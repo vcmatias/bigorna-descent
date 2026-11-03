@@ -13,7 +13,9 @@ namespace Bigorna
         public static string PastaMapas => Path.Combine(Application.persistentDataPath, "CustomMaps");
         /// <summary>Os pacotes baixados do acervo (conteudo da Oficina que os mapas exigem), ao lado de CustomMaps.</summary>
         public static string PastaPacotes => Path.Combine(Application.persistentDataPath, "Pacotes");
-        public static string CaminhoLog => Path.Combine(Application.persistentDataPath, "bigorna.log");
+        static string _caminhoLog;
+        /// <summary>(v263: guardado na primeira vez, na linha principal: a leitura ao fundo também escreve no registro)</summary>
+        public static string CaminhoLog => _caminhoLog ?? (_caminhoLog = Path.Combine(Application.persistentDataPath, "bigorna.log"));
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         public static void Init()

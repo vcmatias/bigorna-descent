@@ -56,29 +56,90 @@ namespace Bigorna.Menu
         public static void Alternar()
         {
             _aberto = !_aberto;
-            if (_aberto) Reler();
+            if (_aberto) RelerAoFundo();
         }
 
-        public static void Reler()
+        /* v263: a pasta e lida com os arquivos ja lidos guardados (Dmap.Lembrado): so o novo ou mudado e lido de novo. Ao abrir
+           a tela, e a cada 5 s com o painel aberto, a leitura vai ao fundo (RelerAoFundo): a tela abre na hora com a lista que
+           ja havia e se atualiza quando a leitura acaba. Na tela de titulo a leitura comeca sozinha (Aquecer), entao o
+           primeiro clique ja encontra tudo lido. Reler (direto) fica para quem precisa da lista nova na mesma hora (depois de
+           baixar ou remover um pacote); com o guardado, ele e rapido. */
+        class Leitura { public List<Dcamp> Campanhas; public List<Dmap> Mapas; public Dictionary<object, DateTime> Alterados; public string Erro; public double Segundos; }
+        static System.Threading.Tasks.Task<Leitura> _lendo;
+        static readonly List<Action> _aoLer = new List<Action>();
+        /// <summary>Uma leitura ao fundo em andamento.</summary>
+        public static bool Lendo => _lendo != null;
+        /// <summary>A pasta ja foi lida ao menos uma vez (a tela pode mostrar a lista que ha).</summary>
+        public static bool JaLida { get; private set; }
+
+        static void AntesDeLer()
         {
             _progressos.Clear();
             MapasOficiais.Reler();
             // (os arquivos que o editor baixou vem de Downloads para a pasta de mapas)
             try { RecolhaDosDownloads.Recolher(Bootstrap.PastaMapas); } catch (Exception ex) { Log.Info("recolha: " + ex.Message); }
+        }
+
+        static Leitura Ler(string pasta, string pacotes)
+        {
+            var r = new Leitura(); var t0 = DateTime.UtcNow;
             try
             {
-                _campanhas = Dcamp.CarregarTodas(Bootstrap.PastaMapas);
-                var pastasDeCampanha = new HashSet<string>(_campanhas.Select(c => c.Pasta), StringComparer.OrdinalIgnoreCase);
-                _mapas = Dmap.CarregarTodos(Bootstrap.PastaMapas);
-                foreach (var sub in Directory.GetDirectories(Bootstrap.PastaMapas))
-                    if (!pastasDeCampanha.Contains(sub)) _mapas.AddRange(Dmap.CarregarTodos(sub)); // os mapas de campanha jogam-se pela campanha
-                _alterados.Clear();
-                foreach (var c in _campanhas) _alterados[c] = AlteradoDaCampanha(c);
-                foreach (var m in _mapas) _alterados[m] = Alterado(m.Caminho);
-                _erro = null;
+                r.Campanhas = Dcamp.CarregarTodas(pasta, pacotes, true);   // (v264: só a ficha de cada arquivo)
+                var pastasDeCampanha = new HashSet<string>(r.Campanhas.Select(c => c.Pasta), StringComparer.OrdinalIgnoreCase);
+                r.Mapas = Dmap.CarregarTodos(pasta, pacotes, true);
+                foreach (var sub in Directory.GetDirectories(pasta))
+                    if (!pastasDeCampanha.Contains(sub)) r.Mapas.AddRange(Dmap.CarregarTodos(sub, pacotes, true)); // os mapas de campanha jogam-se pela campanha
+                r.Alterados = new Dictionary<object, DateTime>();
+                foreach (var c in r.Campanhas) r.Alterados[c] = AlteradoDaCampanha(c);
+                foreach (var m in r.Mapas) r.Alterados[m] = Alterado(m.Caminho);
             }
-            catch (Exception ex) { _erro = T("Não li a pasta: ", "Could not read the folder: ") + ex.Message; }
+            catch (Exception ex) { r.Erro = T("Não li a pasta: ", "Could not read the folder: ") + ex.Message; }
+            r.Segundos = (DateTime.UtcNow - t0).TotalSeconds;
+            return r;
+        }
+
+        static void Aplicar(Leitura r)
+        {
+            if (r.Erro == null) { _campanhas = r.Campanhas; _mapas = r.Mapas; _alterados.Clear(); foreach (var kv in r.Alterados) _alterados[kv.Key] = kv.Value; }
+            _erro = r.Erro; JaLida = true;
             _proximaLeitura = Time.unscaledTime + 5f;
+        }
+
+        /// <summary>A pasta lida agora, nesta linha (rapido com o guardado; o primeiro de todos le tudo).</summary>
+        public static void Reler()
+        {
+            AntesDeLer();
+            Aplicar(Ler(Bootstrap.PastaMapas, Acervo.Pacotes.Carimbo()));
+        }
+
+        /// <summary>A pasta lida ao fundo; pronto (na linha principal) quando acabar. Uma leitura em andamento serve.</summary>
+        public static void RelerAoFundo(Action pronto = null)
+        {
+            if (pronto != null) _aoLer.Add(pronto);
+            _proximaLeitura = Time.unscaledTime + 5f;
+            if (_lendo != null) return;
+            AntesDeLer();
+            string pasta = Bootstrap.PastaMapas, pacotes = Acervo.Pacotes.Carimbo();
+            // (a lingua do jogo vem da Unity, que so responde na linha principal: lida aqui, vale para a leitura toda)
+            try { Traducao.LinguaCongelada = Traducao.LinguaDoJogoAgora?.Invoke(); } catch { Traducao.LinguaCongelada = null; }
+            _lendo = System.Threading.Tasks.Task.Run(() => Ler(pasta, pacotes));
+        }
+
+        /// <summary>Na tela de titulo: a pasta lida ao fundo, uma vez, para o primeiro clique encontrar tudo pronto.</summary>
+        public static void Aquecer() { if (!JaLida && _lendo == null) RelerAoFundo(); }
+
+        /// <summary>A cada quadro: a leitura ao fundo acabou? A lista nova entra e quem esperava e avisado.</summary>
+        public static void Batimento()
+        {
+            if (_lendo == null || !_lendo.IsCompleted) return;
+            var t = _lendo; _lendo = null; Traducao.LinguaCongelada = null;
+            Leitura r;
+            try { r = t.Result; } catch (Exception ex) { r = new Leitura { Erro = T("Não li a pasta: ", "Could not read the folder: ") + (ex.InnerException ?? ex).Message }; }
+            Aplicar(r);
+            Log.Info("mapas da comunidade lidos ao fundo: " + (r.Campanhas?.Count ?? 0) + " campanha(s), " + (r.Mapas?.Count ?? 0) + " mapa(s) em " + r.Segundos.ToString("0.0") + " s (" + Dmap.Guardados + " arquivo(s) guardados)");
+            var esperando = _aoLer.ToList(); _aoLer.Clear();
+            foreach (var a in esperando) try { a(); } catch (Exception ex) { Log.Erro("depois de ler os mapas", ex); }
         }
 
         static void Estilos()
@@ -109,7 +170,7 @@ namespace Bigorna.Menu
                 if (GUI.Button(botao, _aberto ? T("Fechar mapas", "Close maps") : T("Mapas da comunidade", "Community maps"), _botao)) Alternar();
             }
             if (!_aberto) return;
-            if (Time.unscaledTime > _proximaLeitura) Reler();
+            if (Time.unscaledTime > _proximaLeitura) RelerAoFundo();
             float largura = Mathf.Min(760f, Screen.width - 40f), altura = Mathf.Min(Screen.height - 140f, 620f);
             var janela = new Rect((Screen.width - largura) / 2f, 60f, largura, altura);
             GUI.Box(janela, GUIContent.none, _janela);

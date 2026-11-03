@@ -31,6 +31,7 @@ namespace Bigorna
             try { Depuracao.Teclas(); } catch (Exception ex) { Log.Erro("modo de teste", ex); }
             try { VigiarCena(); } catch (Exception ex) { Log.Erro("vigiando a cena", ex); }
             try { Menu.BotaoDoMenu.Batimento(); } catch (Exception ex) { Log.Erro("botão do menu", ex); }
+            try { Menu.PainelMapas.Batimento(); if (Jogo.CenaAtual() == Scene.Titlescene) Menu.PainelMapas.Aquecer(); } catch (Exception ex) { Log.Erro("lendo os mapas da comunidade", ex); }   // (v263: a pasta lida ao fundo; na tela de título, antes do primeiro clique)
             try { Campanha.SavesDaComunidade.Batimento(); } catch (Exception ex) { Log.Erro("partidas da comunidade", ex); }
             try { Menu.Atualizacao.Batimento(); } catch (Exception ex) { Log.Erro("atualização", ex); }
             try { MusicaPropria.Batimento(); } catch { }
@@ -40,7 +41,11 @@ namespace Bigorna
             try { VozesProprias.Batimento(); } catch (Exception ex) { Log.Erro("sons dos monstros", ex); }
             // enquanto o jogo grava a partida, nada entra nem sai da mesa (a gravacao cairia no meio)
             bool salvando = Jogo.Salvando;
-            if (salvando != _salvandoAntes) { _salvandoAntes = salvando; if (Jogo.EmEncontro) Log.Info(salvando ? "o jogo está gravando: o roteiro espera" : "gravação concluída: o roteiro segue"); }
+            if (salvando != _salvandoAntes)
+            {
+                _salvandoAntes = salvando; if (Jogo.EmEncontro) Log.Info(salvando ? "o jogo está gravando: o roteiro espera" : "gravação concluída: o roteiro segue");
+                try { Retomada.AoGravar(salvando); } catch (Exception ex) { Log.Erro("partida em andamento", ex); }   // (v265: o mapa oneshot deixado no meio continua depois)
+            }
             if (!salvando)
             {
                 try { Dialogos.Batimento(); } catch (Exception ex) { Log.Erro("fila de quadros", ex); }
@@ -52,6 +57,7 @@ namespace Bigorna
                 try { Encontro.Apetrechos.Batimento(); } catch (Exception ex) { Log.Erro("apetrechos", ex); }
                 try { Encontro.Escolta.Batimento(); } catch (Exception ex) { Log.Erro("escolta", ex); }
                 try { Encontro.FacanhasProprias.Batimento(); } catch (Exception ex) { Log.Erro("prêmio das façanhas", ex); }
+                try { Menu.NovoJogoMais.Batimento(); } catch (Exception ex) { Log.Erro("Novo jogo +", ex); }   // (v262: a partida marcada, acertada fora das gravações)
             }
             if (_cenaAnterior == Scene.Worldmap || _cenaAnterior == Scene.City) { try { Campanha.Campanha.Batimento(); } catch (Exception ex) { Log.Erro("campanha", ex); } try { Campanha.MapaProprio.Batimento(); } catch (Exception ex) { Log.Erro("mapa próprio", ex); } }
             if (Time.unscaledTime >= _proximaVigilia)

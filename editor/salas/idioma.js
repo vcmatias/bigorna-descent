@@ -16,21 +16,80 @@
 
 const IDIOMAS = [['en', 'English'], ['pt', 'Português (Brasil)']];
 const IDIOMA = (() => {
+  // (v258, v259: the mod's one-shot generator says the language of the game, ?lingua=<code>: the interface is in Portuguese for
+  //  pt and in English for the others; the texts of the map follow LINGUA_TEXTOS)
+  try { const m = /[?&]lingua=([a-z]{2}(?:-[a-z]{2})?)(&|$)/.exec(location.search || ''); if (m) return m[1] === 'pt' ? 'pt' : 'en'; } catch { }
   try { const v = localStorage.getItem('bigorna-idioma'); if (v === 'en' || v === 'pt') return v; } catch { }
   if (window.BIGORNA_IDIOMA === 'pt' || window.BIGORNA_IDIOMA === 'en') return window.BIGORNA_IDIOMA;   // picked in the installer or in the mod's panel
   const l = (window.BIGORNA_JOGO || {}).lang;
   return typeof l === 'string' && /^pt/i.test(l) ? 'pt' : 'en';
 })();
-/* texts written in both languages: L2(en, pt), T2({en, pt}), TXT of {en, pt} (a list: its first), LP() the key */
-const LP = () => IDIOMA === 'pt' ? 'pt' : 'en';
-const L2 = (en, pt) => IDIOMA === 'pt' ? pt : en;
+/* v259: the language of the texts a map is written in (the generator): the editor's own (pt or en) or, in the mod's one-shot
+   generator, any language of the game (?gerador=1&lingua=<code>). For a language other than pt and en, a text is its English
+   one looked up in the table of that language (GERADOR_TRAD[<code>], from bigorna-gerador-<code>.js: the texts of the
+   generator and of its stories, keyed by a hash of the English), the English when it is not there. A sentence made of pieces (a name drawn, a number) is looked up as its template: each piece already given by the table
+   (the longest first, a whole word) becomes {s0}, {s1}…, each number {n0}, {n1}…, and the table's sentence gets them back.
+   The pseudo-language qq marks every text it looks up (⟦…⟧) and the collector (window._coletaTrad) gets the templates:
+   that is how the list to translate is made (tools/gerador_trad) */
+const LINGUA_TEXTOS = (() => { try { const s = location.search || ''; const m = /[?&]lingua=([a-z]{2}(?:-[a-z]{2})?)(&|$)/.exec(s); if (m && /[?&]gerador=1(&|$)/.test(s)) return m[1]; } catch { } return IDIOMA; })();
+const OUTRA_LINGUA = LINGUA_TEXTOS !== 'en' && LINGUA_TEXTOS !== 'pt';
+/* the key of an English text in the tables: FNV-1a of the text, 8 hex digits */
+const chaveDoTexto = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16).padStart(8, '0'); };
+/* the numbers of a text, outside its own marks ({vilao}, [n], <style=…>, {#var}), as {n0}, {n1}… */
+const numerosDoModelo = (s, nums) => s.split(/(\{[^{}]*\}|\[[^\[\]]*\]|<[^<>]*>)/).map((p, i) => i % 2 ? p : p.replace(/\d+/g, d => '{n' + (nums.push(d) - 1) + '}')).join('');
+const _pecasDadas = new Map();   // a text the table gave → its length in English (the pieces a later sentence may carry)
+const _letra = /[\p{L}\p{N}]/u;
+function modeloDoTexto(en) {
+  const pecas = [], nums = []; let t = en;
+  if (_pecasDadas.size) {
+    const cands = [..._pecasDadas.keys()].filter(x => x.length < t.length && t.includes(x)).sort((a, b) => b.length - a.length || (a < b ? -1 : 1));
+    for (const x of cands) { let i = 0, out = '', achou = false;
+      while (true) { const k = t.indexOf(x, i); if (k < 0) break;
+        const antes = k > 0 ? t[k - 1] : '', depois = t[k + x.length] || '';
+        if ((antes && _letra.test(antes) && _letra.test(x[0])) || (depois && _letra.test(depois) && _letra.test(x[x.length - 1]))) { out += t.slice(i, k + 1); i = k + 1; continue; }
+        let n = pecas.indexOf(x); if (n < 0) n = pecas.push(x) - 1; out += t.slice(i, k) + '\u0001' + String.fromCharCode(0x41 + n) + '\u0002'; i = k + x.length; achou = true; }
+      if (achou) t = out + t.slice(i); }
+  }
+  // (the pieces numbered in the order they come in the sentence: the same sentence, the same template)
+  const ordem = []; t.replace(/\u0001([A-Z])\u0002/g, (m, c) => { const k = c.charCodeAt(0) - 0x41; if (!ordem.includes(k)) ordem.push(k); return m; });
+  t = numerosDoModelo(t, nums).replace(/\u0001([A-Z])\u0002/g, (m, c) => '{s' + ordem.indexOf(c.charCodeAt(0) - 0x41) + '}');
+  return { t, pecas: ordem.map(k => pecas[k]), nums };
+}
+const _registrar = (en, saida) => { if (en.length < 3 || !saida) return; _pecasDadas.set(saida, en.length);
+  const c = saida.charAt(0), C = c.toUpperCase(), l = c.toLowerCase(); if (C !== c) _pecasDadas.set(C + saida.slice(1), en.length); if (l !== c) _pecasDadas.set(l + saida.slice(1), en.length); };
+const recomecarTraducao = () => _pecasDadas.clear();   // (at the start of each map)
+/* a text in the language made from the table's (a template filled with names): a piece, too, for the sentences that carry it */
+const pecaNaLingua = s => { if (OUTRA_LINGUA && typeof s === 'string' && s.length >= 3) _registrar('...', s); return s; };
+const TRADZ = en => { if (!OUTRA_LINGUA || typeof en !== 'string' || !en) return en;
+  const qq = LINGUA_TEXTOS === 'qq';
+  const tab = !qq && typeof window !== 'undefined' && window.GERADOR_TRAD ? window.GERADOR_TRAD[LINGUA_TEXTOS] : null;
+  if (!qq && !tab) return en;
+  if (_pecasDadas.has(en)) return en;   // (a text the table already gave, passed again: it is in the language)
+  if (tab) { const v = tab[chaveDoTexto(en)]; if (typeof v === 'string' && v) { _registrar(en, v); return v; } }
+  const m = modeloDoTexto(en);
+  if (qq) { if (typeof window !== 'undefined' && window._coletaTrad) window._coletaTrad(m.t, en); const o = '\u27e6' + en + '\u27e7'; _registrar(en, o); return o; }   // (a test language: every text it would look up comes marked)
+  const v = m.t === en ? null : tab[chaveDoTexto(m.t)];
+  if (typeof v !== 'string' || !v) { if (typeof window !== 'undefined' && window._faltaTrad) window._faltaTrad(m.t, en); return en; }   // (the tests count what is missing)
+  const r = v.replace(/\{([sn])(\d+)\}/g, (x, k, n) => { const a = k === 's' ? m.pecas[+n] : m.nums[+n]; return a !== undefined ? a : x; });
+  _registrar(en, r); return r; };
+/* texts written in both languages: L2(en, pt), T2({en, pt}), TXT of {en, pt} (a list: its first), LP() the key, EM the list
+   of {en: [...], pt: [...]} in the language of the texts (the same length: a draw picks the same one in every language) */
+const LP = () => LINGUA_TEXTOS === 'pt' ? 'pt' : 'en';
+const L2 = (en, pt) => LINGUA_TEXTOS === 'pt' ? pt : OUTRA_LINGUA ? TRADZ(en) : en;
+const LF = (en, pt, ...v) => { const r = L2(en, pt).replace(/\{(\d+)\}/g, (m, k) => v[+k] !== undefined ? v[+k] : m); return OUTRA_LINGUA ? pecaNaLingua(r) : r; };
+const EM = x => { if (!x) return []; if (OUTRA_LINGUA) return Array.isArray(x[LINGUA_TEXTOS]) ? x[LINGUA_TEXTOS] : (x.en || []).map(TRADZ); return x[LP()] || x.en || []; };
 /* a text that goes into the exported file (the players read it in the game): in the language of the work being exported
    (the original, or the language a translated copy is being exported in), not in the language of the editor */
-const LE2 = (en, pt) => { let l = '', o = ''; try { o = linguaOriginal(); l = LINGUA_EDICAO || o; } catch { l = o = IDIOMA; }
+const LE2 = (en, pt) => { if (OUTRA_LINGUA) return TRADZ(en); let l = '', o = ''; try { o = linguaOriginal(); l = LINGUA_EDICAO || o; } catch { l = o = IDIOMA; }
   // (a language other than these two keeps the original's text: only the author's own translations go into the file)
   if (!/^(pt|en)/.test(l || '')) l = o; return /^pt/.test(l || '') ? pt : en; };
+const LEF = (en, pt, ...v) => { const r = LE2(en, pt).replace(/\{(\d+)\}/g, (m, k) => v[+k] !== undefined ? v[+k] : m); return OUTRA_LINGUA ? pecaNaLingua(r) : r; };
+/* a pronoun (she, his…) that goes inside an English sentence looked up whole: it stays English there, so the table has the
+   sentence with it (each language agrees it its own way); in Portuguese, the Portuguese */
+const PRON = (en, pt) => LINGUA_TEXTOS === 'pt' ? pt : en;
 const T2 = o => L2(o.en, o.pt);
-const TXT = o => { if (typeof o === 'string') return o; const v = o ? (o[LP()] || o.en || '') : ''; return Array.isArray(v) ? (v[0] || '') : v; };
+const TXT = o => { if (typeof o === 'string') return o; if (OUTRA_LINGUA && o && o[LINGUA_TEXTOS] == null) { const v = o.en || ''; return TRADZ(Array.isArray(v) ? (v[0] || '') : v); }
+  const v = o ? (o[OUTRA_LINGUA ? LINGUA_TEXTOS : LP()] || o.en || '') : ''; return Array.isArray(v) ? (v[0] || '') : v; };
 
 const tr = (() => {
   if (IDIOMA === 'en') return s => s;

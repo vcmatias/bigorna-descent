@@ -56,7 +56,9 @@ namespace Bigorna.Encontro
                 if (r == null) { Log.Info("  receita do jogo «" + jogo + "» não existe"); return false; }
                 var alvo = r; var ing = r.Ingredients; var v = r.Value; var cr = r.CraftedItemId; var kn = r.KeyName; var kd = r.KeyDescription; var tx = r.TextureAssetPath;
                 _desfazer.Add(() => { alvo.Ingredients = ing; alvo.Value = v; alvo.CraftedItemId = cr; alvo.KeyName = kn; alvo.KeyDescription = kd; alvo.TextureAssetPath = tx; });
-                r.Ingredients = custos; r.Value = valor;
+                // (v255: a recipe of the game sent by its id only stays as the game has it, in the language of the game)
+                if (j["ingredients"] != null) r.Ingredients = custos;
+                if (j["value"] != null) r.Value = valor;
                 if (item != null && item.Id != r.CraftedItemId) { r.CraftedItemId = item.Id; r.KeyName = item.KeyName; r.KeyDescription = item.KeyDescription; r.TextureAssetPath = item.GetTextureAssetPath(); }
             }
             else
@@ -73,7 +75,7 @@ namespace Bigorna.Encontro
                 NaColecao("Recipes", id, r);
             }
             if ((bool?)j["start"] == true) _iniciais.Add(r);
-            Log.Info("  receita " + r.Id + " → " + r.CraftedItemId + ": " + string.Join(", ", custos.Select(c => c.Qty + " " + c.Material.Id).ToArray()));
+            Log.Info("  receita " + r.Id + " → " + r.CraftedItemId + ": " + string.Join(", ", (r.Ingredients ?? new RecipeModel.MaterialCost[0]).Where(c => c.Material != null).Select(c => c.Qty + " " + c.Material.Id).ToArray()));
             return true;
         }
 

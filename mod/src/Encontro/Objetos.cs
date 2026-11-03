@@ -117,12 +117,18 @@ namespace Bigorna.Encontro
         {
             Postos.Clear();
             _prefabs.Clear();
+            _aApresentar.Clear();
         }
+
+        /// <summary>v265: objetos ja decididos que esperam o aviso deles para aparecer (contam como a vista numa gravacao).</summary>
+        static readonly HashSet<NaMesa> _aApresentar = new HashSet<NaMesa>();
 
         public static NaMesa Pegar(int indice) => indice >= 0 && indice < Postos.Count ? Postos[indice] : null;
         public static bool Usado(int indice) => Pegar(indice)?.Usado == true;
 
-        public static IEnumerator Colocar(Dmap m)
+        /// <summary>Planta os objetos do mapa. restaurando (v265, partida retomada): sem os avisos de montagem; cada um fica
+        /// escondido ate o estado da partida (Restaurar) dizer como estava.</summary>
+        public static IEnumerator Colocar(Dmap m, bool restaurando = false)
         {
             Postos.Clear();
             var lista = m.Spawns.Objetos;
@@ -162,7 +168,7 @@ namespace Bigorna.Encontro
                 }
                 catch (Exception ex) { Log.Erro("plantando «" + o.Tipo + "»", ex); }
             }
-            ApresentarEmGrupos(iniciais);
+            if (!restaurando) ApresentarEmGrupos(iniciais);
             if (terreno) { yield return null; Tabuleiro.RefazerGradeAgora(); }
             Log.Info("objetos do mapa: " + Postos.Count + " (" + Postos.Count(p => p.Corpo != null) + " no tabuleiro)");
         }
@@ -400,6 +406,7 @@ namespace Bigorna.Encontro
         static void ApresentarEmGrupos(List<NaMesa> lista)
         {
             var todos = lista.Where(p => p != null && p.Dados != null).ToList();
+            foreach (var p in todos) _aApresentar.Add(p);
             for (int k = 0; k < todos.Count; k += PorGrupo) ApresentarGrupo(todos.Skip(k).Take(PorGrupo).ToList(), k == 0);
         }
 
@@ -420,6 +427,7 @@ namespace Bigorna.Encontro
                 foreach (var p in grupo)
                 {
                     // escondido (hideObject) ou retirado com a peca enquanto o aviso esperava na fila: nao aparece
+                    _aApresentar.Remove(p);
                     if (p.EscondidoPorAcao) continue;
                     var o = p.Dados;
                     try
@@ -678,6 +686,65 @@ namespace Bigorna.Encontro
             if (int.TryParse(usos, out var n) && n > 0) return p.Vezes >= n;
             return true; // um uso, como no jogo
         }
+
+        // ------------------------------------------------------------ v265: a partida em andamento
+        /// <summary>Cada objeto agora: usado, quantas vezes, a vista ou nao, a sala que espera, onde esta.</summary>
+        public static List<EstadoDoMapa.ObjetoE> Exportar() => Postos.Where(p => p != null).Select(p => new EstadoDoMapa.ObjetoE
+        {
+            I = p.Indice, Usado = p.Usado, Vezes = p.Vezes, Grupo = p.Grupo, Escondido = p.Escondido, EscondidoPorAcao = p.EscondidoPorAcao,
+            Visivel = p.Visivel || (_aApresentar.Contains(p) && !p.EscondidoPorAcao && !p.Usado),
+            Pos = p.Dados?.Pos, Rot = p.Dados?.Rot ?? 0, Nivel = p.Dados?.Nivel ?? 0
+        }).ToList();
+
+        /// <summary>Antes de plantar: os objetos movidos por gatilho entram no lugar onde estavam.</summary>
+        public static void AplicarPosicoes(Dmap m, List<EstadoDoMapa.ObjetoE> lista)
+        {
+            var objs = m?.Spawns?.Objetos; if (objs == null || lista == null) return;
+            foreach (var e in lista)
+            {
+                if (e == null || e.I < 0 || e.I >= objs.Count || e.Pos == null || e.Pos.Length < 2) continue;
+                var o = objs[e.I]; o.Pos = new[] { e.Pos[0], e.Pos[1] }; o.Rot = e.Rot; o.Nivel = e.Nivel;
+            }
+        }
+
+        /// <summary>Depois de plantar: cada objeto como estava, sem os avisos de montagem (a vista aparece ja no lugar).</summary>
+        public static void Restaurar(List<EstadoDoMapa.ObjetoE> lista)
+        {
+            if (lista == null) return;
+            int vistos = 0;
+            foreach (var e in lista)
+            {
+                var p = Pegar(e?.I ?? -1); if (p == null) continue;
+                p.Usado = e.Usado; p.Vezes = e.Vezes; p.Grupo = e.Grupo; p.EscondidoPorAcao = e.EscondidoPorAcao;
+                if (e.Visivel && p.Corpo != null)
+                {
+                    p.Escondido = false; p.Corpo.SetActive(true);
+                    if (p.Vista != null) try { p.Vista.SetVisibility(true, false); } catch { }
+                    foreach (var c in p.Corpo.GetComponentsInChildren<Clicavel>(true)) c.gameObject.SetActive(true);
+                    vistos++;
+                }
+                else
+                {
+                    p.Escondido = true;
+                    if (p.Corpo != null) { if (p.Vista != null) try { p.Vista.SetVisibility(false, false); } catch { } p.Corpo.SetActive(false); }
+                }
+            }
+            Log.Info("objetos como estavam: " + vistos + " à vista, " + lista.Count(x => x != null && x.Usado) + " usado(s)");
+        }
+
+        /// <summary>As entidades do jogo nos objetos que o mod pos.</summary>
+        public static IEnumerable<string> EntidadesNossas()
+        {
+            foreach (var p in Postos)
+            {
+                if (p?.Corpo == null) continue;
+                foreach (var ge in p.Corpo.GetComponentsInChildren<FFG.Core.GameEntity>(true)) if (ge != null && !string.IsNullOrEmpty(ge.GUID)) yield return ge.GUID;
+            }
+        }
+
+        /// <summary>Os objetos a vista agora, com a casa (para a mesa remontar o tabuleiro ao retomar); os pilares vao com as pecas.</summary>
+        public static List<string> VisiveisNaMesa() => Postos.Where(p => p != null && p.Visivel && p.Dados != null && p.Dados.DaPeca < 0)
+            .Select(p => p.Rotulo + (string.Equals(p.Rotulo, Nome(p.Dados.Tipo)) ? "" : " (" + Nome(p.Dados.Tipo) + ")") + (p.Dados.TemPosicao ? " " + p.Dados.X + "," + p.Dados.Y : "") + (p.Dados.Nivel > 0 ? Idioma.T(", nível ", ", level ") + p.Dados.Nivel : "")).ToList();
 
         public static void Reabrir(int indice)
         {

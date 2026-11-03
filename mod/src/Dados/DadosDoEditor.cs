@@ -92,6 +92,26 @@ namespace Bigorna.Dados
 
         /// <summary>Os arquivos do aplicativo, embutidos na DLL (Bigorna.App.*), em PastaApp: so os que mudaram. Com o aplicativo
         /// aberto, o .exe fica preso: vai na proxima vez. A copia antiga, da pasta Editor (a 0.2.0 de teste), sai.</summary>
+        /// <summary>v258: o aplicativo instalado e o da DLL (o .exe igual ao embutido)? O gerador do "Mapa oneshot" precisa dele;
+        /// se nao estiver, tenta instalar agora (com o editor aberto, o .exe fica preso e nao da).</summary>
+        public static bool AppEmDia(bool instalar)
+        {
+            bool igual()
+            {
+                try
+                {
+                    var asm = typeof(DadosDoEditor).Assembly; var r = asm.GetManifestResourceNames().FirstOrDefault(n => n == "Bigorna.App.Bigorna_Editor.exe"); if (r == null || !File.Exists(ArquivoApp)) return false;
+                    byte[] novo; using (var st = asm.GetManifestResourceStream(r)) { var ms = new MemoryStream(); st.CopyTo(ms); novo = ms.ToArray(); }
+                    var velho = File.ReadAllBytes(ArquivoApp); return velho.Length == novo.Length && velho.SequenceEqual(novo);
+                }
+                catch { return false; }
+            }
+            if (igual()) return true;
+            if (!instalar) return false;
+            try { InstalarApp(); } catch (Exception ex) { Log.Info("aplicativo do editor: " + ex.Message); }
+            return igual();
+        }
+
         static void InstalarApp()
         {
             var asm = typeof(DadosDoEditor).Assembly;
@@ -164,6 +184,27 @@ namespace Bigorna.Dados
                 }
                 File.WriteAllBytes(ArquivoEditor, novo);
                 Log.Info("editor instalado: " + ArquivoEditor);
+            }
+            InstalarTabelasDoGerador();
+        }
+
+        /// <summary>v259: as tabelas dos textos do gerador de mapas nas linguas do jogo (o mapa oneshot), embutidas na DLL
+        /// (Bigorna.Gerador.&lt;lingua&gt;.js), gravadas ao lado do editor como bigorna-gerador-&lt;lingua&gt;.js, se diferentes.</summary>
+        static void InstalarTabelasDoGerador()
+        {
+            var asm = typeof(DadosDoEditor).Assembly;
+            foreach (var r in asm.GetManifestResourceNames().Where(n => n.StartsWith("Bigorna.Gerador.", StringComparison.Ordinal) && n.EndsWith(".js", StringComparison.Ordinal)))
+            {
+                try
+                {
+                    var lingua = r.Substring("Bigorna.Gerador.".Length, r.Length - "Bigorna.Gerador.".Length - 3);
+                    var destino = Path.Combine(Pasta, "bigorna-gerador-" + lingua + ".js");
+                    byte[] novo; using (var s = asm.GetManifestResourceStream(r)) { var ms = new MemoryStream(); s.CopyTo(ms); novo = ms.ToArray(); }
+                    if (File.Exists(destino)) { var velho = File.ReadAllBytes(destino); if (velho.Length == novo.Length && velho.SequenceEqual(novo)) continue; }
+                    File.WriteAllBytes(destino, novo);
+                    Log.Info("textos do gerador instalados: " + destino);
+                }
+                catch (Exception ex) { Log.Erro("textos do gerador " + r, ex); }
             }
         }
 

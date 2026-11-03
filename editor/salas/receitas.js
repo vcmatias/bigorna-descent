@@ -153,7 +153,8 @@ function receitaDoJogo(id) { const c = (CAT.receitas || []).find(x => x._id === 
 /* edited or new recipes, the ones known from the start, and every recipe a trigger gives */
 function receitasExportadas() {
   const dadas = new Set(); projeto.salas.forEach(s => donosDaSala(s).forEach(({ o }) => todosGatilhos(o).forEach(g => { if (g.tipo === 'give_item' && typeof g.item === 'string' && g.item.startsWith('RECEITA:')) dadas.add(g.item.slice(8)); })));
-  return oficina().receitas.filter(r => r.custom || !r.base || r.inicio || dadas.has(r.id)).map(r => ({ id: r.id, ...(r.base ? { game: r.base } : {}), item: idItemExportado(r.item),
+  // (v255: a recipe of the game goes by its id only, as the game has it: the map just says the party knows it from the start)
+  return oficina().receitas.filter(r => !r.base || r.inicio || dadas.has(r.id)).map(r => r.base ? { id: r.base, game: r.base, start: !!r.inicio } : ({ id: r.id, item: idItemExportado(r.item),
     ingredients: (r.custos || []).filter(x => x.mat && x.qtd > 0).map(x => ({ material: idItemExportado(x.mat), qty: x.qtd })), value: r.valor || 0, start: !!r.inicio }));
 }
 const idReceitaExportada = id => { const r = (oficina().receitas || []).find(x => x.id === id); return r ? (r.base || r.id) : id; };

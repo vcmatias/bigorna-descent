@@ -827,6 +827,9 @@ function armasExportadas() {
         return { slot: sl, name: q.nome || ['Head', 'Haft', 'Grip'][s], ...(q.imagem ? { image: q.imagem } : {}), ...(forma ? { layout: forma } : {}), ...(s === 0 ? { damage: q.dano ?? 3, traits: q.traits || [] } : {}), ...(hab ? { ability: hab } : {}) }; }) };
       return o;
     }
+    // (v255: a weapon of the game stays as the game has it, in the game's language: what an older version changed in its name
+    // and parts stays out; a new weapon in its place and the runes of one's own go)
+    if (!a.runa) return o;
     if (a.nome) o.name = a.nome;
     const partes = Object.entries(a.pecas || {}).filter(([, e]) => Object.keys(e).length).map(([pid, e]) => { const p = itemDoJogo(pid); const forma = e.imagem && e.molde && p ? formaForjada(w, p.Slot, e.molde) : null;
       return { id: pid, ...(e.nome ? { name: e.nome } : {}), ...(e.dano !== undefined ? { damage: e.dano } : {}), ...(e.traits ? { traits: e.traits } : {}), ...(e.texto ? { text: e.texto } : {}), ...(e.chance !== undefined ? { chance: e.chance } : {}), ...(e.imagem ? { image: e.imagem } : {}), ...(forma ? { layout: forma } : {}) }; });

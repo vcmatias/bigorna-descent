@@ -9,7 +9,9 @@
 const CONTRACOES = { 'a a': 'à', 'a as': 'às', 'a o': 'ao', 'a os': 'aos', 'em a': 'na', 'em as': 'nas', 'em o': 'no', 'em os': 'nos', 'de a': 'da', 'de as': 'das', 'de o': 'do', 'de os': 'dos', 'por a': 'pela', 'por as': 'pelas', 'por o': 'pelo', 'por os': 'pelos' };
 // (a whole word only: "começa a brilhar" once became "começà brilhar", \b taking the ç for a break)
 const contrair = t => LP() !== 'pt' ? t : t.replace(/(?<![\p{L}\p{N}])(a|em|de|por) (a|as|o|os) (?=\S)/giu, (m, p1, p2) => { const r = CONTRACOES[p1.toLowerCase() + ' ' + p2.toLowerCase()]; return r ? (p1[0] === p1[0].toUpperCase() ? r.charAt(0).toUpperCase() + r.slice(1) : r) + ' ' : m; });
-const preencher = (t, v) => contrair(TXT(t).replace(/\{(\w+)\}/g, (_, k) => v[k] !== undefined ? v[k] : '{' + k + '}')).replace(/(^|[.!?]\s+)(["“]?)([a-zà-ú])/g, (m, a, q, c) => a + q + c.toUpperCase());   // (also after an opening quote: "{vilao} waits…")
+const preencher = (t, v) => { const r = contrair(TXT(t).replace(/\{(\w+)\}/g, (_, k) => v[k] !== undefined ? v[k] : '{' + k + '}'));
+  // (v259: in the other languages, any letter of theirs, after their own quotes too)
+  return OUTRA_LINGUA ? pecaNaLingua(r.replace(/(^|[.!?]\s+|[。！？])(["“«„「]?)(\p{Ll})/gu, (m, a, q, c) => a + q + c.toUpperCase())) : r.replace(/(^|[.!?]\s+)(["“]?)([a-zà-ú])/g, (m, a, q, c) => a + q + c.toUpperCase()); };   // (also after an opening quote: "{vilao} waits…")
 
 // ------------------------------------------------------------ premises: why the heroes go in
 /* fields: id, nome, resumo; truques (the gimmicks that fit, first is the favourite); faccao (monsters); final (how the
@@ -379,7 +381,7 @@ function planejarMapa(o) {
   // the wilds stand on the ground: no raised floors, platforms, walkways or high bridges there
   batidas.forEach((b, i) => { if ((b.tema || tema) !== 'ermo') return; delete b.alto; delete b.plataforma; delete b.altoParaViaduto; delete b.tamanhoMin; if (b.ponte === 'alta') b.ponte = 'baixa';
     if (b.viaduto) delete b.viaduto; });
-  const vilaoPadrao = rng.pick(VOCAB_MAPA.vilao[LP()]); const lugar = rng.pick((VOCAB_MAPA[tema] || VOCAB_MAPA.masmorra)[LP()]);
+  const vilaoPadrao = rng.pick(EM(VOCAB_MAPA.vilao)); const lugar = rng.pick(EM(VOCAB_MAPA[tema] || VOCAB_MAPA.masmorra));
   const plano = { premissa: prem, truque, complicacoes, batidas, tema, tema2, base, vocab: { vilao: vilaoPadrao, lugar, alvo: TXT(prem.alvo), n: 3 }, semente: o.semente, atos: o.atos === 1 ? 1 : 2, modalidade, cronica: comCronica, raro, semRaros, dificuldade: o.dificuldade || 'normal' };
   // the stories, before anything is built (each brings its own rules of placement); their own rng keeps the plan of a seed
   plano.tags = { f: prem.faccao, t: tema, a: plano.atos, p: prem.id }; plano.rngRoupas = rngDe(o.semente + '#roupas'); plano.usadas = roupasDaCampanha(); plano.roupas = {};
@@ -1055,7 +1057,7 @@ function escoltaDoMapa(pm, plano, rng, notas, salasDe, coletar, fim) {
   // the guide of the story (a skin of HISTORIAS.escolta: who, why, what the waystones are, the beats told at them)
   const G = plano.roupaGuia || HIST('escolta')[0] || { nome: GUIAS[0].nome, ela: GUIAS[0].ela };
   const v = plano.vocab; const X = TXT(G.nome); const dado = T2(rng.pick(DADOS_DEFESA)); const vx = { ...v, X };
-  const ele = G.ela ? L2('she', 'ela') : L2('he', 'ele'), dele = G.ela ? L2('her', 'dela') : L2('his', 'dele'), o_a = G.ela ? L2('her', 'a') : L2('him', 'o'), lo_la = G.ela ? L2('her', 'la') : L2('him', 'lo');
+  const ele = G.ela ? PRON('she', 'ela') : PRON('he', 'ele'), dele = G.ela ? PRON('her', 'dela') : PRON('his', 'dele'), o_a = G.ela ? PRON('her', 'a') : PRON('him', 'o'), lo_la = G.ela ? PRON('her', 'la') : PRON('him', 'lo');
   const Ele = ele.charAt(0).toUpperCase() + ele.slice(1);
   const res = pm.salas[0].objetos.findIndex(o => o._reservado); if (res >= 0) pm.salas[0].objetos[res].name = X;
   const oi0 = res >= 0 ? res : colocarNaSala(pm, 0, 'InteractToken', rng, { name: X }); if (oi0 == null) { notas.push(L2('No place for the guide.', 'Sem lugar para o guia.')); return; }
@@ -1066,7 +1068,7 @@ function escoltaDoMapa(pm, plano, rng, notas, salasDe, coletar, fim) {
   // (talked to once, for good: the way on stays open after the guide falls and is carried)
   const achado = novoContadorMapa(pm, L2('Guide met', 'Guia encontrado'), 1, ''); delete achado.missao;
   // the story (the premise's own, in the guide's mouth when it is the escort) and why this guide must cross
-  const intro = preencher(rng.pick(plano.premissa.intro[LP()] || plano.premissa.intro.en), v); const motivo = RT(G.motivo, vx);
+  const intro = preencher(rng.pick(EM(plano.premissa.intro)), v); const motivo = RT(G.motivo, vx);
   const historia = plano.premissa.id === 'escolta' ? '"' + intro + (motivo ? ' ' + motivo : '') + '"'
     : intro + ' ' + (G.quem ? L2(X + ', ' + TXT(G.quem) + ', knows the way: ', X + ', ' + TXT(G.quem) + ', conhece o caminho: ') + (motivo ? '"' + motivo + '"' : '') : L2(X + ' knows the way, and asks you to take ' + o_a + ' through.', X + ' conhece o caminho e pede que vocês ' + o_a + ' levem até o outro lado.'));
   const M = G.marco || {}; const marcoNome = M.nome ? TXT(M.nome) : L2('waystone', 'marco');
@@ -1228,8 +1230,8 @@ function conceitoDoTruque(plano) {
 }
 function aberturaDoMapa(pm, plano, rng) {
   const a = ABERTURAS[plano.premissa.id]; const s = pm.salas[0]; if (!a || !s) return null;
-  if (plano.truque?.id === 'escolta') return preencher(rng.pick(a.chegada[LP()] || a.chegada.en), plano.vocab);   // (the guide tells it: escoltaDoMapa)
-  const v = plano.vocab; const historia = preencher(rng.pick(plano.premissa.intro[LP()] || plano.premissa.intro.en), v); plano.historiaInicial = historia;
+  if (plano.truque?.id === 'escolta') return preencher(rng.pick(EM(a.chegada)), plano.vocab);   // (the guide tells it: escoltaDoMapa)
+  const v = plano.vocab; const historia = preencher(rng.pick(EM(plano.premissa.intro)), v); plano.historiaInicial = historia;
   let querNpc = rng() < 0.5; if (plano.querNpc != null) querNpc = plano.querNpc;   // (drawn with the plan: the villain was weighed by it)
   let res = s.objetos.findIndex(o => o._reservado); let oi = null;
   // a point of interest fires as soon as a hero stands next to it: never next to where the heroes start
@@ -1247,7 +1249,7 @@ function aberturaDoMapa(pm, plano, rng) {
   o.gatilhos = [gatilhoTexto(T2(d.antes) + (npc ? ' "' + historia + '"' : ' ' + historia) + conceito)].concat(npc ? [] : [autoRemocao()]);
   plano.conceitoDito = { texto: conceito, g: o.gatilhos[0] };
   apresentar(pm, 0, o, null, T2(d.revela));
-  return preencher(rng.pick(a.chegada[LP()] || a.chegada.en), v);
+  return preencher(rng.pick(EM(a.chegada)), v);
 }
 /* a way out guarded by the last room: it works only once that room is open and its monsters are defeated (before, a way
    out at the start or in the last room ended the map without the fight) */
@@ -1754,7 +1756,7 @@ function rivais(pm, plano, rng, salasDe, fim, dif) {
 function traidor(pm, plano, rng, salasDe, fim, dif) {
   const v = plano.vocab; const t = plano.truque?.id;
   if (t === 'escolta' && plano.escolta && (pm.contadores || []).includes(plano.escolta.marcos)) {
-    const { X, ela, oi0, vivo, caido, marcos } = plano.escolta; const Ele = ela ? L2('She', 'Ela') : L2('He', 'Ele');
+    const { X, ela, oi0, vivo, caido, marcos } = plano.escolta; const Ele = ela ? PRON('She', 'Ela') : PRON('He', 'Ele');
     const m = rng.pick(humanosDaOficina(plano)); const s = pm.salas[fim];
     const cs = m ? casasParaFiguras(pm, fim, 1, rng) : [];
     // a guide the enemy possesses (a child of the story, the most defenceless of them): a scene at the last waystone, then
@@ -1842,7 +1844,7 @@ function aliadoDeAluguel(pm, plano, rng, salasDe, fim, dif, trai) {
   if (plano.truque?.id === 'escolta') return null;   // (one figure followed by the monsters at a time)
   // the sellsword of the story (a skin of HISTORIAS.regras.aliado)
   const A = plano.roupaRegra && plano.roupaRegra.contrato ? plano.roupaRegra : null; const a = A || rng.pick(ALIADOS); const X = TXT(a.nome); const ela = !!a.ela;
-  const ele = ela ? L2('she', 'ela') : L2('he', 'ele'), dele = ela ? L2('her', 'dela') : L2('his', 'dele'), o_a = ela ? L2('her', 'a') : L2('him', 'o'); const Ele = ele.charAt(0).toUpperCase() + ele.slice(1);
+  const ele = ela ? PRON('she', 'ela') : PRON('he', 'ele'), dele = ela ? PRON('her', 'dela') : PRON('his', 'dele'), o_a = ela ? PRON('her', 'a') : PRON('him', 'o'); const Ele = ele.charAt(0).toUpperCase() + ele.slice(1);
   const p = personagemNoCaminho(pm, plano, rng, salasDe, fim, X); if (!p) return null; const npc = p.o, si = p.si;
   const preco = { facil: 20, normal: 25, dificil: 35 }[dif] || 25; const dado = T2(rng.pick(DADOS_DEFESA));
   const cont = novoContadorMapa(pm, L2('Ally', 'Aliado'), 1, ''); delete cont.missao; const tem = () => [{ tipo: 'counter', contador: cont.nome, meta: 1 }];
@@ -1904,8 +1906,11 @@ function mareNoFim(pm, plano, notas) {
     // (the cards of the rooms two or more steps behind are gone by then: their place is free; the floor of the rooms ahead
     // is theirs to take, not this one's)
     const idas = new Set(etapasFeitas.slice(0, Math.max(0, k - 1)).flatMap(e => e.cartasQ)); const adiante = new Set(cadeia.slice(k + 1));
-    const r = aguaSobASala(pm, si, rng, t => fixas(t) + antes.filter(doPar(t)).length, prox, { idas, adiante });
-    const cartas = r && r.chao.length ? pm.salas[si].pecas.slice(n0).map((q, j) => n0 + j) : []; antes = cartas.map(j => pm.salas[si].pecas[j]); antes.forEach(q => daCadeia.add(q));
+    const r = aguaSobASala(pm, si, rng, t => fixas(t) + antes.filter(doPar(t)).length, prox, { idas, adiante, atos: plano.atos });
+    const cartas = r && r.chao.length ? pm.salas[si].pecas.slice(n0).map((q, j) => n0 + j) : [];
+    // (v261: the cards on the table at once, this room's water and the room's before it: more than the Act I box has, and the map asks for Act II)
+    if (cartas.length && Object.keys(PAR).some(t => fixas(t) + antes.filter(doPar(t)).length > ALFOMBRAS_POR_ATO[1])) pm.meta.alfombrasDoAto2 = true;
+    antes = cartas.map(j => pm.salas[si].pecas[j]); antes.forEach(q => daCadeia.add(q));
     const p = partesDaMare(pm.salas[si]); const e = { si, chao: p.chao, ilhas: p.ilhas, cartas, cartasQ: antes.slice(), falhou: !r && p.chao.length > 0 }; etapasFeitas.push(e); return e; });
   // the side rooms that open from a room of the chain go under with it (and those that open from them)
   const filhas = si => { const out = []; let novas = [si]; while (novas.length) { const prox = []; novas.forEach(p => pm.salas.forEach((x, xi) => { if (xi === si || naCadeia.has(xi) || xi === fim || out.includes(xi)) return; const ab = abridorDe(pm, xi); if (ab && ab.ri === p) { out.push(xi); prox.push(xi); } })); novas = prox; } return out; };
@@ -1918,11 +1923,13 @@ function mareNoFim(pm, plano, notas) {
   // goes a step behind)
   for (let k = etapas.length - 1; k >= 0; k--) { const { si } = etapas[k];
     ev.gatilhos.push({ uid: uid(), tipo: 'counter', contador: conts[k].nome, acao: 'add', n: 1, texto: '', requisitos: (si > 0 ? [{ tipo: 'room_open', sala: si }] : []).concat(k ? [{ tipo: 'counter', contador: conts[k - 1].nome, meta: 1 }] : []) }); }
-  etapas.forEach(({ si, chao, cartas, ilhas, falhou }, k) => { const s = pm.salas[si]; const nome = s.nome; const vigia = n => { const g = { uid: uid(), tipo: 'counter', acao: 'use', contador: conts[k].nome, n, desde: 'inicio', requisitos: [] }; ev.gatilhos.push(g); return g; };
+  etapas.forEach(({ si, chao, cartas, ilhas, falhou }, k) => { const s = pm.salas[si]; const nome = s.nome || L2('the surroundings', 'os arredores'); const semNome = !s.nome; const vigia = n => { const g = { uid: uid(), tipo: 'counter', acao: 'use', contador: conts[k].nome, n, desde: 'inicio', requisitos: [] }; ev.gatilhos.push(g); return g; };
     // (the islands of the room before this one go when this one is taken: there is no way back to them)
     const ilhaAntes = k > 0 && etapas[k - 1].ilhas ? [{ uid: uid(), tipo: 'remove_room', sala: etapas[k - 1].si, requisitos: [] }] : [];
     if (!chao.length) {   // (all island: its steps pass with no effect, and it goes with the room after it)
-      const v3 = vigia(2); ev['conta:' + v3.uid] = [txtT('The water surrounds ' + nome + ', but it stands above the tide: an island, while the room after it stands.', 'A água cerca ' + nome + ', mas ela fica acima da maré: uma ilha, enquanto a sala seguinte existir.')];
+      const v3 = vigia(2); ev['conta:' + v3.uid] = [semNome   // (v260: a stretch with no name, not always a room: the surroundings)
+        ? txtT('The water closes in all around, but the surroundings stand above the tide: an island, while the room after them stands.', 'A água cerca os arredores, mas eles ficam acima da maré: uma ilha, enquanto a sala seguinte existir.')
+        : txtT('The water surrounds ' + nome + ', but it stands above the tide: an island, while the room after it stands.', 'A água cerca ' + nome + ', mas ela fica acima da maré: uma ilha, enquanto a sala seguinte existir.')];
       if (ilhaAntes.length || filhas(si).length) { const v4 = vigia(3); ev['conta:' + v4.uid] = ilhaAntes.concat(filhas(si).map(f => ({ uid: uid(), tipo: 'remove_room', sala: f, requisitos: [] }))); }
       return; }
     if (cartas.length) { const v2 = vigia(1); ev['conta:' + v2.uid] = [txtT('Water seeps in under the floor of ' + nome + '.', 'A água começa a correr por baixo do chão de ' + nome + '.')].concat(cartas.map(pi => ({ uid: uid(), tipo: 'add_tile', sala: si, peca: pi, requisitos: [] }))); }
@@ -1976,7 +1983,7 @@ function aguaSobASala(pm, si, rng, emUso = null, prox = null, tempo = {}) {
   const livre = k => !alfs.has(k) && (piso.has(k) || cobertas.has(k) || (!outras.has(k) && !sobPecas.has(k)));
   if ([...precisa].some(k => !livre(k))) return null;
   const PAR = { 'underlay-water': 'underlay-spikes', 'underlay-fetidwater': 'underlay-embers' };
-  const resta = t => (caixaAlfombra(t) || 0) - (emUso ? emUso(t) : pm.salas.reduce((n, x) => n + x.pecas.filter(q => q.tile === t || q.tile === PAR[t]).length, 0));
+  const resta = t => (caixaAlfombra(t, tempo.atos) || 0) - (emUso ? emUso(t) : pm.salas.reduce((n, x) => n + x.pecas.filter(q => q.tile === t || q.tile === PAR[t]).length, 0));
   const tipos = []; ['underlay-water', 'underlay-fetidwater'].filter(t => PECA[t]).forEach(t => { for (let i = 0; i < resta(t); i++) tipos.push(t); });
   const max = Math.min(3, tipos.length); if (!max) return null;
   // the path that joins it all on this floor: from a square of the way on to each object, the shortest walk over the floor
@@ -2029,7 +2036,7 @@ function armadilhaRara(pm, plano, salasDe, fim, notas) {
   const rng = rngDe(plano.semente + '#armadilha'); if (plano.raro !== 'armadilha' && (plano.semRaros || rng() >= 0.2)) return;   // (a fifth of the maps try; not every one has a tile for it)
   const kc = (x, y) => x + ',' + y; const PAR = { 'underlay-spikes': 'underlay-water', 'underlay-embers': 'underlay-fetidwater', 'underlay-water': 'underlay-spikes', 'underlay-fetidwater': 'underlay-embers' };
   const usadas = t => pm.salas.reduce((n, x) => n + x.pecas.filter(q => q.tile === t || q.tile === PAR[t]).length, 0);
-  const tipos = rng.embaralhar(Object.keys(FOSSOS).filter(t => PECA[t] && usadas(t) < (caixaAlfombra(t) || 0)));
+  const tipos = rng.embaralhar(Object.keys(FOSSOS).filter(t => PECA[t] && usadas(t) < (caixaAlfombra(t, plano.atos) || 0)));
   if (!tipos.length) return;
   const alfs = new Set(); pm.salas.forEach(x => x.pecas.forEach(q => { if (ehAlfombra(q.tile)) casasDaPeca(q).forEach(([a, b]) => alfs.add(kc(a, b))); }));
   const salas = rng.embaralhar(salasDe.eixo.filter(si => si > 0 && si !== fim).concat(salasDe.lado || []));
@@ -2046,7 +2053,7 @@ function armadilhaRara(pm, plano, salasDe, fim, notas) {
       const outrasPecas = new Set(); pm.salas.forEach(x => x.objetos.forEach(o => { if (o.pos && !cs.some(k => casasDoObjeto(o).some(([a, b]) => kc(a, b) === k))) casasDoObjeto(o).forEach(([a, b]) => outrasPecas.add(kc(a, b))); }));
       const livre = k => !alfs.has(k) && (cs.includes(k) || sob.has(k) || !outrasPecas.has(k));
       const t = tipos[0]; const postas = []; const usadasC = new Set(); let passos = 0; const ordem = cs.map(k => k.split(',').map(Number)).sort((a, b) => a[1] - b[1] || a[0] - b[0]);
-      const resta = Math.min(2, (caixaAlfombra(t) || 0) - usadas(t));
+      const resta = Math.min(2, (caixaAlfombra(t, plano.atos) || 0) - usadas(t));
       const buscar = () => { const falta = ordem.find(([x, y]) => !usadasC.has(kc(x, y))); if (!falta) return true; if (postas.length >= resta || ++passos > 3000) return false;
         for (const rot of [0, 90]) for (const c of PECA[t].cells.map(c => girar(c, rot))) { const z = { tile: t, pos: [falta[0] - c[0], falta[1] - c[1]], rot, level: 0, pilares: [] }; const zc = casasDaPeca(z).map(([x, y]) => kc(x, y));
           if (zc.some(k => !livre(k) || usadasC.has(k))) continue; postas.push(z); zc.forEach(k => usadasC.add(k)); if (buscar()) return true; postas.pop(); zc.forEach(k => usadasC.delete(k)); }
@@ -2086,6 +2093,7 @@ function armadilhaRara(pm, plano, salasDe, fim, notas) {
       }
       const I = rng.pick(ISCAS_DA_ARMADILHA); const F = FOSSOS[t];
       const n0 = s.pecas.length; s.pecas.push(...postas); const cartas = postas.map((z, j) => n0 + j);
+      if (usadas(t) > ALFOMBRAS_POR_ATO[1]) pm.meta.alfombrasDoAto2 = true;   // (v261: the 4th card of the pair is in the Act II box)
       const isca = { type: 'InteractToken', pos: [bx, by], rot: 0, level: 0, name: '', textClick: L2(I.olhar[0], I.olhar[1]), textUse: '', gatilhos: [], requisitos: [], senao: [] };
       Object.defineProperty(isca, '_narrador', { value: true, enumerable: false, configurable: true });
       const teste = { uid: uid(), tipo: 'skill_test', text: textoDoTeste({ stat: 'agility', text: { en: 'The floor falls away under the hero who took it. Jump!', pt: 'O chão some sob o herói que pegou a isca. Pule!' } }), successes: sucessosDoTeste(2), requisitos: [] };
@@ -2253,7 +2261,7 @@ function campeao(pm, plano, rng, si, dif) {
   const m = pool.slice().sort((a, b) => (b.tiers || []).length - (a.tiers || []).length)[0]; const maxT = tierDoLider(m, plano);
   const TRACOS = [{ en: 'Fiery: its attacks deal +1 damage', pt: 'Incandescente: seus ataques causam +1 de dano', n: { en: 'the Fiery', pt: 'Incandescente' }, at: 1 }, { en: 'Stoneskin: +1 defence', pt: 'Pele de Pedra: +1 de defesa', n: { en: 'Stoneskin', pt: 'Pele de Pedra' }, df: 1 }, { en: 'Swift: it moves 2 more spaces', pt: 'Veloz: move 2 espaços a mais', n: { en: 'the Swift', pt: 'Veloz' } }, { en: 'Bloodthirst: it heals 1 whenever it deals damage', pt: 'Sede de Sangue: cura 1 sempre que causa dano', n: { en: 'Bloodthirst', pt: 'Sede de Sangue' } }];
   const tr = rng.embaralhar(TRACOS).slice(0, dif === 'dificil' ? 2 : 1);
-  const nome = rng.pick(['Gorthak', 'Vessa', 'Ulmar', 'Kragg', 'Ysolde', 'Morrow'].concat(HIST('regras.campeao').filter(x => typeof x === 'string'))) + ' ' + L2(tr[0].n.en, tr[0].n.pt);
+  const nome = pecaNaLingua(rng.pick(['Gorthak', 'Vessa', 'Ulmar', 'Kragg', 'Ysolde', 'Morrow'].concat(HIST('regras.campeao').filter(x => typeof x === 'string'))) + ' ' + L2(tr[0].n.en, tr[0].n.pt));   // (v259: a piece of the sentences)
   vaga.enemy = m.id; vaga.tier = maxT; vaga.uid = vaga.uid || uid();
   // what the app can do, it does (attack and defence of the champion alone); the rest the table applies. The text says it
   // is the champion only (before, "its attacks deal +1" read as if every monster had it)
@@ -2272,10 +2280,16 @@ function campeao(pm, plano, rng, si, dif) {
    fatigue, damage, health, tests, actions) goes to a box of its own, "Special rule". A paragraph that starts as story and
    turns into a rule is cut where the rule begins */
 const PALAVRAS_DE_REGRA = /\b(rodadas?|rounds?|fadiga|fatigue|dano|damage|pontos? de vida|health|teste de|tests? (of )?(agility|might|will|insight|força|agilidade|disposição|intuição)|cura(ndo)? \d|heal(s|ing)? \d|ações?|actions?|manobras?|maneuvers?)\b/i;
+/* the table of a language brings its own words of a rule (a regular expression, key "__regra"); without it, the English and
+   the language's own numbers of rounds can't be told apart, so only the English words are tried */
+const palavrasDeRegraDaLingua = () => { const t = typeof window !== 'undefined' && window.GERADOR_TRAD ? window.GERADOR_TRAD[LINGUA_TEXTOS] : null;
+  try { if (t && t.__regra) return new RegExp(PALAVRAS_DE_REGRA.source + '|' + t.__regra, 'iu'); } catch { } return PALAVRAS_DE_REGRA; };
 function separarRegras(pm, plano) {
   const intro = [], regras = [];
-  String(pm.meta.intro || '').split(/\n\n+/).forEach(p => { if (!PALAVRAS_DE_REGRA.test(p)) { intro.push(p); return; }
-    const fr = p.split(/(?<=[.!?…])\s+/); const k = fr.findIndex(f => PALAVRAS_DE_REGRA.test(f));
+  // (v259: in the other languages, the words of a rule in that language, from its table, and its own full stops)
+  const RE = OUTRA_LINGUA ? palavrasDeRegraDaLingua() : PALAVRAS_DE_REGRA;
+  String(pm.meta.intro || '').split(/\n\n+/).forEach(p => { if (!RE.test(p)) { intro.push(p); return; }
+    const fr = p.split(OUTRA_LINGUA ? /(?<=[.!?…])\s+|(?<=[。！？])/ : /(?<=[.!?…])\s+/); const k = fr.findIndex(f => RE.test(f));
     if (k > 0) intro.push(fr.slice(0, k).join(' ')); regras.push(fr.slice(k).join(' ')); });
   regras.push(...(plano.regraExtra || []));
   pm.meta.intro = intro.filter(Boolean).join('\n\n');
@@ -2733,7 +2747,7 @@ const REACAO_DO_VILAO = { npc: [['So {quem} talked. I should have finished that 
   guia: [['So you brought {quem} all the way to me. The journey ends here.', 'Então vocês trouxeram {quem} até mim. A viagem termina aqui.']],
   pista: [['You found {marca} and came all the way here after me. Clever. It ends now.', 'Vocês acharam {marca} e vieram atrás de mim até aqui. Espertos. Isso acaba agora.'], ['I left {marca} behind, and you read it. A pity for you.', 'Deixei {marca} para trás, e vocês souberam ler. Pena para vocês.']] };
 const RESPOSTAS_DOS_HEROIS = [['Then this ends here.', 'Então isso acaba aqui.'], ['We did not come this far to turn back now.', 'Não chegamos até aqui para voltar agora.'], ['Enough talk. Get ready.', 'Chega de conversa. Preparem-se.']];
-function frasesDe(t) { return (t || '').replace(/\s+/g, ' ').match(/[^.!?…]+[.!?…]+["»”]?/g) || []; }
+function frasesDe(t) { return (t || '').replace(/\s+/g, ' ').match(OUTRA_LINGUA ? /[^.!?…。！？]+[.!?…。！？]+["»”」]?/g : /[^.!?…]+[.!?…]+["»”]?/g) || []; }
 /* the way on waits for the guide: the opener of the second room asks the party to talk to the guide first */
 function travaDoGuia(ab1, vivo, X) {
   if (!ab1 || ab1.o['senao:' + ab1.g.uid] || (ab1.g.requisitos || []).some(r => r.tipo === 'counter' && r.contador === vivo.nome)) return;
@@ -2749,8 +2763,9 @@ function cenaDoChefe(pm, plano, rng, si) {
   // (the climax answers the anchor: who or what told the story at the start, in its words, and the answer standing here)
   const an = plano.roteiro?.abertura; const quem = an && an.nome ? comoJaVisto(an.nome) : '';
   const resposta = vil ? L2(' Now the answer stands before you: ' + vil + '.', ' Agora a resposta está diante de vocês: ' + vil + '.') : L2(' Now you see it with your own eyes.', ' Agora vocês veem com os próprios olhos.');
-  const lembra = eco && quem ? contrair(an.npc ? L2('At the start, ' + quem + ' warned you: "' + eco + '"', 'Lá no começo, ' + quem + ' avisou: «' + eco + '»') : L2('At the start, by ' + quem + ', the warning was clear: "' + eco + '"', 'Lá no começo, diante de ' + quem + ', o aviso foi claro: «' + eco + '»')) + resposta
-    : eco ? L2('At the start, the warning was clear: "' + eco + '" Now you see it with your own eyes.', 'Lá no começo, o aviso foi claro: «' + eco + '» Agora vocês veem com os próprios olhos.') : L2('At last, the one behind it all.', 'Enfim, quem está por trás de tudo.');
+  // (v259: templates, so the other languages have the whole sentence: the warning is a cut of a text already in the language)
+  const lembra = eco && quem ? contrair(an.npc ? LF('At the start, {0} warned you: "{1}"', 'Lá no começo, {0} avisou: «{1}»', quem, eco) : LF('At the start, by {0}, the warning was clear: "{1}"', 'Lá no começo, diante de {0}, o aviso foi claro: «{1}»', quem, eco)) + resposta
+    : eco ? LF('At the start, the warning was clear: "{0}" Now you see it with your own eyes.', 'Lá no começo, o aviso foi claro: «{0}» Agora vocês veem com os próprios olhos.', eco) : L2('At last, the one behind it all.', 'Enfim, quem está por trás de tudo.');
   // (the villain answers it too: it knows who talked, or what it left behind)
   const R = quem && plano.premissa.faccao !== 'feras' ? REACAO_DO_VILAO[an.familia === 'escolta' ? 'guia' : an.npc ? 'npc' : 'pista'] : null; const reacao = R ? preencher(L2(...rng.pick(R)), { quem, marca: quem }) + ' ' : '';
   const cx = (id, speaker, title, text, next) => ({ id, type: 'normal', speaker, title, text, cast: speaker === '@hero1' ? [] : ['@hero1'], background: FUNDO_PADRAO, next, options: [] });
@@ -2966,7 +2981,7 @@ function montarMapa(o, tentativa) {
       const s = pm.salas[si]; s.funcao = b.funcao;
       if (b.muroLongo && c.abridor?.sala === b.pai) muroArriscado(pm, plano, rng, b.pai, b.muroLongo.topo);
       if (b.transicao) { s.texto = (textoDaTransicao(b.transicao, plano, rng) + (s.texto ? '\n\n' + s.texto : '')).trim(); plano.transicaoFeita = si; }
-      if (b.funcao === 'climax') { s.texto = preencher(rng.pick(plano.premissa.climax[LP()] || plano.premissa.climax.en), plano.vocab);
+      if (b.funcao === 'climax') { s.texto = preencher(rng.pick(EM(plano.premissa.climax)), plano.vocab);
         b.climax = true; }
     }
     // (the passage of a detour of two left out for want of tiles never was: it leaves the plan)
@@ -3016,11 +3031,11 @@ function montarMapa(o, tentativa) {
     grandesComEspaco(pm);
     if (plano.dificuldade === 'facil') { poucosItens(pm, 3); lideresPorHerois(pm); }
     // texts of the map
-    const v = plano.vocab; const pequenas = new Set(['the', 'of', 'a', 'o', 'a', 'os', 'as', 'de', 'do', 'da', 'dos', 'das', 'e', 'and']); const titulo = t => t.split(' ').map(w => pequenas.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    const v = plano.vocab; const pequenas = new Set(['the', 'of', 'a', 'o', 'a', 'os', 'as', 'de', 'do', 'da', 'dos', 'das', 'e', 'and']); const titulo = t => OUTRA_LINGUA ? t : t.split(' ').map(w => pequenas.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');   // (v259: the other languages write titles as sentences)
     const lugarT = titulo(v.lugar); const vilaoT = titulo(v.vilao);
-    pm.meta.name = preencher(rng.pick(plano.premissa.titulo[LP()] || plano.premissa.titulo.en), { ...v, lugar: lugarT, vilao: vilaoT }); pm.meta.name = pm.meta.name.charAt(0).toUpperCase() + pm.meta.name.slice(1);
+    pm.meta.name = preencher(rng.pick(EM(plano.premissa.titulo)), { ...v, lugar: lugarT, vilao: vilaoT }); pm.meta.name = pm.meta.name.charAt(0).toUpperCase() + pm.meta.name.slice(1);
     // the start text only sets the scene: the story is told in the first room (aberturaDoMapa)
-    pm.meta.intro = chegada || (preencher(rng.pick(plano.premissa.intro[LP()] || plano.premissa.intro.en), { ...v, lugar: v.lugar }) + (conceitoDoTruque(plano) ? '\n\n' + conceitoDoTruque(plano) : ''));
+    pm.meta.intro = chegada || (preencher(rng.pick(EM(plano.premissa.intro)), { ...v, lugar: v.lugar }) + (conceitoDoTruque(plano) ? '\n\n' + conceitoDoTruque(plano) : ''));
     if (plano.introExtra) pm.meta.intro += '\n\n' + plano.introExtra.join('\n\n');
     // (the boss's scene recalls the warning of the start: the story of the first room, else the intro of the map)
     if (clx) plano.cenaChefe = cenaDoChefe(pm, plano, rng, clx.sala);
@@ -3029,7 +3044,7 @@ function montarMapa(o, tentativa) {
     contagemRegressiva(pm);
     separarRegras(pm, plano);
     pm.meta.description = TXT(plano.premissa.resumo);
-    pm.campanha = { chegada: '', conclusao: preencher(rng.pick(plano.premissa.fim[LP()] || plano.premissa.fim.en), v) };
+    pm.campanha = { chegada: '', conclusao: preencher(rng.pick(EM(plano.premissa.fim)), v) };
     pm.meta.gerado = { temas: plano.tema2 && plano.transicaoFeita != null ? [plano.tema, plano.tema2, plano.transicaoFeita] : null, retorno: { viaduto: plano.viadutos || [], runas: (plano.retorno?.runas || []).length, voltas: plano.voltas || [], passagem: plano.retorno?.passagem || null, sotao: (plano.retorno?.sotao || []).length, espiral: !!plano.espiral }, modalidade: plano.modalidade?.id || 'classica', cronica: plano.cronica || false, premissa: plano.premissa.id, truque: plano.truque?.id || null, complicacoes: plano.feitas || [], chefe: plano.chefe?.id || null, semRetorno: (plano.semRetornoFeito || []).length ? plano.semRetornoFeito : null, semente: o.semente, atos: plano.atos, batidas: plano.batidas.map(b => ({ funcao: b.funcao, arquetipo: b.arquetipo, sala: b.sala ?? null, papel: b.papel })), roupas: roupasVestidas(plano), roteiro: plano.roteiro || null };
     // the campaign progression: a map starts where the game's first quest does (20; 15 easy, 25 hard). In a campaign it grows
     // with every map before it (usarMapaGerado)
@@ -3067,9 +3082,11 @@ function desenharMapaGerado(cv, pm) {
 function abrirGeradorMapa() {
   const d = painelFlutuante('janelaGeradorMapa', tr('Generate a map (experimental)'), () => { d.hidden = true; });
   d.hidden = false; const corpo = d.querySelector('.corpo');
-  const o = GMAPA.opcoes = GMAPA.opcoes || { cronica: 'auto', atos: ATOS.get(), premissa: 'random', truque: 'auto', duracao: 'media', dificuldade: 'normal', tema: 'qualquer', semente: novaSemente(), manterPool: true, manterItens: true };
+  const o = GMAPA.opcoes = GMAPA.opcoes || { cronica: 'auto', atos: ATOS.get(), premissa: 'random', truque: 'auto', duracao: 'media', dificuldade: 'normal', tema: 'qualquer', semente: '', manterPool: true, manterItens: true };
+  if (!o.semente) o.semente = sementeCompleta(o.duracao, o.dificuldade, o.atos);
   const sel = (id, lista, v) => `<select id="${id}">${lista.map(([k, t]) => `<option value="${esc(k)}" ${String(v) === String(k) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
-  corpo.innerHTML = `<p class="ajuda">A whole map: why the heroes go in (premise), what they must do to win (objective), what changes along the way (extra rule), how the tension grows and the end. It replaces the map on screen (or comes as a new map of the campaign), fully editable.</p>
+  corpo.innerHTML = `<p class="ajuda">A whole map: why the heroes go in (premise), what they must do to win (objective), what changes along the way (extra rule), how the tension grows and the end.${campanha ? '' : ' It replaces the map on screen, fully editable.'}</p>
+    ${campanha ? `<p class="ajuda aviso" id="gm_campanha" data-sem-traducao>${esc(L2('You are in a campaign: the generated map is added to it as a new map, after “' + (projeto.meta.name || L2('the map on screen', 'o mapa na tela')) + '” in the story flow, with its gold on completion. The maps already in the campaign stay as they are; the new one opens on screen, fully editable.', 'Você está numa campanha: o mapa gerado entra nela como um mapa novo, depois de “' + (projeto.meta.name || 'o mapa na tela') + '” no fluxo da história, com o ouro da conclusão. Os mapas que já estão na campanha ficam como estão; o novo abre na tela, todo editável.'))}</p>` : ''}
     <div class="geradorOpcoes">
       <label class="campo" title="${esc(tr('The story: why the heroes go in.'))}">Premise ${sel('gm_pre', [['random', 'Random']].concat(PREMISSAS_MAPA.map(p => [p.id, TXT(p.nome)])), o.premissa)}</label>
       <label class="campo" title="${esc(tr('What the heroes must do to win.') + '\n' + TRUQUES_MAPA.map(t => TXT(t.nome) + ': ' + TXT(t.resumo)).join('\n'))}">Objective ${sel('gm_tru', [['auto', 'The premise\'s own'], ['nenhum', 'Simple']].concat(TRUQUES_MAPA.map(t => [t.id, TXT(t.nome)])), o.truque)}</label>
@@ -3079,7 +3096,7 @@ function abrirGeradorMapa() {
       <label class="campo">Difficulty ${sel('gm_dif', [['facil', 'Easy'], ['normal', 'Normal'], ['dificil', 'Hard']], o.dificuldade)}</label>
       <label class="campo">Terrain and theme ${sel('gm_tema', Object.entries(TEMAS_SALA).map(([k, t]) => [k, t.nome]), o.tema)}</label>
       <label class="campo" title="Tiles, objects, monsters and items the generator may use: those of the boxes you own">Boxes ${sel('gm_atos', OPCOES_ATOS, o.atos)}</label>
-      <label class="campo" title="Each Generate uses a new seed. To see a map again, type its seed here before generating.">Seed <input id="gm_sem" value="${esc(o.semente)}" style="width:90px"></label>
+      <label class="campo" title="Each Generate uses a new seed. To see a map again, type its seed here before generating. The seed of 7 characters brings the length, the difficulty and the boxes too.">Seed <input id="gm_sem" value="${esc(o.semente)}" style="width:90px"></label>
       <label class="chk" style="grid-column:1/-1" title="Unticked, the premise picks monsters of its faction from the Workshop"><input type="checkbox" id="gm_pool" ${o.manterPool ? 'checked' : ''}> Use the monster pool of this map</label>
       <label class="chk" style="grid-column:1/-1" title="Unticked, the item pool comes from the Workshop (the items of the chosen boxes)"><input type="checkbox" id="gm_itens" ${o.manterItens ?? o.manterPool ? 'checked' : ''}> Use the item pool of this map</label>
     </div>
@@ -3103,7 +3120,7 @@ function abrirGeradorMapa() {
   Object.keys(DICAS).forEach(id => { const el = $('#' + id); if (!el) return; const campo = el.closest('label') || el;
     const por = () => { const t = dica(id); campo.title = t; el.title = t; $('#gm_dica').textContent = t; };
     campo.title = dica(id); el.title = campo.title; el.addEventListener('change', por); campo.addEventListener('mouseenter', por); el.addEventListener('focus', por); });
-  const ler = () => { o.cronica = $('#gm_cro')?.value || 'auto'; o.modalidade = $('#gm_mod')?.value || 'auto'; o.premissa = $('#gm_pre').value; o.truque = $('#gm_tru').value; o.duracao = $('#gm_dur').value; o.dificuldade = $('#gm_dif').value; o.tema = $('#gm_tema').value; o.semente = $('#gm_sem').value.trim() || novaSemente(); o.manterPool = $('#gm_pool').checked; o.manterItens = $('#gm_itens').checked; o.atos = +$('#gm_atos').value === 1 ? 1 : 2; ATOS.set(o.atos); };
+  const ler = () => { o.cronica = $('#gm_cro')?.value || 'auto'; o.modalidade = $('#gm_mod')?.value || 'auto'; o.premissa = $('#gm_pre').value; o.truque = $('#gm_tru').value; o.duracao = $('#gm_dur').value; o.dificuldade = $('#gm_dif').value; o.tema = $('#gm_tema').value; o.manterPool = $('#gm_pool').checked; o.manterItens = $('#gm_itens').checked; o.atos = +$('#gm_atos').value === 1 ? 1 : 2; ATOS.set(o.atos); o.semente = $('#gm_sem').value.trim() || sementeCompleta(o.duracao, o.dificuldade, o.atos); };
   const mostrar = () => {
     const r = GMAPA.resultado; const el = $('#gm_res'); if (!r) { el.innerHTML = ''; return; }
     if (r.erro) { el.innerHTML = `<p class="ajuda aviso">${esc(r.erro)}</p>`; return; }
@@ -3115,7 +3132,7 @@ function abrirGeradorMapa() {
       ${resumoDasRoupas(pm)}
       <ol class="batidas">${pm.salas.map((s, i) => `<li><b>${esc(tr(ARQUETIPO_SALA(s.arquetipo)?.nome || s.arquetipo || ''))}</b> <small>${esc(tr((FUNCOES_SALA.find(f => f[0] === s.funcao) || ['', ''])[1]))}${s.intensidade ? ' · ' + tr('intensity') + ' ' + s.intensidade : ''}</small></li>`).join('')}</ol>
       ${r.notas.length ? `<p class="ajuda aviso" data-sem-traducao>${esc(r.notas.join(' · '))}</p>` : ''}
-      <div class="linha"><button class="primario" id="gm_usar">${tr('Use this map')}</button><span class="etq">${r.nota}</span><span style="flex:1"></span><button id="gm_sim" title="${esc(tr('Debug: a small party plays this map by the easy rules (2 successes on every test, 2 actions a hero, no special weapons nor abilities, 8 health each, the monsters\u2019 damage applied), with 2, 3 and 4 heroes'))}">${tr('Simulate')}</button><select id="gm_simModo" title="${esc(tr('Standard: the easy rules above. Custom: your own party (health, damage per attack, attacks a round, successes…).'))}"><option value="padrao">${tr('Standard simulation')}</option><option value="custom">${tr('Custom simulation')}</option></select></div><div id="gm_simCfg" hidden>${formularioSimulacao()}</div><div id="gm_simres"></div></div></div>`;
+      <div class="linha"><button class="primario" id="gm_usar">${campanha ? tr('Add to the campaign') : tr('Use this map')}</button><span class="etq">${r.nota}</span><span style="flex:1"></span><button id="gm_sim" title="${esc(tr('Debug: a small party plays this map by the easy rules (2 successes on every test, 2 actions a hero, no special weapons nor abilities, 8 health each, 11 in Act II, the monsters\u2019 damage applied), with 2, 3 and 4 heroes'))}">${tr('Simulate')}</button><select id="gm_simModo" title="${esc(tr('Standard: the easy rules above. Custom: your own party (health, damage per attack, attacks a round, successes…).'))}"><option value="padrao">${tr('Standard simulation')}</option><option value="custom">${tr('Custom simulation')}</option></select></div><div id="gm_simCfg" hidden>${formularioSimulacao()}</div><div id="gm_simres"></div></div></div>`;
     desenharMapaGerado(el.querySelector('canvas'), pm);
     $('#gm_usar').onclick = () => { usarMapaGerado(pm); d.hidden = true; };
     // the simulation: standard (the easy rules) or custom (the party the user describes; kept in this browser)
@@ -3125,7 +3142,12 @@ function abrirGeradorMapa() {
     $('#gm_sim').onclick = () => { $('#gm_simres').innerHTML = modo.value === 'custom' ? tabelaDaSimulacao(pm, lerSimulacaoCustom()) : tabelaDaSimulacao(pm); };
   };
   // every Generate is a new map: a new seed, unless one was typed in
-  $('#gm_gerar').onclick = () => { ler(); if (o.semente === GMAPA.sementeUsada) { o.semente = novaSemente(); $('#gm_sem').value = o.semente; } GMAPA.sementeUsada = o.semente;
+  // (v266: a seed of 7 characters brings the length, the difficulty and the boxes: typed in, the fields follow it; a change in
+  // one of these fields changes the first character of the seed)
+  const seguirSemente = () => { const ls = lerSemente($('#gm_sem').value); if (!ls) return; $('#gm_dur').value = ls.duracao; $('#gm_dif').value = ls.dificuldade; $('#gm_atos').value = String(ls.atos); $('#gm_sem').value = ls.semente; };
+  $('#gm_sem').addEventListener('change', seguirSemente);
+  ['gm_dur', 'gm_dif', 'gm_atos'].forEach(id => $('#' + id).addEventListener('change', () => { const ls = lerSemente($('#gm_sem').value); if (ls) $('#gm_sem').value = sementeCompleta($('#gm_dur').value, $('#gm_dif').value, +$('#gm_atos').value, ls.sorteio); }));
+  $('#gm_gerar').onclick = () => { seguirSemente(); ler(); if (o.semente === GMAPA.sementeUsada) { o.semente = sementeCompleta(o.duracao, o.dificuldade, o.atos); $('#gm_sem').value = o.semente; } GMAPA.sementeUsada = o.semente;
     // the Workshop is the source: with too little in it, the window says so first
     const precisa = { monstros: !(o.manterPool && reservaComMonstros(projeto)), itens: !(o.manterItens && reservaDeItensCompleta(projeto)) };
     const gerar = () => comEspera($('#gm_gerar'), () => { GMAPA.resultado = gerarMapa(o); mostrar(); });
