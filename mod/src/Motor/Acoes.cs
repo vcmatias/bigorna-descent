@@ -592,6 +592,42 @@ namespace Bigorna.Motor
         /// <summary>Modo de teste: da o monstro por derrotado, como se tivesse caido em combate.</summary>
         public static void Derrotar(SerializedEnemy e) => Morrer(e);
 
+        /// <summary>v277, modo de teste: o monstro cai pelas mãos de um herói, como num ataque: o dano que falta para zerar a vida
+        /// conta para o herói (as proezas de ataque e de derrota andam), a vida vai a zero e a árvore de derrota do jogo corre
+        /// com o herói no quadro dela (PlayerIndex), como no ataque do jogo. Devolve o nome do herói (null se não deu).</summary>
+        public static string DerrotarPorHeroi(SerializedEnemy e, int indice)
+        {
+            if (e == null || string.IsNullOrEmpty(e.GUID) || e.Health <= 0) return null;
+            if (_mortos.Contains(e.GUID)) { Log.Info("  «" + e.ModelId + "» já caiu; a derrota dele ainda corre"); return null; }
+            var herois = Jogo.Partida?.ActivePlayers;
+            if (herois == null || herois.Count == 0) return null;
+            indice = ((indice % herois.Count) + herois.Count) % herois.Count;
+            var heroi = herois[indice]; if (heroi == null) return null;
+            string nome = NomeHeroi(heroi.Model?.Id);
+            _mortos.Add(e.GUID);
+            try
+            {
+                int dano = Math.Max(0, e.Health);
+                var proezas = Jogo.Persistente?.FeatController;
+                try { proezas?.ProgressEnemyAttacked(e, heroi, dano, 0, 0); } catch (Exception ex) { Log.Info("  proezas do ataque: " + ex.Message); }
+                e.Health = 0; try { SingletonBehaviour<GameData>.Instance.SetDirty(); } catch { }
+                try { proezas?.ProgressEnemyDefeated(e, heroi, false); } catch (Exception ex) { Log.Info("  proezas da derrota: " + ex.Message); }
+                var gc = Jogo.Controle;
+                var arvore = gc.GetEnemyDefeatedDT(e);
+                if (arvore != null)
+                {
+                    arvore.blackboard.SetValue("EnemyGUID", e.GUID);
+                    arvore.blackboard.SetValue("PlayerIndex", indice);
+                    ((IProcess)arvore).Context = e;
+                    Jogo.Persistente.ProcessStack.Schedule(arvore, arvore);
+                }
+                else gc.PerformManualEnemyDefeat(e);
+                Log.Info("  caiu «" + e.ModelId + "» por " + nome + " (" + dano + " de dano)");
+            }
+            catch (Exception ex) { Log.Info("  não consegui dar por morto: " + ex.Message); }
+            return nome;
+        }
+
         // (um inimigo ja dado por morto, com a arvore de derrota ainda na fila, nao morre de novo: duas arvores para o mesmo
         // inimigo travaram a gravacao do fim de rodada no teste 10)
         static readonly HashSet<string> _mortos = new HashSet<string>();

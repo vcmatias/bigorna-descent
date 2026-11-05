@@ -314,7 +314,7 @@ const actDoItem = i => { const c = i && i.base && (CATALOGO.itens || []).find(x 
 /* what the Workshop offers the generators within the boxes: monsters to draw (with tiers, neither villain nor named),
    bosses (named or villains), item cards, materials and the Workshop's own objects */
 function daOficina(atos = 2) {
-  const b = bestiario(); const ms = (b.monstros || []).filter(m => (m.tiers || []).length && (m.act || 0) < atos);
+  const b = bestiario(); const ms = (b.monstros || []).filter(m => (m.tiers || []).length && (m.act || 0) < atos && (!m.base || m.custom || monstroDasCaixas(m.base)));   // (v293: a game monster of no box stays out of the draw; the user's own ones keep their own names and stay in)
   const itens = (b.itens || []).filter(i => actDoItem(i) < atos);
   return { monstros: ms.filter(m => !m.villain && !m.named), chefes: ms.filter(m => m.villain || m.named),
     cartas: itens.filter(i => i.cls !== 'CraftingMaterialModel' && (i.custom || !i.base || CLS_CARTAS.includes(i.cls))),
@@ -337,9 +337,12 @@ function faltasDaOficina(atos, precisa) {
 /* a starter selection into the Workshop, from the game and within the boxes: the monsters the game itself draws at random
    (no quest-specific ones; the named among them are the bosses), the item cards (no upgrades, no digital ones) and the
    crafting materials. What the Workshop already has is kept. Returns {monstros, itens} added */
-function selecaoInicial(atos, cats) {
+/* v292: originais (optional): the ids of the monsters the boxes of the game bring (the mod's one-shot sends them): the game
+   keeps other monster models that no box uses, and their names come out wrong on the board */
+function selecaoInicial(atos, cats, originais) {
   const b = bestiario(); const n = { monstros: 0, itens: 0 }; const nomeOk = c => c && c.name_en && !/^[A-Z0-9_' ]+$/.test(c.name_en);
-  if (cats.monstros) (CATALOGO.monstros || []).filter(c => monstroDeEscolha(c) && nomeOk(c) && c.IsRandomEligible && !c.IsVillain && (c.Tiers || []).length && doAto(c, atos))
+  const original = c => (!originais || originais.has(c._id)) && monstroDasCaixas(c._id);   // (v293: and always one some box brings)
+  if (cats.monstros) (CATALOGO.monstros || []).filter(c => monstroDeEscolha(c) && nomeOk(c) && original(c) && c.IsRandomEligible && !c.IsVillain && (c.Tiers || []).length && doAto(c, atos))
     .forEach(c => { if (!b.monstros.some(m => m.base === c._id)) { b.monstros.push(monstroDoCatalogo(c)); n.monstros++; } });
   if (cats.itens) (CATALOGO.itens || []).filter(c => nomeOk(c) && doAto(c, atos) && ((CLS_CARTAS.includes(c._cls) && !c.IsUpgrade && !c.IsDigital) || c._cls === 'CraftingMaterialModel'))
     .forEach(c => { if (!b.itens.some(i => i.base === c._id)) { const x = itemDoCatalogo(c); b.itens.push(x); trazerReceitasDoItem(x); n.itens++; } });

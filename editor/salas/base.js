@@ -123,6 +123,14 @@ function nomeLegivel(n) {
    one keeps it (the mod shows the model's name without the quest prefix) */
 const MONSTROS_SEM_TEXTO = new Set(['ENEMY_BERSERKER_0', 'ENEMY_Q12_NE_KRUL_1', 'ENEMY_Q12_NE_KRUL_2', 'ENEMY_Q12_SPECTER', 'ENEMY_Q13_XENITH', 'ENEMY_Q4_HERMIT', 'ENEMY_Q4_IGOR', 'ENEMY_Q8_E2_BOSS_UTHUK', 'ENEMY_S2_GOLEM', 'ENEMY_S2_NECROMANCER', 'ENEMY_WOLF_S2']);
 const monstroDeEscolha = z => !!z && !MONSTROS_SEM_TEXTO.has(z._id);
+/* v293: the original monsters, those some box of the game brings (catalogo.caixas, written by the mod from format 6 on): the
+   game keeps other monster models that no box uses, and their names come out wrong on the board (ENEMY_VIPER_1). The
+   generators and the starter selection draw only from these; without the list (older data), from all, as before */
+// (v295: only the boxes checked in the game's Collection ("marcada"): a monster of a box left out is "not owned" in the
+//  game, and the board shows its id in place of the name; data without "marcada" count every box)
+const MONSTROS_DAS_CAIXAS = (() => { const c = (window.CATALOGO || {}).caixas; if (!Array.isArray(c) || !c.length) return null;
+  const s = new Set(); c.filter(x => x.marcada !== false).forEach(x => (x.monstros || []).forEach(id => s.add(id))); return s.size ? s : null; })();
+const monstroDasCaixas = id => !MONSTROS_DAS_CAIXAS || MONSTROS_DAS_CAIXAS.has(id);
 CAT.monstros.forEach(m => { if (ehChaveCrua(m.name_en)) { m._chave = m.name_en; m.name_en = (nomeLegivel(m._name) && tr(nomeLegivel(m._name))) || m.name_en; } if (ehChaveCrua(m.plural_en)) m.plural_en = m.name_en; });
 (CAT.itens || []).forEach(i => { if (i.name_en) i.name_en = comMaisVisivel(i.name_en); });
 const RETRATOS = window.RETRATOS || { monstros: {}, itens: {}, personagens: {} };
@@ -415,7 +423,7 @@ const trocarOriginais = (k, v) => ehLeve(v) ? original(v) : v;
    each file (the meta, then this) and stops, instead of reading tens of MB of rooms, pictures and the editor's copy. It
    holds what the list shows and checks: the act, the packages required, the languages and the translations of the meta's
    texts, the counts of the summary (tiles, enemies, triggers) and, for a campaign, its nodes come right after it. The keys
-   of the file go in this order: format, version, meta, ficha, [nodes], then the rest */
+   of the file go in this order: format, version, app, meta, ficha, [nodes], then the rest */
 function comFicha(d) {
   if (!d || typeof d !== 'object' || Array.isArray(d) || (d.format !== 'dmap' && d.format !== 'dcamp')) return d;
   const textosDaMeta = new Set(); const anda = v => { if (typeof v === 'string') { if (v.trim()) textosDaMeta.add(v); } else if (Array.isArray(v)) v.forEach(anda); else if (v && typeof v === 'object') Object.values(v).forEach(anda); };
@@ -424,7 +432,8 @@ function comFicha(d) {
   const ficha = { requires: d.requires || [], languages: d.languages || [], translations: traducoes,
     counts: d.format === 'dmap' ? { tiles: (d.board && d.board.tiles || []).length, enemies: (d.spawns && d.spawns.enemies || []).length, triggers: (d.triggers || []).length }
       : { nodes: (d.nodes || []).length } };
-  const o = { format: d.format, version: d.version, meta: d.meta, ficha };
+  // (v270: "app": the signature of Bigorna, so a file of another editor of the same format (DescentForge) is told apart)
+  const o = { format: d.format, version: d.version, app: 'bigorna', meta: d.meta, ficha };
   if (d.format === 'dcamp') o.nodes = d.nodes;
   Object.keys(d).forEach(k => { if (!(k in o)) o[k] = d[k]; });
   return o;
@@ -493,7 +502,8 @@ const figurasDoTipo = t => FIGURAS ? (FIGURAS[t] || 0) : null;
 /* the game's rule over a group of balanced spaces (the room's, or a "Spawn from the pool" trigger's): all the spaces
    of the group share one budget of points, so they decide together how many monsters enter and how strong; like the
    game, a monster enters only while there is a free miniature of its type (`ocupadas`: types already on the table) */
-function simularVagas(vagas, intensidade, poolIds, herois, p = projeto, ocupadas = []) {
+/* (v268: minimo, the figures a wave brings at least: points are kept for them, as the mod does) */
+function simularVagas(vagas, intensidade, poolIds, herois, p = projeto, ocupadas = [], minimo = 0) {
   const r = regraDoBalanceio(p); const min = Math.max(1, Math.min(10, r.min)), max = Math.max(min, Math.min(10, r.max));
   const pool = poolIds.map(monstro).filter(m => m && (m.tiers || []).length);
   if (!pool.length || !vagas) return { n: 0, tier: 0, pontos: 0, pool: pool.length };
@@ -501,10 +511,14 @@ function simularVagas(vagas, intensidade, poolIds, herois, p = projeto, ocupadas
   const livre = m => fig[m.tipo] > 0; let limitado = false;
   let pontos = Math.round(Math.max(1, Math.min(10, intensidade)) * 0.1 * Math.floor(herois * 1.5) * Math.max(1, r.progresso)); const inicio = pontos;
   const tem = t => pool.some(m => livre(m) && m.tiers.some(x => x.tier === t)); let n = 0, tier = max;
-  while (n < Math.min(5, vagas) && pontos >= custoTier(min)) { let t = tier; while (t >= min && (custoTier(t) > pontos || !tem(t))) t--; if (t < min) { limitado = !pool.some(livre); break; } tier = t; pontos -= custoTier(t); n++;
+  const minF = Math.max(0, Math.min(5, vagas, minimo || 0));
+  while (n < Math.min(5, vagas) && pontos >= custoTier(min)) { const reserva = Math.max(0, minF - n - 1) * custoTier(min); let t = tier; while (t >= min && (custoTier(t) + (t > min ? reserva : 0) > pontos || !tem(t))) t--; if (t < min) { limitado = !pool.some(livre); break; } tier = t; pontos -= custoTier(t); n++;
     const m = pool.filter(x => livre(x) && x.tiers.some(y => y.tier === t)).sort((a, b) => fig[b.tipo] - fig[a.tipo])[0]; fig[m.tipo]--; }
   if (!n) { if (!pool.some(livre)) return { n: 0, tier: 0, pontos: inicio, semFiguras: true, pool: pool.length };
-    const menores = pool.filter(livre).map(m => { const ts = m.tiers.map(x => x.tier).filter(t => t >= min && t <= max); return ts.length ? Math.min(...ts) : Math.min(...m.tiers.map(x => x.tier)); }); return { n: 1, tier: Math.min(...menores), pontos: inicio, curto: true, pool: pool.length }; }
+    const menores = pool.filter(livre).map(m => { const ts = m.tiers.map(x => x.tier).filter(t => t >= min && t <= max); return ts.length ? Math.min(...ts) : Math.min(...m.tiers.map(x => x.tier)); }); return { n: Math.max(1, minF), tier: Math.min(...menores), pontos: inicio, curto: true, pool: pool.length }; }
+  // (the minimum, when the points ran out first: the rest at the lowest tier, while miniatures are free)
+  while (n < minF && pool.some(livre)) { const m = pool.filter(livre).sort((a, b) => fig[b.tipo] - fig[a.tipo])[0]; fig[m.tipo]--; n++;
+    const ts = m.tiers.map(x => x.tier).filter(t => t >= min && t <= max); tier = Math.min(tier, ts.length ? Math.min(...ts) : Math.min(...m.tiers.map(x => x.tier))); }
   return { n, tier, pontos: inicio, pool: pool.length, limitado };
 }
 /* the table "what the game would do" for 1 to 4 heroes */
@@ -1069,7 +1083,15 @@ function carregarRapido(semPergunta) {
 const estadoAtualSemQuando = () => ({ campanha, projeto: campanha ? null : projeto, missaoAtual, salaAtual });
 /* the work in progress is kept every 2 s (only when it changed) and restored when the page is opened again */
 let _estadoGuardado = null, estadoPronto = false, _guardando = null;
-function temTrabalho() { return !!(projeto.salas.length || campanha || projeto.meta.name || Object.values(projeto.bestiario || {}).some(l => Array.isArray(l) && l.length)); }
+/* v294: the Workshop has something of the user: a list with something in it, besides the pool of feats as the editor sets it
+   up by itself (every feat of the game for every hero, predefinirProezas): a Workshop just reset is not work to keep */
+function poolDeProezasPadrao(b) {
+  const pool = (b && b.poolFacanhas) || []; if (!pool.length || typeof CAT === 'undefined' || !Array.isArray(CAT.facanhas) || typeof HEROIS_IDS === 'undefined') return false;
+  const padrao = CAT.facanhas.filter(c => c.HeroSource && HEROIS_IDS.includes(c.HeroSource.id)).map(c => c._id);
+  return pool.length === padrao.length && padrao.every(id => pool.includes(id));
+}
+function oficinaComTrabalho(b) { return Object.entries(b || {}).some(([k, l]) => Array.isArray(l) && l.length && !(k === 'poolFacanhas' && poolDeProezasPadrao(b))); }
+function temTrabalho() { return !!(projeto.salas.length || campanha || projeto.meta.name || oficinaComTrabalho(projeto.bestiario)); }
 function guardarEstado() {
   if ((typeof REDEFININDO !== 'undefined' && REDEFININDO) || !estadoPronto) return _guardando || Promise.resolve();
   if (EDITANDO_PADRAO) { guardarOficina(); return _guardando || Promise.resolve(); }   // (the work waits aside: only the Workshop is kept)

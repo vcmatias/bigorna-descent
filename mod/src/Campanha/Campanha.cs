@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
@@ -135,7 +135,7 @@ namespace Bigorna.Campanha
                 var ativos = partida?.ActiveDestinationIds;
                 if (ativos == null || ativos.Count == 0 || dados.CurrentSaveIndex == _ranhuraVista) return false;
                 _ranhuraVista = dados.CurrentSaveIndex;
-                foreach (var c in Dcamp.CarregarTodas(Bootstrap.PastaMapas))
+                foreach (var c in Bootstrap.Campanhas())
                 {
                     if (!c.Nos.Any(n => ativos.Contains(n.Id))) continue;
                     Log.Info("partida carregada é da campanha «" + c.NomeVisivel + "»; reabrindo");

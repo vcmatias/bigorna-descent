@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,7 +10,7 @@ using static Bigorna.Idioma;
 
 namespace Bigorna.Menu
 {
-    /// <summary>Lista dos .dmap da pasta CustomMaps, com botao para jogar. Desenhado em IMGUI na tela de titulo.</summary>
+    /// <summary>Lista dos mapas da pasta de mapas (v270: Bigorna\\Mapas; .bmap e .dmap), com botao para jogar. Desenhado em IMGUI na tela de titulo.</summary>
     public static class PainelMapas
     {
         static bool _aberto;
@@ -80,16 +80,23 @@ namespace Bigorna.Menu
             try { RecolhaDosDownloads.Recolher(Bootstrap.PastaMapas); } catch (Exception ex) { Log.Info("recolha: " + ex.Message); }
         }
 
-        static Leitura Ler(string pasta, string pacotes)
+        static Leitura Ler(string[] pastas, string pacotes)
         {
             var r = new Leitura(); var t0 = DateTime.UtcNow;
             try
             {
-                r.Campanhas = Dcamp.CarregarTodas(pasta, pacotes, true);   // (v264: só a ficha de cada arquivo)
-                var pastasDeCampanha = new HashSet<string>(r.Campanhas.Select(c => c.Pasta), StringComparer.OrdinalIgnoreCase);
-                r.Mapas = Dmap.CarregarTodos(pasta, pacotes, true);
-                foreach (var sub in Directory.GetDirectories(pasta))
-                    if (!pastasDeCampanha.Contains(sub)) r.Mapas.AddRange(Dmap.CarregarTodos(sub, pacotes, true)); // os mapas de campanha jogam-se pela campanha
+                // (v270: a pasta nova e a antiga; da antiga, só o que é do Bigorna: Dmap/Dcamp deixam de fora os de outro editor)
+                r.Campanhas = new List<Dcamp>(); r.Mapas = new List<Dmap>(); var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var pasta in pastas)
+                {
+                    if (!Directory.Exists(pasta)) continue;
+                    var cs = Dcamp.CarregarTodas(pasta, pacotes, true);   // (v264: só a ficha de cada arquivo)
+                    r.Campanhas.AddRange(cs.Where(c => string.IsNullOrEmpty(c.Id) || ids.Add(c.Id)));
+                    var pastasDeCampanha = new HashSet<string>(cs.Select(c => c.Pasta), StringComparer.OrdinalIgnoreCase);
+                    r.Mapas.AddRange(Dmap.CarregarTodos(pasta, pacotes, true));
+                    foreach (var sub in Directory.GetDirectories(pasta))
+                        if (!pastasDeCampanha.Contains(sub)) r.Mapas.AddRange(Dmap.CarregarTodos(sub, pacotes, true)); // os mapas de campanha jogam-se pela campanha
+                }
                 r.Alterados = new Dictionary<object, DateTime>();
                 foreach (var c in r.Campanhas) r.Alterados[c] = AlteradoDaCampanha(c);
                 foreach (var m in r.Mapas) r.Alterados[m] = Alterado(m.Caminho);
@@ -110,7 +117,7 @@ namespace Bigorna.Menu
         public static void Reler()
         {
             AntesDeLer();
-            Aplicar(Ler(Bootstrap.PastaMapas, Acervo.Pacotes.Carimbo()));
+            Aplicar(Ler(Bootstrap.PastasDeMapas, Acervo.Pacotes.Carimbo()));
         }
 
         /// <summary>A pasta lida ao fundo; pronto (na linha principal) quando acabar. Uma leitura em andamento serve.</summary>
@@ -120,7 +127,7 @@ namespace Bigorna.Menu
             _proximaLeitura = Time.unscaledTime + 5f;
             if (_lendo != null) return;
             AntesDeLer();
-            string pasta = Bootstrap.PastaMapas, pacotes = Acervo.Pacotes.Carimbo();
+            string[] pasta = Bootstrap.PastasDeMapas; string pacotes = Acervo.Pacotes.Carimbo();
             // (a lingua do jogo vem da Unity, que so responde na linha principal: lida aqui, vale para a leitura toda)
             try { Traducao.LinguaCongelada = Traducao.LinguaDoJogoAgora?.Invoke(); } catch { Traducao.LinguaCongelada = null; }
             _lendo = System.Threading.Tasks.Task.Run(() => Ler(pasta, pacotes));
@@ -202,14 +209,14 @@ namespace Bigorna.Menu
             GUILayout.EndHorizontal();
             GUILayout.Label(_aba == 0 ? T("Uma campanha encadeia vários mapas no mapa-múndi do jogo (diálogos, viagens, recompensas). Os mapas de uma campanha jogam-se por ela, não pela lista de mapas avulsos.",
                                          "A campaign links several maps on the game's world map (dialogues, travel, rewards). A campaign's maps are played through it, not from the standalone maps list.")
-                : _aba == 1 ? T("Um mapa avulso é um .dmap solto: começa direto no tabuleiro e, ao terminar, volta ao menu.",
-                                "A standalone map is a single .dmap: it starts right on the board and goes back to the menu when it ends.")
+                : _aba == 1 ? T("Um mapa avulso é um .bmap solto: começa direto no tabuleiro e, ao terminar, volta ao menu.",
+                                "A standalone map is a single .bmap: it starts right on the board and goes back to the menu when it ends.")
                 : T("As missões do próprio jogo, para jogar de novo qualquer uma delas com as regras oficiais: escolham a missão, o grupo e a dificuldade.",
                     "The game's own quests, to replay any of them with the official rules: choose the quest, the party and the difficulty."), _pequeno);
             GUILayout.Space(4f);
             _rolagem = GUILayout.BeginScrollView(_rolagem);
-            if (_aba == 0 && _campanhas.Count == 0) GUILayout.Label(T("Nenhuma campanha (.dcamp) na pasta. No editor, «Iniciar campanha» e depois «Exportar campanha».", "No campaigns (.dcamp) in the folder. In the editor, use “Start a campaign” and then “Export campaign”."), _texto);
-            if (_aba == 1 && _mapas.Count == 0) GUILayout.Label(T("Nenhum .dmap avulso na pasta. Exporte um mapa no editor e copie para cá.", "No standalone .dmap in the folder. Export a map in the editor and copy it here."), _texto);
+            if (_aba == 0 && _campanhas.Count == 0) GUILayout.Label(T("Nenhuma campanha (.bcamp) na pasta. No editor, «Iniciar campanha» e depois «Exportar campanha».", "No campaigns (.bcamp) in the folder. In the editor, use “Start a campaign” and then “Export campaign”."), _texto);
+            if (_aba == 1 && _mapas.Count == 0) GUILayout.Label(T("Nenhum .bmap avulso na pasta. Exporte um mapa no editor e copie para cá.", "No standalone .bmap in the folder. Export a map in the editor and copy it here."), _texto);
             if (_aba == 0) foreach (var c in _campanhas)
             {
                 if (!_progressos.TryGetValue(c, out var prog)) _progressos[c] = prog = Campanha.Progresso.Carregar(c);

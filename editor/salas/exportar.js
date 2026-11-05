@@ -1,4 +1,7 @@
-/* Bigorna Rooms v2 — export (.dmap v3, .dcamp v2), open, import rooms, autosave, settings, start-up. */
+/* Bigorna Rooms v2 — export (.bmap / .bcamp: the .dmap v3 and .dcamp v2 formats, with names of their own), open, import rooms, autosave, settings, start-up. */
+/* v270: the names of the files of Bigorna (the format stays "dmap"/"dcamp"; the names and the folder are its own, apart from
+   those of DescentForge, another mod of the same format). The old names still open */
+const EXT_MAPA = '.bmap', EXT_CAMPANHA = '.bcamp';
 'use strict';
 
 /* v255: an original of the game (imported from it: it has a base) always enters the game as the game's own, by its id, in the
@@ -95,7 +98,10 @@ function copiaSemPacotes(o, mapaDeCampanha) {
   return clone(raso);
 }
 const VERSAO_DMAP = 3, VERSAO_DCAMP = 2;
-function montarDmap(p = projeto) { return comProjeto(p, () => { const d = montarDmapDe(p); podarCustom(d.custom, [d]); podarBestiario(d.bigornaSalas && d.bigornaSalas.bestiario, d.custom); separarPacotes(d); return d; }); }
+function montarDmap(p = projeto) { return comProjeto(p, () => { const d = montarDmapDe(p); podarCustom(d.custom, [d]); podarBestiario(d.bigornaSalas && d.bigornaSalas.bestiario, d.custom); separarPacotes(d); manterRequires(d, p.meta); return d; }); }
+/* v294: without the Pacotes folder the editor cannot work out "requires": the one the file came with stays */
+const separaPacotes = () => !_semSepararPacotes && typeof Arquivos !== 'undefined' && Arquivos.ativo && (PACOTES_DA_PASTA || []).length > 0;
+function manterRequires(doc, meta) { if (!doc || separaPacotes() || doc.requires || !meta || !Array.isArray(meta.requiresLidos) || !meta.requiresLidos.length) return doc; doc.requires = meta.requiresLidos.map(q => ({ ...q })); return doc; }
 /* v241: the assets of the packages stay in the packages. In the app, an entry of a package of the Pacotes folder (a monster,
    an item, an NPC, a tile, an object, as the package has it) leaves the map or campaign, which names the package in
    "requires" (with the edition the author has): the mod takes the entries from the package installed, and the editor and
@@ -193,7 +199,7 @@ function montarDmapDe(p) {
   const marcas = new Map(); const marcaDe = e => { if (!todosGatilhos(e).length) return 0; if (!marcas.has(e)) marcas.set(e, marcas.size + 1); return marcas.get(e); };
   const inimigoExportado = (e, group, si) => ehPool(e.enemy) && si !== undefined
     ? { enemy: POOL_ID, pos: [e.pos[0], e.pos[1]], group: group + '-pool', tier: 0, level: e.level || 0, pool: poolDe(p, si).filter(id => monstro(id)).map(idExportado), intensity: intensidadeDaSala(p.salas[si]) }
-    : { enemy: idExportado(e.enemy), pos: [e.pos[0], e.pos[1]], group, tier: (e.tierPorHerois ? e.tierPorHerois[1] : e.tier) || 0, level: e.level || 0, ...(e.tierPorHerois ? { tierByHeroes: e.tierPorHerois.slice(0, 4) } : {}), ...(marcaDe(e) ? { tag: marcaDe(e) } : {}), ...(e.bonusAtaque ? { attackBonus: e.bonusAtaque } : {}), ...(e.bonusDefesa ? { defenseBonus: e.bonusDefesa } : {}) };
+    : { enemy: idExportado(e.enemy), pos: [e.pos[0], e.pos[1]], group, tier: (e.tierPorHerois ? e.tierPorHerois[1] : e.tier) || 0, level: e.level || 0, ...(e.tierPorHerois ? { tierByHeroes: e.tierPorHerois.slice(0, 4) } : {}), ...(marcaDe(e) ? { tag: marcaDe(e) } : {}), ...(e.bonusAtaque ? { attackBonus: e.bonusAtaque } : {}), ...(e.bonusDefesa ? { defenseBonus: e.bonusDefesa } : {}), ...(e.nomeProprio ? { name: e.nomeProprio } : {}) };
   let niveis = 1;
   /* tiles added by a trigger ("Add a tile"): hidden in their own group, with the objects on them */
   const adicionadas = pecasAdicionadas(p), casaAdicionada = new Map();
@@ -283,7 +289,7 @@ function montarDmapDe(p) {
           break; }
         case 'spawn': if (g.fonte === 'pool') { if ((g.cells || []).length) { const pool = poolDe(p, si).filter(id => monstro(id)).map(idExportado);
             // the spaces of the trigger are one group of balanced spaces: the mod applies the game's rule to all of them at once
-            g.cells.forEach(c => enemies.push({ enemy: POOL_ID, pos: [c[0], c[1]], group: g.uid, tier: 0, level: c[2] || 0, pool, intensity: intensidadeDoGatilho(g) }));
+            g.cells.forEach(c => enemies.push({ enemy: POOL_ID, pos: [c[0], c[1]], group: g.uid, tier: 0, level: c[2] || 0, pool, intensity: intensidadeDoGatilho(g), ...(g.minimo > 1 ? { minFigures: Math.min(g.minimo, g.cells.length) } : {}) }));
             acoes.push({ id: 'spawnGroup', params: { group: g.uid } });
             // "when the group is defeated": the consequences of the whole group, whenever its last monster falls
             const aoCair = acoesDe(s, si, o, 'grupo:' + g.uid, extras);
@@ -478,7 +484,7 @@ function montarDmapDe(p) {
   return {
     format: 'dmap', version: VERSAO_DMAP,
     meta: { id, name: p.meta.name || 'Map', author: p.meta.author || autorGuardado() || '', description: p.meta.description || '', language: p.meta.lingua || IDIOMA, difficulty: 'normal',
-      heroCount: [2, Math.max(2, Math.min(4, p.salas[0]?.herois.length || 4))], intro: p.meta.intro || '', ...(p.meta.regra ? { rules: p.meta.regra } : {}), requiresAct: atoNecessario(p) > 1 ? 'II' : 'I', music: p.meta.musica && p.meta.musica.arquivo ? { file: p.meta.musica.arquivo, title: p.meta.musica.nome || '', when: 'map', loop: p.meta.musica.loop !== false, url: '', event: '' } : { file: '', title: '', when: 'map', loop: true, url: '', event: p.meta.music || '' }, scene: '', background: p.meta.background || '',
+      heroCount: [2, Math.max(2, Math.min(4, p.salas[0]?.herois.length || 4))], intro: p.meta.intro || '', ...(p.campanha && (p.campanha.conclusao || '').trim() ? { outro: p.campanha.conclusao } : {}), ...(p.meta.regra ? { rules: p.meta.regra } : {}), requiresAct: atoNecessario(p) > 1 ? 'II' : 'I', music: p.meta.musica && p.meta.musica.arquivo ? { file: p.meta.musica.arquivo, title: p.meta.musica.nome || '', when: 'map', loop: p.meta.musica.loop !== false, url: '', event: '' } : { file: '', title: '', when: 'map', loop: true, url: '', event: p.meta.music || '' }, scene: '', background: p.meta.background || '',
       created: new Date().toISOString().slice(0, 10), editor: 'bigorna-rooms' },
     board: { gridSize: [60, 60], levels: niveis, tiles, blocked: [], floor: 'flagstone' },
     spawns: { heroStart: (p.salas[0]?.herois || []).map(h => [h[0], h[1], h[2] || 0]), enemies, interactables, reserve: [...new Set([...(p.reserva || []).filter(x => !(r0.remove || []).includes(x)), ...(r0.add || [])])].map(idExportado), itemPool: (p.itensPool || []).map(idItemExportado), ...(enemies.some(e => e.enemy === POOL_ID) ? { balance: (r => ({ minTier: r.min, maxTier: r.max, progression: r.progresso }))(regraDoBalanceio(p)) } : {}) },
@@ -534,7 +540,7 @@ function montarDcamp(reusar) {
   const bloqueados = new Set(); campanha.missoes.forEach(mp => (mp.salas || []).forEach(ss => donosDaSala(ss).forEach(({ o }) => todosGatilhos(o).forEach(g => { if (g.tipo === 'unlock_map') { const ant = projeto; projeto = mp; try { const nn = noDoDesbloqueio(g); if (nn) bloqueados.add(nn.id); } finally { projeto = ant; } } }))));
   campanha.missoes.forEach(mp => (mp.contadores || []).forEach(c => todosGatilhos(c).forEach(g => { if (g.tipo === 'unlock_map') { const nn = noDoDesbloqueio(g); if (nn) bloqueados.add(nn.id); } })));
   const nodes = campanha.nos.filter(ehAncora).map(n => ({ id: ids[n.id], num: n.num, name: nomeDoNo(n), description: n.descricao || '', coords: [n.coords[0], n.coords[1]],
-    marker: n.marcador || (n.tipo === 'side' ? 'side' : n.tipo === 'travel' ? 'narrative' : 'main'), kind: n.tipo === 'travel' ? 'dialogue' : 'scenario', map: n.tipo === 'travel' ? '' : ids[n.id] + '.dmap',
+    marker: n.marcador || (n.tipo === 'side' ? 'side' : n.tipo === 'travel' ? 'narrative' : 'main'), kind: n.tipo === 'travel' ? 'dialogue' : 'scenario', map: n.tipo === 'travel' ? '' : ids[n.id] + EXT_MAPA,
     onArrive: ganchos[n.id]?.onArrive || '', onTravel: '', onComplete: n.tipo === 'travel' ? '' : (ganchos[n.id]?.onComplete || ''),
     spawn: { auto: n.auto !== false, afterNodes: ancorasAntes(n).map(a => ids[a.id]).filter(Boolean), afterQuests: [], questsThisAct: 0, ...(bloqueados.has(n.id) ? { unlockVar: varDesbloqueio(n.id) } : {}), ...(n.seEscolha ? { choice: { var: varEscolha(n.seEscolha.nome), value: n.seEscolha.sim === false ? 0 : 1 } } : {}) },
     rewards: { items: (n.recompensas?.items || []).map(idItemExportado), materials: n.recompensas?.materials || 0, gold: n.recompensas?.gold || 0 } }));
@@ -556,14 +562,14 @@ function montarDcamp(reusar) {
     const k = contexto + '|' + id + '|' + impressaoDaObra(mp); const c = _dmapsDaMissao.get(mp); if (c && c.k === k) return c.doc;
     // (the key taken again after making the map: making it fills defaults in the mission)
     const d = montarDmap(mp); d.meta.id = id; _dmapsDaMissao.set(mp, { k: contexto + '|' + id + '|' + impressaoDaObra(mp), doc: d }); return d; };
-  const mapas = campanha.nos.filter(n => n.tipo === 'map' || n.tipo === 'side').map(n => ({ nome: ids[n.id] + '.dmap', doc: mapa(campanha.missoes[n.missao], ids[n.id]) }));
+  const mapas = campanha.nos.filter(n => n.tipo === 'map' || n.tipo === 'side').map(n => ({ nome: ids[n.id] + EXT_MAPA, doc: mapa(campanha.missoes[n.missao], ids[n.id]) }));
   podarCustom(dcamp.custom, [dcamp, ...mapas.map(m => m.doc)]);   // (the campaign's: what any of its maps or its dialogues uses)
   podarBestiario(dcamp.bigornaSalas && dcamp.bigornaSalas.campanha && dcamp.bigornaSalas.campanha.bestiario, dcamp.custom);
   // (v238: the tiles and objects of a campaign go in its maps, where the mod reads them: the campaign's own list was 30 MB
   // the game never read)
   dcamp.custom.tiles = []; dcamp.custom.objects = [];
   // (v241: the packages every map needs, named by the campaign too, and what of them it carries taken out)
-  separarPacotes(dcamp); const req = new Map(); [dcamp, ...mapas.map(m => m.doc)].forEach(d => (d.requires || []).forEach(q => req.set(q.id, q)));
+  separarPacotes(dcamp); manterRequires(dcamp, campanha.meta); const req = new Map(); [dcamp, ...mapas.map(m => m.doc)].forEach(d => (d.requires || []).forEach(q => req.set(q.id, q)));
   if (req.size) dcamp.requires = [...req.values()];
   return { cid, dcamp, mapas };
 }
@@ -572,11 +578,11 @@ async function exportarCampanha() {
   await prepararTopos();
   const { cid, dcamp, mapas } = montarDcamp();
   await originaisProntos();
-  const r = await exportarComImagens(cid + '.dcamp', dcamp, cid); const usadas = new Set(r.imagens);
+  const r = await exportarComImagens(cid + EXT_CAMPANHA, dcamp, cid); const usadas = new Set(r.imagens);
   for (const m of mapas) (await exportarComImagens(m.nome, m.doc, cid)).imagens.forEach(n => usadas.add(n));
   if (r.onde === 'pasta') await limparImagensDaPasta(cid, usadas);   // (v240: the pictures no file of the campaign uses leave its folder)
   for (const a of [...musicasDosMapas(mapas.map(m => m.doc), cid), ...videosDasCenas(dcamp, cid)]) if (a.texto) await Config.exportar(a.nome, a.texto, cid);
-  aviso(r.onde === 'pasta' ? 'Campaign saved to ' + r.pasta + ' (' + (mapas.length + 1) + ' files).' : 'Downloaded ' + (mapas.length + 1) + ' files. Put them all in a folder named “' + cid + '” inside CustomMaps.');
+  aviso(r.onde === 'pasta' ? 'Campaign saved to ' + r.pasta + ' (' + (mapas.length + 1) + ' files).' : 'Downloaded ' + (mapas.length + 1) + ' files. Put them all in a folder named “' + cid + '” inside Bigorna\\Mapas.');
   if (r.onde === 'pasta') Auto.marcar();
 }
 $('#btnExportar').onclick = () => exportarTudo();
@@ -589,7 +595,7 @@ async function exportarTudo(semPerguntar) {
   if (!campanha) {
     const d = montarDmap();
     await originaisProntos();
-    const r = await exportarComImagens(d.meta.id + '.dmap', d);
+    const r = await exportarComImagens(d.meta.id + EXT_MAPA, d);
     for (const a of musicasDosMapas([d], null)) if (a.texto) await Config.exportar(a.nome, a.texto);
     aviso(r.onde === 'pasta' ? 'Saved to ' + r.pasta + '\\' + r.nome + '. In the game, open “Community maps”.' : 'Downloaded ' + r.nome + '. The game brings it from Downloads into its maps list by itself (with the mod).');
     if (r.onde === 'pasta') Auto.marcar();
@@ -605,7 +611,7 @@ function apagarTudo() {
   if (!projeto.salas.length && !m.name && !m.intro && !m.description && !(projeto.reserva || []).length) return aviso('The map has nothing to clear.');
   const oque = 'the ' + projeto.salas.length + ' room(s) of the map “' + (m.name || 'without a name') + '”: tiles, pillars, objects, monsters, hero spaces and their triggers, and its name and map setup (texts, music, mission, pools, counters)';
   modal('Clear the map?', `<p>This erases ${esc(oque)}. The workshop${campanha ? ', the other maps, the campaign' : ''} and the author stay. Files already exported stay in the folder.</p><p class="ajuda">Do you want to export it before clearing?</p>
-    <button class="op destaque" data-o="exp"><b>Export, then clear</b><small>${campanha ? 'Writes the .dcamp and its maps' : 'Writes the .dmap'}${Config.nomePasta() ? ' into ' + esc(Config.nomePasta()) : ' (download)'}, then clears.</small></button>
+    <button class="op destaque" data-o="exp"><b>Export, then clear</b><small>${campanha ? 'Writes the .bcamp and its maps' : 'Writes the .bmap'}${Config.nomePasta() ? ' into ' + esc(Config.nomePasta()) : ' (download)'}, then clears.</small></button>
     <button class="op perigo" data-o="ja"><b>Clear without exporting</b><small>Everything not exported is lost.</small></button>
     <div class="rodape"><button data-o="nao">Cancel</button></div>`, (el, fechar) => {
     el.querySelector('[data-o="nao"]').onclick = fechar;
@@ -620,7 +626,7 @@ function limparMapa() {
   Object.keys(novo).forEach(k => { if (k !== 'bestiario') projeto[k] = novo[k]; });
   projeto.meta.author = autor; if (!projeto.bestiario) projeto.bestiario = novo.bestiario;
   salaAtual = -1; sel = null; ferramenta = null; escolha = null; nivel = 0; gatAberto = -1;
-  guardarEstado(); if (!campanha && !Object.values(projeto.bestiario || {}).some(l => Array.isArray(l) && l.length)) apagarEstadoGuardado();
+  guardarEstado(); if (!campanha && !oficinaComTrabalho(projeto.bestiario)) apagarEstadoGuardado();   // (v294: the default pool of feats is no work)
   camposDaMissao(); tudo(); enquadrar(); aviso('The map was cleared. Start with the starting room.');
 }
 function limparTudo() {
@@ -638,8 +644,12 @@ function lerProjetoDe(texto) {
   const d = JSON.parse(texto);
   // (a file of a newer editor opens as well: what this one does not know stays out)
   const novo = (d.format === 'dcamp' ? d.version > VERSAO_DCAMP : d.version > VERSAO_DMAP) || undefined;
-  if (d.format === 'dcamp' && d.bigornaSalas?.campanha) return { campanha: d.bigornaSalas.campanha, novo };
-  if (d.format === 'dmap' && d.bigornaSalas) return { projeto: d.bigornaSalas, novo };
+  // (v294: the packages the file requires go with the work: an editor without the Pacotes folder (the browser) cannot tell
+  //  them from the entries, and the file saved again lost its "requires": the game then left the package's monsters out)
+  const req = Array.isArray(d.requires) ? d.requires.filter(q => q && q.id) : [];
+  const comReq = x => { if (x && req.length) { x.meta = x.meta || {}; x.meta.requiresLidos = req; } return x; };
+  if (d.format === 'dcamp' && d.bigornaSalas?.campanha) return { campanha: comReq(d.bigornaSalas.campanha), novo };
+  if (d.format === 'dmap' && d.bigornaSalas) return { projeto: comReq(d.bigornaSalas), novo };
   throw new Error('This file was not made with Bigorna Rooms (it has no room data), so its logic cannot be read.');
 }
 async function escolherArquivo(tipos) {
@@ -650,18 +660,20 @@ async function escolherArquivo(tipos) {
   return new Promise(resolve => { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = tipos.join(','); inp.onchange = async () => { const f = inp.files[0]; resolve(f ? await f.text() : null); }; inp.oncancel = () => resolve(null); inp.click(); });
 }
 async function abrirArquivo() {
-  const texto = await escolherArquivo(['.dmap', '.dcamp']); if (!texto) return;
+  const texto = await escolherArquivo(['.bmap', '.bcamp', '.dmap', '.dcamp']); if (!texto) return;
   // (v241: a file that needs packages opens only with them here)
   { let req = null; try { req = JSON.parse(texto).requires; } catch { } const faltam = await pacotesQueFaltam(req); if (faltam.length) { avisarPacotesQueFaltam(faltam, /"format"\s*:\s*"dcamp"/.test(texto.slice(0, 200)) ? 'campanha' : 'mapa'); return 'fechar'; } }
   const que = lerProjetoDe(texto);
+  // (v270: a .dmap/.dcamp from before the signature opens as well; saving writes it as .bmap/.bcamp, and the old file stays)
+  let antigo = false; try { antigo = JSON.parse(texto).app !== 'bigorna'; } catch { }
   await extrairImagens(que.campanha || que.projeto);   // (v240: the pictures into the store; the work keeps their references)
   await recolherImagens(que.campanha || que.projeto);
   if (que.campanha) { aplicarEstado({ campanha: que.campanha, missaoAtual: 0, salaAtual: 0 }); } else { aplicarEstado({ projeto: que.projeto, salaAtual: 0 }); }
-  carregarAudios(); camposDaMissao(); tudo(); enquadrar(); setTimeout(avisarPacotesNovos, 3200); que.novo ? avisoLongo('This file was made with a newer version of the editor: it opened, but what this version does not know was left out. Update Bigorna before saving it again.') : aviso((que.campanha ? 'Campaign' : 'Map') + ' opened.');
+  carregarAudios(); camposDaMissao(); tudo(); enquadrar(); setTimeout(avisarPacotesNovos, 3200); que.novo ? avisoLongo('This file was made with a newer version of the editor: it opened, but what this version does not know was left out. Update Bigorna before saving it again.') : antigo ? avisoLongo(que.campanha ? 'Campaign opened. It is in the old format (.dcamp): when saved, it becomes a .bcamp with its maps as .bmap, and the old files stay as they are.' : 'Map opened. It is in the old format (.dmap): when saved, it becomes a .bmap, and the old file stays as it is.') : aviso((que.campanha ? 'Campaign' : 'Map') + ' opened.');
   return 'fechar';
 }
 async function importarSalas() {
-  const texto = await escolherArquivo(['.dmap']); if (!texto) return;
+  const texto = await escolherArquivo(['.bmap', '.dmap']); if (!texto) return;
   let d; try { d = JSON.parse(texto); } catch { return aviso('That file is not readable JSON.'); }
   { const faltam = await pacotesQueFaltam(d.requires); if (faltam.length) return avisarPacotesQueFaltam(faltam, 'mapa'); }
   if (d.format !== 'dmap' || !d.bigornaSalas?.salas) return aviso('That map was not made with Bigorna Rooms: its room logic is not readable, so nothing was imported.');
@@ -710,9 +722,9 @@ const Auto = (() => {
     typeof LINGUA_EDICAO !== 'undefined' ? LINGUA_EDICAO : '', Object.keys(TOPOS).length, IDIOMA].join('|'); } catch { return null; } };
   function retrato() {
     try {
-      if (campanha) { const { cid, dcamp, mapas } = montarDcamp(true); const mus = [...musicasDosMapas(mapas.map(m => m.doc), cid), ...videosDasCenas(dcamp, cid)]; return { chave: impressao([dcamp.nodes, dcamp.dialogues, mapas.map(m => m.doc.board), mapas.map(m => m.doc.spawns), mapas.map(m => m.doc.triggers), dcamp.custom, mapas.map(m => m.doc.meta), mus.map(a => a.nome + !!a.texto)]), arquivos: [Object.assign(textoTardio(cid + '.dcamp', dcamp, cid), { adiavel: true }), ...mapas.map(m => textoTardio(m.nome, m.doc, cid)), ...mus] }; }
+      if (campanha) { const { cid, dcamp, mapas } = montarDcamp(true); const mus = [...musicasDosMapas(mapas.map(m => m.doc), cid), ...videosDasCenas(dcamp, cid)]; return { chave: impressao([dcamp.nodes, dcamp.dialogues, mapas.map(m => m.doc.board), mapas.map(m => m.doc.spawns), mapas.map(m => m.doc.triggers), dcamp.custom, mapas.map(m => m.doc.meta), mus.map(a => a.nome + !!a.texto)]), arquivos: [Object.assign(textoTardio(cid + EXT_CAMPANHA, dcamp, cid), { adiavel: true }), ...mapas.map(m => textoTardio(m.nome, m.doc, cid)), ...mus] }; }
       if (!projeto.salas.length && !projeto.meta.name) return null;
-      const d = montarDmap(); const mus = musicasDosMapas([d], null); return { chave: impressao([d.board, d.spawns, d.triggers, d.objectives, d.meta, d.custom, mus.map(a => a.nome + !!a.texto)]), arquivos: [textoTardio(d.meta.id + '.dmap', d, null), ...mus] };
+      const d = montarDmap(); const mus = musicasDosMapas([d], null); return { chave: impressao([d.board, d.spawns, d.triggers, d.objectives, d.meta, d.custom, mus.map(a => a.nome + !!a.texto)]), arquivos: [textoTardio(d.meta.id + EXT_MAPA, d, null), ...mus] };
     } catch (e) { console.warn('autosave', e); return null; }
   }
   /* (v239: the campaign file carries the editor's copy of every map: in a big campaign it is tens of MB, and each change in
@@ -725,7 +737,7 @@ const Auto = (() => {
   /* (the campaign's folder: once every file of it was written in this session, the pictures none uses go away; at most once a minute) */
   async function limparPastaDaCampanha(arquivos) {
     const sub = arquivos[0] && arquivos[0].sub; if (!sub || Date.now() - limpezaDaPasta.quando < 60000) return;
-    const docs = arquivos.filter(a => /\.(dmap|dcamp)$/.test(a.nome)).map(a => sub + '/' + a.nome); if (!docs.every(c => imagensDoArquivo.has(c))) return;
+    const docs = arquivos.filter(a => /\.(bmap|bcamp|dmap|dcamp)$/.test(a.nome)).map(a => sub + '/' + a.nome); if (!docs.every(c => imagensDoArquivo.has(c))) return;
     const usadas = new Set(); docs.forEach(c => imagensDoArquivo.get(c).forEach(n => usadas.add(n)));
     const marca = [...usadas].sort().join(','); if (marca === limpezaDaPasta.marca) return;
     limpezaDaPasta = { quando: Date.now(), marca }; await limparImagensDaPasta(sub, usadas);
@@ -781,8 +793,8 @@ const Auto = (() => {
 const EXTRAS_CONFIG = [
   { secao: 'Language / Idioma', opcoes: IDIOMAS, valor: () => IDIOMA, acao: v => mudarIdioma(v) },   // idioma.js: saves the work, then reloads
   { campo: 'Author (goes into every map and campaign file you export)', valor: () => autorGuardado(), acao: v => { guardarAutor(v); projeto.meta.author = v; if (campanha) { campanha.meta.author = v; campanha.missoes.forEach(m => { m.meta.author = v; }); } renderConferencia(); } },
-  { rotulo: '📂 Open a map or campaign…', acao: abrirArquivo, ajuda: 'Open a .dmap or .dcamp made with Bigorna Rooms (replaces the current work).' },
-  { rotulo: '⇩ Import rooms from a .dmap…', acao: importarSalas, ajuda: 'Brings chosen rooms of another Bigorna map into this one, without replacing it.' },
+  { rotulo: '📂 Open a map or campaign…', acao: abrirArquivo, ajuda: 'Open a .bmap or .bcamp made with Bigorna Rooms (replaces the current work).' },
+  { rotulo: '⇩ Import rooms from a .bmap…', acao: importarSalas, ajuda: 'Brings chosen rooms of another Bigorna map into this one, without replacing it.' },
   { rotulo: '💾 Quick save (F5)', acao: salvarRapido, ajuda: 'Quick save keeps a copy in this browser; quick load brings it back.' },
   { rotulo: '↩ Quick load (F9)', acao: () => carregarRapido() },
   { secao: 'Workshop packages', rotulo: '📦 Export a package…', acao: () => { exportarPacote(); return 'fechar'; }, ajuda: 'A .bigorna file with what you made in the Workshop (monsters, NPCs, items, weapons, recipes, feats, skills with their cards, heroes, tiles, objects): the parts you pick, or everything at once.' },
@@ -830,7 +842,7 @@ function abrirTerrenoDasCaixas() {
    to export the work. */
 let REDEFININDO = false;
 function resetarConfiguracoes() {
-  const temTrabalho = !!(campanha || projeto.salas.length || projeto.meta.name || Object.values(bestiario() || {}).some(l => Array.isArray(l) && l.length));
+  const temTrabalho = !!(campanha || projeto.salas.length || projeto.meta.name || oficinaComTrabalho(bestiario()));   // (v294)
   modal(tr('Reset everything?'), `<p>${tr('This erases everything the editor keeps: the map or campaign on screen, the Workshop (monsters, items, materials, objects, imported or made), the packages (in the app: the Pacotes folder, every package in it), the pictures kept by the editor, the quick save, your archetypes, the hints and warnings, window positions and sizes, the author, the export folder and the autosave.')}</p><p class="ajuda">${tr('The language of the editor stays. Maps and campaigns already exported stay in their folder (those that require packages ask for them again).')}</p>
     ${temTrabalho ? `<button class="op destaque" data-o="exp"><b>${tr('Export, then reset')}</b><small>${tr('Writes the work on screen first.')}</small></button>` : ''}
     <button class="op perigo" data-o="ja"><b>${tr('Reset everything')}</b><small>${tr('Everything not exported is lost.')}</small></button>

@@ -124,7 +124,7 @@ function acompanharOriginais() {
 
 // ------------------------------------------------------------ export: "languages" and "translations"
 /* an id, a file, a date: never a text (an id made from a name changes with the language; the file keeps the original's) */
-const pareceId = s => /^[a-z0-9][a-z0-9_.:\-\/]*$/.test(s) || /\.(dmap|dcamp|ogg|mp3|wav|mp4|webm|png|jpe?g|glb|gltf|obj)$/i.test(s) || /^@/.test(s);
+const pareceId = s => /^[a-z0-9][a-z0-9_.:\-\/]*$/.test(s) || /\.(bmap|bcamp|dmap|dcamp|ogg|mp3|wav|mp4|webm|png|jpe?g|glb|gltf|obj)$/i.test(s) || /^@/.test(s);
 function diffTextos(a, b, out = {}) {
   if (typeof a === 'string') { if (typeof b === 'string' && a !== b && a.trim() && b.trim() && !pareceId(a) && !Object.prototype.hasOwnProperty.call(out, a)) out[a] = b; return out; }
   if (Array.isArray(a)) { if (Array.isArray(b)) for (let i = 0; i < Math.min(a.length, b.length); i++) diffTextos(a[i], b[i], out); return out; }

@@ -18,7 +18,8 @@ namespace Bigorna
         GUIStyle _rotulo;
         bool _salvandoAntes;
 
-        void Awake() { Instancia = this; Canvas.willRenderCanvases += AntesDaInterface; }
+        void Awake() { Instancia = this; Canvas.willRenderCanvases += AntesDaInterface; if (!_vigiando) { _vigiando = true; Application.logMessageReceived += VigiarCargaDoMundo; } }
+        void OnApplicationQuit() { try { Menu.Oneshot.FecharGerador("o jogo fechou"); } catch { } }   // (v274; o gerador também vigia o processo do jogo)
         void OnDestroy() { Canvas.willRenderCanvases -= AntesDaInterface; }
         /// <summary>Logo antes de a interface ser desenhada, em todo quadro: os retratos proprios entram no lugar dos do jogo sem piscar.</summary>
         static void AntesDaInterface() { try { if (Roteiro.EmMarcha || Jogo.EncontroPronto) Personalizados.RetratosAntesDoQuadro(); } catch { } try { HeroisProprios.FormasNasArmas(); } catch { } }
@@ -30,7 +31,10 @@ namespace Bigorna
             if (Input.GetKeyDown(KeyCode.F9)) { Relatos.Alternar(); if (Relatos.Aberto) Visivel = true; }
             try { Depuracao.Teclas(); } catch (Exception ex) { Log.Erro("modo de teste", ex); }
             try { VigiarCena(); } catch (Exception ex) { Log.Erro("vigiando a cena", ex); }
+            try { Encontro.Lancador.DestravarCarga(); } catch { }   // (v288: o quadro de carregamento escondido)
             try { Menu.BotaoDoMenu.Batimento(); } catch (Exception ex) { Log.Erro("botão do menu", ex); }
+            try { Menu.TelaDeMapas.Batimento(); } catch (Exception ex) { Log.Erro("tela de mapas", ex); }
+            try { GrupoDoSave.Batimento(); } catch (Exception ex) { Log.Erro("quadro do grupo", ex); }   // (v286)   // (v280: o Novo jogo + que volta do quadro de dificuldade)
             try { Menu.PainelMapas.Batimento(); if (Jogo.CenaAtual() == Scene.Titlescene) Menu.PainelMapas.Aquecer(); } catch (Exception ex) { Log.Erro("lendo os mapas da comunidade", ex); }   // (v263: a pasta lida ao fundo; na tela de título, antes do primeiro clique)
             try { Campanha.SavesDaComunidade.Batimento(); } catch (Exception ex) { Log.Erro("partidas da comunidade", ex); }
             try { Menu.Atualizacao.Batimento(); } catch (Exception ex) { Log.Erro("atualização", ex); }
@@ -39,6 +43,7 @@ namespace Bigorna
             try { HeroisProprios.RetratosNaTela(); } catch { }
             try { if (Jogo.EmEncontro) Objetos.VigiarHeroi(); } catch { }
             try { VozesProprias.Batimento(); } catch (Exception ex) { Log.Erro("sons dos monstros", ex); }
+            try { CanalDeTeste.Batimento(); } catch (Exception ex) { Log.Erro("canal de teste", ex); }   // (v268: desligado sem o arquivo Bigorna\Teste\ativo)
             // enquanto o jogo grava a partida, nada entra nem sai da mesa (a gravacao cairia no meio)
             bool salvando = Jogo.Salvando;
             if (salvando != _salvandoAntes)
@@ -82,7 +87,8 @@ namespace Bigorna
             try { PacoteVirtual.Instalar(); } catch { }
             bool mundo = cena == Scene.Worldmap || cena == Scene.City;
             if (cena == Scene.Titlescene) Idioma.JogoPronto = true;
-            if (cena == Scene.Titlescene) { try { HeroisProprios.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando os heróis", ex); } try { ReceitasProprias.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando as receitas", ex); } try { FacanhasProprias.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando as façanhas", ex); } try { PericiasProprias.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando as perícias", ex); } PainelMapas.Reler(); Campanha.Campanha.Fechar(); Campanha.MapaMundi.RegistrarTodas(); StartCoroutine(Campanha.SavesDaComunidade.AoEntrarNoTitulo()); try { Dados.DadosDoEditor.NoTitulo(); } catch (Exception ex) { Log.Erro("dados do editor", ex); } }
+            if (antes == Scene.Titlescene && cena != Scene.Titlescene) Menu.Oneshot.FecharGerador("a tela de título ficou para trás");   // (v274)
+            if (cena == Scene.Titlescene) { try { GrupoDoSave.RecuperarPendente(); } catch (Exception ex) { Log.Erro("a pergunta do grupo", ex); } try { HeroisProprios.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando os heróis", ex); } try { ReceitasProprias.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando as receitas", ex); } try { FacanhasProprias.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando as façanhas", ex); } try { PericiasProprias.Restaurar(); } catch (Exception ex) { Log.Erro("restaurando as perícias", ex); } PainelMapas.Reler(); Campanha.Campanha.Fechar(); Campanha.MapaMundi.RegistrarTodas(); StartCoroutine(Campanha.SavesDaComunidade.AoEntrarNoTitulo()); try { Dados.DadosDoEditor.NoTitulo(); } catch (Exception ex) { Log.Erro("dados do editor", ex); } }
             if (mundo)
             {
                 try
@@ -105,14 +111,70 @@ namespace Bigorna
             if (cena == Scene.Titlescene) Menu.MapasOficiais.EmJogo = false;
         }
 
+        static DateTime _quedaDoMundo = DateTime.MinValue; static bool _vigiando;
+        static void VigiarCargaDoMundo(string texto, string pilha, LogType tipo)
+        {
+            if (tipo == LogType.Exception && ((pilha ?? "").Contains("CoroutineLoadWorldMap") || (texto ?? "").Contains("CoroutineLoadWorldMap"))) _quedaDoMundo = DateTime.UtcNow;
+        }
         System.Collections.IEnumerator VoltarAoMenu()
         {
             Log.Info("missão avulsa encerrada: voltando ao menu");
-            float limite = Time.unscaledTime + 20f;
-            while (Time.unscaledTime < limite && (Jogo.Carregador == null || Jogo.Carregador.IsLoading)) yield return null;
+            float limite = Time.unscaledTime + 20f; var desde = DateTime.UtcNow.AddSeconds(-3);
+            {
+            // (v288: o jogo carrega o mapa-mundi e espera o «Continuar» do quadro de carregamento, que fica escondido: a carga
+            //  ficava pendurada até o limite e, solta mais tarde (no mapa seguinte), caía sem o mapa-mundi e travava o começo do
+            //  outro mapa. Agora a carga para ali, e a tela de título vem logo)
+            while (Time.unscaledTime < limite && (Jogo.Carregador == null || Jogo.Carregador.IsLoading))
+            {
+                try
+                {
+                    var tela = Jogo.UI?.LoadingScreen;
+                    // (v288: numa partida retomada a carga do mapa-mundi cai antes do «Continuar» (NullReference no jogo) e fica
+                    //  como carregando: o erro dela no registro do jogo conta como carga caída)
+                    bool caiu = _quedaDoMundo > desde;
+                    if (tela != null && (tela.IsWaitingForInput || caiu))
+                    {
+                        // (o mapa-mundi não serve à missão avulsa: a carga dele para ali, sem o diálogo nem a música dele)
+                        Log.Info(tela.IsWaitingForInput ? "missão avulsa encerrada: a carga do mapa-mundi esperava «Continuar»; paro a carga e volto ao menu" : "missão avulsa encerrada: a carga do mapa-mundi parou no meio; volto ao menu");
+                        // (v289: só com o campo da carga achado; se o jogo mudou por dentro, a carga segue do jeito do próprio jogo:
+                        //  o toque no «Continuar», ou a espera até o limite, como antes)
+                        var campo = CampoDaCarga;
+                        if (campo == null)
+                        {
+                            if (!_avisouCampo) { _avisouCampo = true; Log.Info("AVISO: o jogo mudou por dentro (LevelLoader._isLoading); a volta ao menu segue do jeito antigo"); }
+                            if (tela.IsWaitingForInput) Jogo.UI.OnLoadingScreenContinueClicked();
+                        }
+                        else
+                        {
+                            Jogo.Carregador.StopAllCoroutines();
+                            campo.SetValue(Jogo.Carregador, false);
+                            tela.IsWaitingForInput = false; try { tela.ButtonLoadingContinue.gameObject.SetActive(false); } catch { }
+                            break;
+                        }
+                    }
+                }
+                catch (Exception ex) { Log.Erro("parando a carga do mapa-mundi", ex); }
+                yield return null;
+            }
+            }
+            if (Jogo.Carregador != null && Jogo.Carregador.IsLoading) Log.Info("missão avulsa encerrada: o mapa-mundi ainda carregava depois de 20 s");
             yield return new WaitForSeconds(0.5f);
             try { Jogo.Carregador.LoadTitlescreen(false, false, false); }
-            catch (Exception ex) { Log.Erro("voltando ao menu", ex); }
+            catch (Exception ex) { Log.Erro("voltando ao menu", ex); yield break; }
+            // (v289: a conferência: a tela de título abre e a carga termina; senão, fica no registro, para o F9 levar)
+            float ate = Time.unscaledTime + 40f;
+            while (Time.unscaledTime < ate && !(Jogo.CenaAtual() == Scene.Titlescene && Jogo.Carregador != null && !Jogo.Carregador.IsLoading)) yield return null;
+            if (Jogo.CenaAtual() == Scene.Titlescene && Jogo.Carregador != null && !Jogo.Carregador.IsLoading) Log.Info("missão avulsa encerrada: de volta à tela de título");
+            else Log.Info("AVISO: a volta ao menu não terminou em 40 s (cena " + Jogo.CenaAtual() + ", carregando " + (Jogo.Carregador?.IsLoading.ToString() ?? "?") + ")");
+        }
+        static System.Reflection.FieldInfo _campoDaCarga; static bool _campoProcurado, _avisouCampo;
+        static System.Reflection.FieldInfo CampoDaCarga
+        {
+            get
+            {
+                if (!_campoProcurado) { _campoProcurado = true; try { var f = typeof(LevelLoader).GetField("_isLoading", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic); _campoDaCarga = f != null && f.FieldType == typeof(bool) ? f : null; } catch { } }
+                return _campoDaCarga;
+            }
         }
 
         void OnGUI()

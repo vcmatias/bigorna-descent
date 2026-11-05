@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Bigorna.Encontro;
@@ -40,6 +40,10 @@ namespace Bigorna.Motor
         static int _versao = -1, _pintado = -2;
 
         public static void Fechar() { _aberto = false; _porConfirmar = null; }
+        /// <summary>v268 (canal de teste): o que a mesa oferece agora, na ordem do painel (seção, rótulo).</summary>
+        public static List<(string secao, string rotulo)> Itens() { Montar(); return _itens.Select(i => (i.Secao, i.Rotulo)).ToList(); }
+        /// <summary>v268 (canal de teste): faz o item i da mesa, como o botão do painel (sem a confirmação).</summary>
+        public static bool Fazer(int i) { Montar(); if (i < 0 || i >= _itens.Count) return false; var it = _itens[i]; it.Acao?.Invoke(); Atualizar(); return true; }
         public static void Atualizar() { _versao++; }
 
         static string Area(Dictionary<string, object> p)
@@ -108,7 +112,7 @@ namespace Bigorna.Motor
             {
                 if (feito || !Roteiro.Anunciado(o)) continue;
                 int ii = i;
-                _itens.Add(new Item { Secao = T("Objetivos", "Objectives"), Rotulo = T("Opcional cumprido: ", "Optional completed: ") + Roteiro.TextoDe(o), Confirmar = true, Acao = () => Roteiro.MarcarOpcional(ii) });
+                _itens.Add(new Item { Secao = T("Objetivos", "Objectives"), Rotulo = (string.IsNullOrEmpty(o.Missao) ? T("Opcional cumprido: ", "Optional completed: ") : T("Cumprido: ", "Completed: ")) + Roteiro.TextoDe(o), Confirmar = true, Acao = () => Roteiro.MarcarOpcional(ii) });
             }
             foreach (var d in m.Roteiro.Derrota)
             {

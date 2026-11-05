@@ -6,7 +6,8 @@
    and terrain drawn; the monsters and items are the game's (the starter selection of the boxes the player owns), so the
    map plays in the language of the game. The game chooses only the length, the difficulty and the boxes (from its collection).
    pedido: { duracao: 'curta'|'media'|'longa', dificuldade: 'facil'|'normal'|'dificil', atos: 1|2, semente?: text,
-             atoGrupo?: 1|2 (v261: the act of the saved party, for the simulation's health) }
+             atoGrupo?: 1|2 (v261: the act of the saved party, for the simulation's health),
+             monstros?: [id] (v292: the original monsters, those of the boxes of the game's collection) }
    answer: { semente (v266: the seed that is enough on its own, unless one in another shape was asked), duracao, dificuldade, atos, nome, dmap (the .dmap as text), simulacao: [{ herois, vida (per hero), venceu, rodadas, limite, perda, vidaMin, monstros,
              itens, achados }] } or { erro } */
 const MODO_GERADOR = typeof location !== 'undefined' && /[?&]gerador=1(&|$)/.test(location.search || '');
@@ -24,7 +25,12 @@ const BigornaGerador = {
       if (!semente) semente = sementeCompleta(duracao, dificuldade, atos);
       recomecarTraducao();
       // the Workshop of the generation: only the game's own monsters and items of the boxes (a fresh one at each call)
-      campanha = null; _oficina = oficinaVazia(); oficina(); selecaoInicial(atos, { monstros: true, itens: true });
+      // (v292: only the original monsters, those of the boxes of the game, when the mod sends them)
+      const originais = Array.isArray(p.monstros) && p.monstros.length ? new Set(p.monstros.map(String)) : null;
+      campanha = null; _oficina = oficinaVazia(); oficina(); selecaoInicial(atos, { monstros: true, itens: true }, originais);
+      // (v292: oficina() brings back the Workshop of the map of the call before (the page answers many calls while it stays
+      //  open): its monsters from outside the list leave, so a call with the list never draws one)
+      if (originais) { const b = oficina(); b.monstros = b.monstros.filter(m => !m.base || originais.has(m.base)); }
       projeto = projetoNovo(); salaAtual = -1; ATOS.set(atos);
       // (v259: the names of the game's monsters, items and characters come in the game's language: inside a sentence they
       // are pieces of it, so the table has the sentence with {s0} in their place)

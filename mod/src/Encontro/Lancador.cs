@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Collections;
 using System.Collections.Generic;
@@ -72,6 +72,32 @@ namespace Bigorna.Encontro
             return null;
         }
 
+        /// <summary>v288: depois de um mapa vencido, a volta do jogo ao mapa-mundi cai (WorldMapSceneController ausente) e o
+        /// quadro de carregamento fica desligado; o mapa seguinte (aberto ou retomado) podia esperar o «Continuar» desse
+        /// quadro, que ninguém vê, e não começa. Com o quadro escondido e o jogo esperando o toque por 2 s, o Continuar é tocado
+        /// por nós (como o próprio teste do jogo faz). Chamado a cada quadro pelo núcleo.</summary>
+        static float _cargaEscondida = -1f;
+        public static void DestravarCarga()
+        {
+            bool travado = false;
+            try
+            {
+                var tela = Jogo.UI?.LoadingScreen; var cena = Jogo.CenaAtual();
+                // (no encontro: o quadro escondido; na tela de título: a volta do «Salvar & Sair», que espera o toque com o menu já
+                //  à vista e, sem ele, segurava a carga da partida retomada depois. O mapa-mundi de uma missão avulsa não chega
+                //  aqui: a volta ao menu para a carga dele)
+                travado = tela != null && tela.IsWaitingForInput && ((cena == Scene.Game && !tela.gameObject.activeInHierarchy)
+                    || (cena == Scene.Titlescene && UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "Titlescene"));   // (uma carga que sai da tela de título, como a da campanha nova, já está noutra cena)
+            }
+            catch { }
+            if (!travado) { _cargaEscondida = -1f; return; }
+            if (_cargaEscondida < 0f) { _cargaEscondida = Time.unscaledTime; return; }
+            if (Time.unscaledTime - _cargaEscondida < 2f) return;
+            _cargaEscondida = -1f;
+            Log.Info(Jogo.CenaAtual() == Scene.Titlescene ? "carregamento: a volta à tela de título esperava «Continuar» com o menu à vista; toco nele" : "carregamento: o quadro de «Continuar» do jogo ficou escondido; toco nele para o jogo seguir");
+            try { Jogo.UI.OnLoadingScreenContinueClicked(); } catch (Exception ex) { Log.Erro("tocando o Continuar do carregamento", ex); }
+        }
+
         /// <summary>Campanha: o jogo ja carregou a cena base (viagem no mapa-mundi); so montamos o mapa por cima.</summary>
         public static void PrepararSobreCena(Dmap m)
         {
@@ -96,7 +122,7 @@ namespace Bigorna.Encontro
                 Silencio.Reiniciar();
                 Dialogos.Limpar();
                 Passo("textos das missões (leitura)", TextosDeMissao.Comecar);
-                Passo("conteúdo próprio", () => Personalizados.Registrar(m.Custom, "«" + m.NomeVisivel + "»"));
+                Passo("conteúdo próprio", () => { Personalizados.Registrar(m.Custom, "«" + m.NomeVisivel + "»"); Personalizados.NomesProprios(m); });
                 Objetos.Limpar();
                 Inimigos.Reiniciar();
                 yield return Seguro("tabuleiro", Tabuleiro.Montar(m));
@@ -156,7 +182,7 @@ namespace Bigorna.Encontro
             SerializedSaveData sg;
             try
             {
-                Personalizados.Registrar(m.Custom, "«" + m.NomeVisivel + "»");
+                Personalizados.Registrar(m.Custom, "«" + m.NomeVisivel + "»"); Personalizados.NomesProprios(m);
                 if (salvar.GetExistingIndexes().Contains(0)) salvar.DeleteSaveSlot(0);
                 var pasta = SaveLoadController.GetSaveDirectory(0); Directory.CreateDirectory(pasta);
                 File.Copy(a.CaminhoSav, Path.Combine(pasta, Path.GetFileName(a.CaminhoSav)), true);
@@ -182,6 +208,25 @@ namespace Bigorna.Encontro
             return null;
         }
 
+        /// <summary>v267: ao ler uma gravacao, o jogo confere uma variavel do quadro do Ato I (DataValidator.ValidateAct1BBData_PostRel)
+        /// sem ver se o quadro existe; ele vem da historia da campanha, e a cena base dos mapas do mod nao o tem. Sem ele a leitura
+        /// para no meio (NullReferenceException) e a tela de carregamento fica parada. Um quadro vazio com o mesmo nome basta: a
+        /// conferencia so le "Quest_8". O quadro fica entre as cenas (DontDestroyOnLoad, como os do jogo) e sai na volta ao titulo.</summary>
+        static NodeCanvas.Framework.GlobalBlackboard _quadroAto1;
+        static void GarantirQuadroDoAto1()
+        {
+            try
+            {
+                if (_quadroAto1 != null || GameData.Act1BB != null) return;
+                // (o nome do quadro e o que o jogo procura; sem ele o Blackboard se chama "<objeto>_BB")
+                var go = new GameObject(DataConstants.BB_ACT_1);
+                _quadroAto1 = go.AddComponent<NodeCanvas.Framework.GlobalBlackboard>();
+                _quadroAto1.name = DataConstants.BB_ACT_1;
+                Log.Info("retomando: quadro do Ato I posto para a leitura da gravação (a cena base não o tem)" + (GameData.Act1BB == _quadroAto1 ? "" : "; AVISO: o jogo não o acha pelo nome"));
+            }
+            catch (Exception ex) { Log.Erro("quadro do Ato I", ex); }
+        }
+
         static IEnumerator PrepararRetomada(Dmap m, EstadoDoMapa e)
         {
             int minha = ++_geracao;
@@ -194,6 +239,7 @@ namespace Bigorna.Encontro
                 yield return null;
                 while (Time.unscaledTime < limite && minha == _geracao && salvar != null && salvar.IsLoading)
                 {
+                    GarantirQuadroDoAto1();
                     if (Time.unscaledTime >= aviso) { aviso = Time.unscaledTime + 20f; Log.Info("retomando: esperando o jogo carregar a partida (a tela pede «Continuar»?)"); }
                     yield return null;
                 }

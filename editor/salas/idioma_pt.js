@@ -305,6 +305,8 @@ const TR_PT = {
     "Everything was cleared. Start with the starting room.": "Tudo foi limpo. Comece pela sala inicial.",
     "Campaign opened.": "Campanha aberta.",
     "Map opened.": "Mapa aberto.",
+    "Campaign opened. It is in the old format (.dcamp): when saved, it becomes a .bcamp with its maps as .bmap, and the old files stay as they are.": "Campanha aberta. Ela está no formato antigo (.dcamp): ao salvar, vira .bcamp, com os mapas dela em .bmap, e os arquivos antigos ficam como estão.",
+    "Map opened. It is in the old format (.dmap): when saved, it becomes a .bmap, and the old file stays as it is.": "Mapa aberto. Ele está no formato antigo (.dmap): ao salvar, vira .bmap, e o arquivo antigo fica como está.",
     "That file is not readable JSON.": "Esse arquivo não é um JSON legível.",
     "That map was not made with Bigorna Rooms: its room logic is not readable, so nothing was imported.": "Esse mapa não foi feito com o Bigorna Rooms: a lógica das salas dele não pode ser lida, então nada foi importado.",
     "That map has no rooms.": "Esse mapa não tem salas.",
@@ -439,7 +441,7 @@ const TR_PT = {
     "In the game, open “{q}”.": "No jogo, abra “{Q}”.",
     "Community maps": "Mapas da comunidade",
     "The game brings it from Downloads into its maps list by itself (with the mod).": "O jogo o traz da pasta Downloads para a lista de mapas sozinho (com o mod).",
-    "Put them all in a folder named “{q}” inside CustomMaps.": "Ponha todos numa pasta chamada “{Q}” dentro da CustomMaps.",
+    "Put them all in a folder named “{q}” inside Bigorna\\Mapas.": "Ponha todos numa pasta chamada “{Q}” dentro da Bigorna\\Mapas.",
     "The checklist has pending items:": "A verificação tem itens pendentes:",
     "This erases the campaign's maps.": "Isto apaga os mapas da campanha.",
     "Story variables": "Variáveis da história",
@@ -566,7 +568,7 @@ const TR_PT = {
     "tall pillar": "pilar alto",
     "short pillar": "pilar baixo",
     "medium pillar": "pilar médio",
-    "Downloaded {n} files. Put them all in a folder named “{q}” inside CustomMaps.": "{n} arquivos baixados. Ponha todos numa pasta chamada “{Q}” dentro da CustomMaps.",
+    "Downloaded {n} files. Put them all in a folder named “{q}” inside Bigorna\\Mapas.": "{n} arquivos baixados. Ponha todos numa pasta chamada “{Q}” dentro da Bigorna\\Mapas.",
     "Recalculate tier {n} from tier {n} with the game’s curve? Their current numbers are replaced.": "Recalcular o tier {n} a partir do tier {n} com a curva do jogo? Os números atuais são substituídos.",
     "Recalculate tiers {n}–{n} from tier {n} with the game’s curve? Their current numbers are replaced.": "Recalcular os tiers {n}–{n} a partir do tier {n} com a curva do jogo? Os números atuais são substituídos.",
     "OK: first move all its triggers to another object (you click it), then delete.": "OK: primeiro mover todos os gatilhos dele para outro objeto (você clica nele) e depois apagar.",
@@ -794,7 +796,7 @@ const TR_PT = {
     "Only items listed in the workshop can be given by triggers, rewards and dialogues, dropped by monsters or crafted.": "Só os itens listados na oficina podem ser dados por gatilhos, recompensas e diálogos, deixados por monstros ou construídos.",
     "Only workshop items can be dropped: import or create them in the Items tab.": "Só itens da oficina podem ser deixados: importe-os ou crie-os na aba Itens.",
     "Only workshop items can be given: import or create them in the Workshop (rooms screen).": "Só itens da oficina podem ser dados: importe-os ou crie-os na Oficina (tela das salas).",
-    "Open a .dmap or .dcamp made with Bigorna Rooms (replaces the current work).": "Abre um .dmap ou .dcamp feito com o Bigorna Rooms (substitui o trabalho atual).",
+    "Open a .bmap or .bcamp made with Bigorna Rooms (replaces the current work).": "Abre um .bmap ou .bcamp feito com o Bigorna Rooms (substitui o trabalho atual).",
     "Open it": "Abrir",
     "Text once used up": "Texto depois de gasto",
     "How this workshop works": "Como funciona esta oficina",
@@ -1054,7 +1056,7 @@ const TR_PT = {
     "Workshop objects (made in the Workshop)": "Objetos da oficina (feitos na Oficina)",
     "Workshop tiles (made in the Workshop)": "Peças da oficina (feitas na Oficina)",
     "Worn by a hero: a card with its rule, kept in the party’s inventory.": "Usada por um herói: uma carta com a sua regra, guardada no inventário do grupo.",
-    "Writes the .dmap (download), then clears.": "Grava o .dmap (download) e depois limpa.",
+    "Writes the .bmap (download), then clears.": "Grava o .bmap (download) e depois limpa.",
     "✎ Draw a road": "✎ Desenhar uma estrada",
     "✓ Finish this road": "✓ Terminar esta estrada",
     "Tiles can stand at levels 1, 2 and 3 (the level buttons) on": "As peças podem ficar nos níveis 1, 2 e 3 (os botões de nível) sobre",
@@ -1224,13 +1226,13 @@ const TR_PT = {
     "Brings back the hints of Rooms, the explanations shown the first time a tab opens and the warnings you chose not to see again. Reset all settings: tips and warnings, window positions and sizes, author, export folder and autosave. Your maps and campaigns stay.": "Traz de volta as dicas das Salas, as explicações mostradas na primeira vez que uma aba abre e os avisos que você pediu para não ver de novo. Redefinir todas as configurações: dicas e avisos, posições e tamanhos das janelas, autor, pasta de exportação e salvamento automático. Seus mapas e campanhas ficam.",
     "Choose folder…": "Escolher pasta…",
     "Close": "Fechar",
-    "Copies the CustomMaps path": "Copia o caminho da pasta CustomMaps",
-    "Copies the CustomMaps path; paste it in Explorer's address bar": "Copia o caminho da pasta CustomMaps; cole-o na barra de endereço do Explorador",
-    "Copy CustomMaps path": "Copiar caminho da CustomMaps",
+    "Copies the Bigorna\\Mapas path": "Copia o caminho da pasta Bigorna\\Mapas",
+    "Copies the Bigorna\\Mapas path; paste it in Explorer's address bar": "Copia o caminho da pasta Bigorna\\Mapas; cole-o na barra de endereço do Explorador",
+    "Copy Bigorna\\Mapas path": "Copiar caminho da Bigorna\\Mapas",
     "Export folder": "Pasta de exportação",
     "No folder chosen: exported files are downloaded, and the game (with the mod) brings them from Downloads into its maps list by itself. Choosing the folder is only needed for autosave and the list of files.": "Nenhuma pasta escolhida: os arquivos exportados são baixados, e o jogo (com o mod) os traz da pasta Downloads para a lista de mapas sozinho. Escolher a pasta só é preciso para o salvamento automático e a lista de arquivos.",
-    "Open a .dmap or .dcamp made with Bigorna Rooms (replaces the current work). Brings chosen rooms of another Bigorna map into this one, without replacing it. Quick save keeps a copy in this browser": "Abre um .dmap ou .dcamp feito com o Bigorna Rooms (substitui o trabalho atual). Traz salas escolhidas de outro mapa do Bigorna para este, sem substituí-lo. O salvamento rápido guarda uma cópia neste navegador",
-    "Open a .dmap or .dcamp made with Bigorna Rooms (replaces the current work). Brings chosen rooms of another Bigorna map into this one, without replacing it. Quick save keeps a copy in this browser; quick load brings it back.": "Abre um .dmap ou .dcamp feito com o Bigorna Rooms (substitui o trabalho atual). Traz salas escolhidas de outro mapa do Bigorna para este, sem substituí-lo. O salvamento rápido guarda uma cópia neste navegador; o carregamento rápido a traz de volta.",
+    "Open a .bmap or .bcamp made with Bigorna Rooms (replaces the current work). Brings chosen rooms of another Bigorna map into this one, without replacing it. Quick save keeps a copy in this browser": "Abre um .bmap ou .bcamp feito com o Bigorna Rooms (substitui o trabalho atual). Traz salas escolhidas de outro mapa do Bigorna para este, sem substituí-lo. O salvamento rápido guarda uma cópia neste navegador",
+    "Open a .bmap or .bcamp made with Bigorna Rooms (replaces the current work). Brings chosen rooms of another Bigorna map into this one, without replacing it. Quick save keeps a copy in this browser; quick load brings it back.": "Abre um .bmap ou .bcamp feito com o Bigorna Rooms (substitui o trabalho atual). Traz salas escolhidas de outro mapa do Bigorna para este, sem substituí-lo. O salvamento rápido guarda uma cópia neste navegador; o carregamento rápido a traz de volta.",
     "Settings": "Configurações",
     "The maps folder of Descent is": "A pasta de mapas do Descent é",
     "Tips and settings": "Dicas e configurações",
@@ -1240,7 +1242,7 @@ const TR_PT = {
     "Everything in the folder (maps, campaigns and their folders), with the option to delete": "Tudo o que está na pasta (mapas, campanhas e as pastas delas), com a opção de apagar",
     "‹ Back": "‹ Voltar",
     "Refresh": "Atualizar",
-    "Delete what you no longer want in the folder: maps (.dmap), campaigns (.dcamp) and their folders. What is deleted here is gone for good.": "Apaguem o que não querem mais na pasta: mapas (.dmap), campanhas (.dcamp) e as pastas delas. O que for apagado aqui some de vez.",
+    "Delete what you no longer want in the folder: maps (.bmap), campaigns (.bcamp) and their folders. What is deleted here is gone for good.": "Apaguem o que não querem mais na pasta: mapas (.bmap), campanhas (.bcamp) e as pastas delas. O que for apagado aqui some de vez.",
     "The browser did not allow reading the folder.": "O navegador não permitiu ler a pasta.",
     "The browser did not allow changing the folder.": "O navegador não permitiu mexer na pasta.",
     "The folder is empty.": "A pasta está vazia.",
@@ -1249,7 +1251,7 @@ const TR_PT = {
     "quick load brings it back.": "o carregamento rápido a traz de volta.",
     "↩ Quick load (F{n})": "↩ Carregamento rápido (F{n})",
     "↺ Show tips and warnings again": "↺ Mostrar dicas e avisos de novo",
-    "⇩ Import rooms from a .dmap…": "⇩ Importar salas de um .dmap…",
+    "⇩ Import rooms from a .bmap…": "⇩ Importar salas de um .bmap…",
     "⟲ Reset all settings…": "⟲ Redefinir todas as configurações…",
     "💾 Quick save (F{n})": "💾 Salvamento rápido (F{n})",
     "📂 Open a map or campaign…": "📂 Abrir um mapa ou campanha…",
@@ -1384,7 +1386,7 @@ const TR_PT = {
     "Everything not exported is lost.": "Tudo o que não foi exportado se perde.",
     "Export, then clear": "Exportar e depois limpar",
     "This erases the {n} room(s) of the map “{q}”: tiles, pillars, objects, monsters, hero spaces and their triggers. The workshop, the map setup (name, texts, music, pools), the other maps and the campaign stay. Files already exported stay in the folder.": "Isto apaga a(s) {n} sala(s) do mapa “{Q}”: peças, pilares, objetos, monstros, espaços de heróis e seus gatilhos. A oficina, a configuração do mapa (nome, textos, música, reservas), os outros mapas e a campanha ficam. Os arquivos já exportados ficam na pasta.",
-    "Writes the .dcamp and its maps (download), then clears.": "Grava o .dcamp e seus mapas (download) e depois limpa.",
+    "Writes the .bcamp and its maps (download), then clears.": "Grava o .bcamp e seus mapas (download) e depois limpa.",
     "(a hero uses it: tap it with the hero chosen)": "(um herói o usa: toque nele com o herói escolhido)",
     "(a player taps it with no hero chosen)": "(um jogador toca nele sem herói escolhido)",
     "+ Add": "+ Adicionar",
@@ -2046,7 +2048,7 @@ const TR_PT = {
     "when a count reaches its total, its map objective is completed and its consequence runs (once). A counter can also count by itself the monsters defeated or the rounds passed.": "quando uma contagem chega ao total, o objetivo de mapa dela é concluído e a consequência dela roda (uma vez). Um contador também pode contar sozinho os monstros derrotados ou as rodadas passadas.",
     // ---------------------------------------------------------------- Map setup
     "(Ogg Vorbis) is the format that suits the game best": "(Ogg Vorbis) é o formato que combina melhor com o jogo",
-    "(Ogg Vorbis) is the format that suits the game best; WAV and MP{n} also work. The file is saved next to the map file in the CustomMaps folder (the same folder as the .dmap).": "(Ogg Vorbis) é o formato que combina melhor com o jogo; WAV e MP{n} também funcionam. O arquivo é salvo ao lado do arquivo do mapa na pasta CustomMaps (a mesma pasta do .dmap).",
+    "(Ogg Vorbis) is the format that suits the game best; WAV and MP{n} also work. The file is saved next to the map file in the Bigorna\\Mapas folder (the same folder as the .bmap).": "(Ogg Vorbis) é o formato que combina melhor com o jogo; WAV e MP{n} também funcionam. O arquivo é salvo ao lado do arquivo do mapa na pasta Bigorna\\Mapas (a mesma pasta do .bmap).",
     "+ add an item…": "+ adicionar um item…",
     "Add music (OGG, WAV, MP{n})…": "Adicionar música (OGG, WAV, MP{n})…",
     "All workshop items": "Todos os itens da oficina",
@@ -2089,15 +2091,15 @@ const TR_PT = {
     "The tiers the game picks from (its default is {n} to {n}": "Os tiers de onde o jogo escolhe (o padrão dele é de {n} a {n}",
     "The tiers the game picks from (its default is {n} to {n}; quest {n} stays at {n}).": "Os tiers de onde o jogo escolhe (o padrão dele é de {n} a {n}; a missão {n} fica no {n}).",
     "Use a specific object (click it)": "Usar um objeto específico (clique nele)",
-    "WAV and MP{n} also work. The file is saved next to the map file in the CustomMaps folder (the same folder as the .dmap).": "WAV e MP{n} também funcionam. O arquivo é salvo ao lado do arquivo do mapa na pasta CustomMaps (a mesma pasta do .dmap).",
+    "WAV and MP{n} also work. The file is saved next to the map file in the Bigorna\\Mapas folder (the same folder as the .bmap).": "WAV e MP{n} também funcionam. O arquivo é salvo ao lado do arquivo do mapa na pasta Bigorna\\Mapas (a mesma pasta do .bmap).",
     "What the monsters and the rewards of this map draw from, and how hard the game's rule makes the “{q}” spaces.": "De onde os monstros e as recompensas deste mapa sorteiam, e quão difícil a regra do jogo deixa os espaços “{Q}”.",
     "Your own music for this map, played in a loop in place of the game’s.": "Sua própria música para este mapa, tocada em repetição no lugar da do jogo.",
     "as the mission, completing it ends the map.": "como missão, concluí-lo encerra o mapa.",
     "empty": "vazia",
     "in the game, “{q}” lists it.": "no jogo, “{Q}” o lista.",
     "quest {n} stays at {n}).": "a missão {n} fica no {n}).",
-    "writes the .dmap into the folder chosen in ⚙ (the game’s CustomMaps)": "grava o .dmap na pasta escolhida em ⚙ (a CustomMaps do jogo)",
-    "writes the .dmap into the folder chosen in ⚙ (the game’s CustomMaps); in the game, “{q}” lists it.": "grava o .dmap na pasta escolhida em ⚙ (a CustomMaps do jogo); no jogo, “{Q}” o lista.",
+    "writes the .bmap into the folder chosen in ⚙ (the game’s Bigorna\\Mapas)": "grava o .bmap na pasta escolhida em ⚙ (a Bigorna\\Mapas do jogo)",
+    "writes the .bmap into the folder chosen in ⚙ (the game’s Bigorna\\Mapas); in the game, “{q}” lists it.": "grava o .bmap na pasta escolhida em ⚙ (a Bigorna\\Mapas do jogo); no jogo, “{Q}” o lista.",
     "{n} = no limit": "{n} = sem limite",
     // ---------------------------------------------------------------- Workshop: monsters, NPCs, items, recipes, tiles, objects, heroes, weapons, feats
     "(H/W): only on the Heroic and Warfare difficulties": "(H/G): só nas dificuldades Heroico e Guerra",
@@ -2778,7 +2780,7 @@ const TR_PT = {
     "World map position: {n}, {n}.": "Posição no mapa do mundo: {n}, {n}.",
     "Write the boxes of this scene": "Escrever as caixas desta cena",
     "Write the boxes ▸": "Escrever as caixas ▸",
-    "Writes the .dcamp and its maps (download), then deletes.": "Grava o .dcamp e seus mapas (download) e depois apaga.",
+    "Writes the .bcamp and its maps (download), then deletes.": "Grava o .bcamp e seus mapas (download) e depois apaga.",
     "You are building the rooms of this map. Pick another map, or add maps, waypoints and dialogues, on the campaign screen (“{q}” above).": "Você está montando as salas deste mapa. Escolha outro mapa, ou adicione mapas, paradas e diálogos, na tela da campanha (“{Q}” acima).",
     "after Map {n}": "depois de Mapa {n}",
     "after Side quest {n}": "depois de Missão paralela {n}",
@@ -3047,7 +3049,7 @@ const TR_PT = {
     "Pursuer": "Perseguidor",
     "Stories": "Histórias",
     "Stories of the generator": "Histórias do gerador",
-    "writes the .dmap: into the folder chosen in ⚙, or into Downloads, from where the game (with the mod) brings it by itself; in the game, “{q}” lists it.": "grava o .dmap: na pasta escolhida em ⚙, ou em Downloads, de onde o jogo (com o mod) o traz sozinho; no jogo, “{Q}” o lista.",
+    "writes the .bmap: into the folder chosen in ⚙, or into Downloads, from where the game (with the mod) brings it by itself; in the game, “{q}” lists it.": "grava o .bmap: na pasta escolhida em ⚙, ou em Downloads, de onde o jogo (com o mod) o traz sozinho; no jogo, “{Q}” o lista.",
     "🎓 Repeat the tutorial": "🎓 Repetir o tutorial",
     "The guided first steps again: the buttons open one by one as each step is done.": "Os primeiros passos guiados de novo: os botões se abrem um a um conforme cada passo é feito.",
     "Back": "Voltar",
@@ -3076,7 +3078,7 @@ const TR_PT = {
     "Pick the new room in the list and, with Enemy (E), place its monsters: they come in when the room opens. Monsters that arrive later use a “Spawn monsters” trigger.": "Escolham a sala nova na lista e, com Inimigo (E), coloquem os monstros dela: eles entram quando a sala abre. Monstros que chegam depois usam um gatilho “Fazer surgir monstros”.",
     "Map setup holds the name, the introduction, the music and the final mission (how the map is won). Give the map a name.": "Configurar mapa guarda o nome, a introdução, a música e a missão final (como se vence o mapa). Deem um nome ao mapa.",
     "Export": "Exportar",
-    "Export map writes the .dmap. With no folder chosen in ⚙ it goes to Downloads, and the game (with the mod) brings it by itself into its list of maps.": "Exportar mapa grava o .dmap. Sem pasta escolhida em ⚙, ele vai para Downloads, e o jogo (com o mod) o traz sozinho para a lista de mapas.",
+    "Export map writes the .bmap. With no folder chosen in ⚙ it goes to Downloads, and the game (with the mod) brings it by itself into its list of maps.": "Exportar mapa grava o .bmap. Sem pasta escolhida em ⚙, ele vai para Downloads, e o jogo (com o mod) o traz sozinho para a lista de mapas.",
     "In the game": "No jogo",
     "On the title screen of the game, “Community maps” lists your maps: pick one and play. If something goes wrong in the game, press F9 (“Report a problem”): you write what happened, and nothing is sent without your click.": "Na tela de título do jogo, “Mapas da comunidade” lista os seus mapas: escolham um e joguem. Se algo der errado no jogo, apertem F9 (“Relatar um problema”): vocês escrevem o que aconteceu, e nada é enviado sem o seu clique.",
     "Everything else": "Todo o resto",
@@ -3664,8 +3666,8 @@ const TR_PT = {
     "it is read here and comes as the package is. To change it, change a copy: it goes into your Workshop, with the same id (what uses it gets your copy).": "aqui ele só se lê e vem como está no pacote. Para mudar, mude uma cópia: ela vai para a sua Oficina, com o mesmo id (o que usa a entrada passa a usar a sua cópia).",
     "✎ Change a copy": "✎ Mudar uma cópia",
     "Now it is yours: the changes go into your Workshop.": "Agora é sua: as mudanças vão para a sua Oficina.",
-    "In the Bigorna Editor app, exported files go straight into the game's <b>CustomMaps</b> folder, and the Workshop is kept in the <b>Pacotes</b> folder, next to it.": "No aplicativo Bigorna Editor, os arquivos exportados vão direto para a pasta <b>CustomMaps</b> do jogo, e a Oficina fica na pasta <b>Pacotes</b>, ao lado dela.",
-    "Autosave: keep the files in <b>CustomMaps</b> up to date as you work (no need to export)": "Salvamento automático: manter os arquivos em <b>CustomMaps</b> em dia enquanto você trabalha (sem precisar exportar)",
+    "In the Bigorna Editor app, exported files go straight into the game's <b>Bigorna\\Mapas</b> folder, and the Workshop is kept in the <b>Pacotes</b> folder, next to it.": "No aplicativo Bigorna Editor, os arquivos exportados vão direto para a pasta <b>Bigorna\\Mapas</b> do jogo, e a Oficina fica na pasta <b>Pacotes</b>, ao lado dela.",
+    "Autosave: keep the files in <b>Bigorna\\Mapas</b> up to date as you work (no need to export)": "Salvamento automático: manter os arquivos em <b>Bigorna\\Mapas</b> em dia enquanto você trabalha (sem precisar exportar)",
     "The Bigorna project takes no responsibility for what is published in the community library: each author answers for their own work.": "O projeto Bigorna não se responsabiliza pelo que é publicado no acervo: cada autor responde pela sua obra.",
     "Paint the edge in this colour (off: the edge only loses the colour erased)": "Pintar a borda nesta cor (desmarcado: a borda só perde a cor apagada)",
     "The magic eraser cleans the edge it leaves (this many pixels): the colour erased comes out of it (no light fringe) and, ticked, it takes this colour (a dark outline). Clicked on a transparent part, it cleans the fringe left by an older erase. 0: no edge": "A borracha mágica limpa a borda que ela deixa (esta quantidade de pixels): a cor apagada sai dela (sem franja clara) e, marcada, ela toma esta cor (um contorno escuro). Clicada numa parte transparente, limpa a franja deixada por um apagamento antigo. 0: sem borda",
@@ -4108,12 +4110,12 @@ const TR_PT = {
     [/^Room (\d+(?:[.,]\d+)*) alone uses (\d+(?:[.,]\d+)*) short pillars; the boxes have (\d+(?:[.,]\d+)*) \(([^;\n]+?)\)\.$/, "Só a sala $1 usa $2 pilares baixos; as caixas têm $3 ($T4)."],   // Room {n} alone uses {n} short pillars; the boxes have {n} ({x}).
     [/^Recipe for ([^;\n]+?) imported\. Change its costs if you like\.$/, "Receita de $1 importada. Mude os custos dela se quiser."],   // Recipe for {x} imported. Change its costs if you like.
     [/^Room (\d+(?:[.,]\d+)*) alone uses (\d+(?:[.,]\d+)*) tall pillars; the boxes have (\d+(?:[.,]\d+)*) \(([^;\n]+?)\)\.$/, "Só a sala $1 usa $2 pilares altos; as caixas têm $3 ($T4)."],   // Room {n} alone uses {n} tall pillars; the boxes have {n} ({x}).
-    [/^Writes the \.dcamp and its maps into ([^;\n]+?), then deletes\.$/, "Grava o .dcamp e seus mapas em $1 e depois apaga."],   // Writes the .dcamp and its maps into {x}, then deletes.
+    [/^Writes the \.bcamp and its maps into ([^;\n]+?), then deletes\.$/, "Grava o .bcamp e seus mapas em $1 e depois apaga."],   // Writes the .bcamp and its maps into {x}, then deletes.
     [/^Removing this tile also removes what sits on it: ([^;\n]+?)\.$/, "Remover esta peça também remove o que está nela: $1."],   // Removing this tile also removes what sits on it: {x}.
     [/^Monster created from the ([^;\n]+?) type\. Fill in its sheet\.$/, "Monstro criado a partir do tipo $T1. Preencha a ficha dele."],   // Monster created from the {x} type. Fill in its sheet.
     [/^tile ([^;\n]+?): the pillar at ([^;\n]+?) is not in a socket \(warning\)$/, "peça $1: o pilar em $2 não está num encaixe (aviso)"],   // tile {x}: the pillar at {x} is not in a socket (warning)
     [/^Room (\d+(?:[.,]\d+)*): tile ([^;\n]+?) is elevated \(level (\d+(?:[.,]\d+)*)\) with no pillars\.$/, "Sala $1: a peça $2 está elevada (nível $3) sem pilares."],   // Room {n}: tile {x} is elevated (level {n}) with no pillars.
-    [/^Writes the \.dcamp and its maps into ([^;\n]+?), then clears\.$/, "Grava o .dcamp e seus mapas em $1 e depois limpa."],   // Writes the .dcamp and its maps into {x}, then clears.
+    [/^Writes the \.bcamp and its maps into ([^;\n]+?), then clears\.$/, "Grava o .bcamp e seus mapas em $1 e depois limpa."],   // Writes the .bcamp and its maps into {x}, then clears.
     [/^Range of the weapon: ([^;\n]+?)\. Click a part to change it\.$/, "Alcance da arma: $T1. Clique numa parte para alterá-la."],   // Range of the weapon: {x}. Click a part to change it.
     [/^Copied: ([^;\n]+?) \(paste it in the Explorer address bar\)\.$/, "Copiado: $1 (cole-o na barra de endereço do Explorador)."],   // Copied: {x} (paste it in the Explorer address bar).
     [/^([^;\n]+?) is on the board (\d+(?:[.,]\d+)*) time\(s\)\. Turn it into a tile\?$/, "$1 está no tabuleiro $2 vez(es). Transformá-la numa peça?"],   // {x} is on the board {n} time(s). Turn it into a tile?
@@ -4131,7 +4133,7 @@ const TR_PT = {
     [/^Pool of this room now: ([^;\n]+?)\. (\d+(?:[.,]\d+)*) space\(s\): ([^;\n]+?)\.$/, "Reserva desta sala agora: $1. $2 espaço(s): $T3."],   // Pool of this room now: {x}. {n} space(s): {x}.
     [/^There is already a variable called ([^;\n]+?)\.$/, "Já existe uma variável chamada $1."],   // There is already a variable called {x}.
     [/^(\d+(?:[.,]\d+)*) medium pillars; the boxes have (\d+(?:[.,]\d+)*) \(([^;\n]+?)\)\.$/, "$1 pilares médios; as caixas têm $2 ($T3)."],   // {n} medium pillars; the boxes have {n} ({x}).
-    [/^Writes the \.dmap into ([^;\n]+?), then clears\.$/, "Grava o .dmap em $1 e depois limpa."],   // Writes the .dmap into {x}, then clears.
+    [/^Writes the \.bmap into ([^;\n]+?), then clears\.$/, "Grava o .bmap em $1 e depois limpa."],   // Writes the .bmap into {x}, then clears.
     [/^There is already a counter called ([^;\n]+?)\.$/, "Já existe um contador chamado $1."],   // There is already a counter called {x}.
     [/^(\d+(?:[.,]\d+)*) short pillars; the boxes have (\d+(?:[.,]\d+)*) \(([^;\n]+?)\)\.$/, "$1 pilares baixos; as caixas têm $2 ($T3)."],   // {n} short pillars; the boxes have {n} ({x}).
     [/^(\d+(?:[.,]\d+)*) tall pillars; the boxes have (\d+(?:[.,]\d+)*) \(([^;\n]+?)\)\.$/, "$1 pilares altos; as caixas têm $2 ($T3)."],   // {n} tall pillars; the boxes have {n} ({x}).

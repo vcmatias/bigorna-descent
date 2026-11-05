@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -135,7 +135,18 @@ namespace Bigorna.Encontro
                 {
                     modelo = UserCollectionManager.GetEnemy(e.Id, false);
                     if (modelo == null) { Log.Info("  inimigo desconhecido: " + e.Id); continue; }
-                    if (UserCollectionManager.GetEnemy(e.Id, true) == null) Log.Info("  «" + e.Id + "» é de uma caixa que você não tem: entra na partida, mas sem miniatura para colocar");
+                    // (v268: um monstro de uma caixa fora da Coleção do jogo travava a fase das trevas (a lógica dele não carrega:
+                    //  GetAllLogicDTTimings quebrava, relato de 04/11/2026). Entra no lugar dele um da coleção, do mesmo tipo; sem
+                    //  nenhum, ele fica de fora)
+                    if (UserCollectionManager.GetEnemy(e.Id, true) == null)
+                    {
+                        var troca = SubstitutoDaColecao(modelo, e.Tier);
+                        if (troca == null) { Log.Info("  «" + e.Id + "» é de uma caixa fora da coleção, e nenhum " + modelo.Type + " da coleção o substitui: não entra"); continue; }
+                        Log.Info("  «" + e.Id + "» é de uma caixa fora da coleção: entra «" + troca.Id + "», do mesmo tipo");
+                        modelo = troca;
+                    }
+                    // (v268: a figura com nome proprio, o vilao de um mapa gerado: o mesmo monstro, com o nome dele)
+                    if (!string.IsNullOrWhiteSpace(e.Nome)) { var comNome = Personalizados.ComNome(modelo.Id, e.Nome); if (comNome != null) modelo = comNome; }
                     int pedido = e.Tier;
                     if (e.TierPorHerois != null && e.TierPorHerois.Length > 0)
                     {
@@ -381,6 +392,20 @@ namespace Bigorna.Encontro
             }
             catch { }
             return modelo.name;
+        }
+
+        /// <summary>v268: um monstro da coleção do jogo, do mesmo tipo, para o lugar de um de fora dela (o de tier mais perto do pedido,
+        /// sem os que têm nome próprio no jogo); null se a coleção não tem nenhum desse tipo.</summary>
+        public static EnemyModel SubstitutoDaColecao(EnemyModel fora, int tier)
+        {
+            try
+            {
+                var meus = (UserCollectionManager.GetEnemies(true) ?? new List<EnemyModel>()).Where(m => m != null && m.Type == fora.Type && m.Tiers != null && m.Tiers.Length > 0 && !m.IsNamed && !m.IsVillain && !m.Id.StartsWith("Bigorna", StringComparison.OrdinalIgnoreCase) && !m.Id.StartsWith("BIGORNA_", StringComparison.OrdinalIgnoreCase)).ToList();
+                if (meus.Count == 0) return null;
+                int perto(EnemyModel m) => tier <= 0 ? 0 : m.Tiers.Min(t => Math.Abs(t.Tier - tier));
+                return meus.OrderBy(perto).ThenBy(m => m.Id, StringComparer.Ordinal).First();
+            }
+            catch (Exception ex) { Log.Info("substituto de «" + fora?.Id + "»: " + ex.Message); return null; }
         }
 
         public static IEnumerable<SerializedEnemy> Vivos(string id, string grupo)

@@ -55,7 +55,7 @@ function simularPartida(pm, cfg, H) {
   const media = (ids, tier) => { const ss = ids.map(id => statsDe(id, tier)); if (!ss.length) return { hp: 20, def: 1, atk: 1 }; const k = x => Math.round(ss.reduce((a, s) => a + s[x], 0) / ss.length); return { hp: k('hp'), def: k('def'), atk: k('atk') }; };
   const entrar = (sala, st, grupo, dono) => { const m = { sala, ...st, grupo, dono, chegando: sala !== local }; log('monster in room ' + (sala + 1) + ' hp' + st.hp + ' atk' + st.atk + ' def' + st.def); vivos.push(m); R.monstros++; R.monstrosPorSala[sala] = (R.monstrosPorSala[sala] || 0) + 1; if (grupo) { grupos[grupo] = grupos[grupo] || { sala, lista: [], dono }; grupos[grupo].lista.push(m); } return m; };
   const poolDaSala = si => poolDe(pm, si).filter(id => monstro(id));
-  const porPool = (si, vagas, intensidade, grupo, dono) => { if (!vagas) return; const x = simularVagas(vagas, intensidade, poolDaSala(si), H, pm); for (let k = 0; k < x.n; k++) entrar(si, media(poolDaSala(si), x.tier), grupo, dono); };
+  const porPool = (si, vagas, intensidade, grupo, dono, minimo) => { if (!vagas) return; const x = simularVagas(vagas, intensidade, poolDaSala(si), H, pm, [], minimo || 0); for (let k = 0; k < x.n; k++) entrar(si, media(poolDaSala(si), x.tier), grupo, dono); };
   const abrirSala = si => { if (abertas.has(si) || removidas.has(si)) return; abertas.add(si); log('room ' + (si + 1) + ' opens');
     const s = pm.salas[si]; (s.inimigos || []).filter(e => !ehPool(e.enemy)).forEach(e => { const m = entrar(si, statsDe(e.enemy, (e.tierPorHerois ? e.tierPorHerois[Math.min(3, H - 1)] : e.tier) || 1), null, e); if (e.bonusAtaque) m.atk += e.bonusAtaque; if (e.bonusDefesa) m.def += e.bonusDefesa; });
     porPool(si, vagasPoolDaSala(s), intensidadeDaSala(s), 'G' + si, s.grupoPool || null); };
@@ -68,7 +68,7 @@ function simularPartida(pm, cfg, H) {
       case 'counter': { const a = g.acao || 'add'; if (a === 'use') { vigias.push({ o, g, si, feito: false }); break; }
         cont[g.contador] = a === 'set' ? (g.n ?? 0) : a === 'sub' ? (cont[g.contador] || 0) - (g.n ?? 1) : (cont[g.contador] || 0) + (g.n ?? 1); { const cc = (pm.contadores || []).find(x => x.nome === g.contador); const l = cc ? limiteDoContador(cc) : 0; if (l && cont[g.contador] > l) cont[g.contador] = l; } contadores(); break; }
       case 'open_room': abrirSala(g.sala); break;
-      case 'spawn': if (g.fonte === 'pool') porPool(si, (g.cells || []).length, intensidadeDoGatilho(g), g.uid, o); else (g.inimigos || []).forEach(e => { const m = entrar(si, statsDe(e.enemy, (e.tierPorHerois ? e.tierPorHerois[Math.min(3, H - 1)] : e.tier) || 1), g.uid, o); m.dono = e; if (e.bonusAtaque) m.atk += e.bonusAtaque; }); break;
+      case 'spawn': if (g.fonte === 'pool') porPool(si, (g.cells || []).length, intensidadeDoGatilho(g), g.uid, o, g.minimo); else (g.inimigos || []).forEach(e => { const m = entrar(si, statsDe(e.enemy, (e.tierPorHerois ? e.tierPorHerois[Math.min(3, H - 1)] : e.tier) || 1), g.uid, o); m.dono = e; if (e.bonusAtaque) m.atk += e.bonusAtaque; }); break;
       case 'rounds': timers.push({ o, g, si, desde: rodada, feitas: 0 }); break;
       case 'skill_test': { const S = g.successes || 2; let ok;
         if (g.cumulativo) { acumulado[g.uid] = (acumulado[g.uid] || 0) + cfg.sucessos; ok = acumulado[g.uid] >= S; } else ok = cfg.sucessos >= S;

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Bigorna.Formato;
@@ -83,6 +83,9 @@ namespace Bigorna.Encontro
             var nomes = (vagas[0].Pool != null && vagas[0].Pool.Count > 0 ? vagas[0].Pool : Inimigos.Reserva).Where(x => !string.IsNullOrEmpty(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             var pool = new List<EnemyModel>();
             foreach (var n in nomes) { var m = UserCollectionManager.GetEnemy(n, false); if (m != null && m.Tiers != null && m.Tiers.Length > 0) pool.Add(m); }
+            // (v268: só os da Coleção do jogo, quando o pool tem algum: um monstro de uma caixa fora dela trava a fase das trevas)
+            var daColecao = pool.Where(m => UserCollectionManager.GetEnemy(m.Id, true) != null).ToList();
+            if (daColecao.Count > 0 && daColecao.Count < pool.Count) { Log.Info("balanced: fora do pool, de caixas fora da coleção: " + string.Join(", ", pool.Except(daColecao).Select(m => m.Id).ToArray())); pool = daColecao; }
             string grupo = vagas[0].Grupo;
             if (pool.Count == 0) { Log.Info("balanced (" + grupo + "): o pool está vazio; nenhum monstro entra"); return saida; }
 
@@ -96,6 +99,9 @@ namespace Bigorna.Encontro
             // vagas em ordem aleatoria (o jogo sorteia as casas livres)
             var casas = vagas.OrderBy(_ => UnityEngine.Random.value).ToList();
             int limite = Math.Min(5, casas.Count);
+            // (v268: a leva que pede um minimo de figuras, como as ondas do gerador, guarda pontos para elas: o tier desce ate
+            //  o que deixa pagar as que faltam no tier minimo)
+            int minimo = Mathf.Clamp(vagas.Max(v => v.Minimo), 0, limite);
             int desejado = tMax;
             var detalhes = new List<string>();
             while (saida.Count < limite && pontos >= Custo(tMin))
@@ -103,8 +109,9 @@ namespace Bigorna.Encontro
                 // o tier desejado cabe nos pontos e algum monstro do pool o tem; senao, desce
                 // so os monstros com figura livre (como o jogo: as miniaturas das caixas, menos as em jogo)
                 bool Livre(EnemyModel m) => FigurasLivres(m.Type, vaoEntrar) > 0;
+                int reserva = Math.Max(0, minimo - saida.Count - 1) * Custo(tMin);
                 int t = desejado;
-                while (t >= tMin && (Custo(t) > pontos || !pool.Any(m => m.GetEnemyTierInfo(t) != null && Livre(m)))) t--;
+                while (t >= tMin && (Custo(t) + (t > tMin ? reserva : 0) > pontos || !pool.Any(m => m.GetEnemyTierInfo(t) != null && Livre(m)))) t--;
                 if (t < tMin) { if (!pool.Any(Livre)) detalhes.Add("sem figuras livres"); break; }
                 desejado = t;
                 var opcoes = pool.Where(m => m.GetEnemyTierInfo(t) != null && Livre(m)).ToList();
@@ -128,9 +135,21 @@ namespace Bigorna.Encontro
                 detalhes.Add(c0.m.Id + " t" + menor + " (pontos curtos: o mínimo)");
                 pontos = Math.Max(0, pontos - Custo(menor));
             }
+            // (v268: o minimo da leva, quando os pontos acabaram antes: as que faltam no menor tier, enquanto houver figura livre)
+            while (saida.Count > 0 && saida.Count < minimo)
+            {
+                var livres = pool.Where(m => FigurasLivres(m.Type, vaoEntrar) > 0).Select(m => new { m, t = m.Tiers.Select(x => x.Tier).Where(x => x >= tMin && x <= tMax).DefaultIfEmpty(m.MinTier).Min() }).ToList();
+                if (livres.Count == 0) { detalhes.Add("sem figuras livres para o mínimo"); break; }
+                int menor = livres.Min(c => c.t); var op = livres.Where(c => c.t == menor).ToList(); var c1 = op[UnityEngine.Random.Range(0, op.Count)];
+                var vaga = casas[saida.Count];
+                saida.Add(new Dmap.Inimigo { Id = c1.m.Id, Pos = vaga.Pos, Grupo = vaga.Grupo, Nivel = vaga.Nivel, Tier = menor });
+                vaoEntrar[c1.m.Type] = (vaoEntrar.TryGetValue(c1.m.Type, out var ja1) ? ja1 : 0) + 1;
+                detalhes.Add(c1.m.Id + " t" + menor + " (mínimo da leva)");
+                pontos = Math.Max(0, pontos - Custo(menor));
+            }
             _banco = Math.Max(0, pontos);
             Log.Info("balanced (" + grupo + "): " + jogadores + " jogador(es), intensidade " + intensidade + ", progresso " + progresso + ", tiers " + tMin + "–" + tMax
-                + " → " + antes + " pontos, " + vagas.Count + " vaga(s): " + string.Join(", ", detalhes.ToArray()) + "; sobra " + _banco);
+                + " → " + antes + " pontos, " + vagas.Count + " vaga(s)" + (minimo > 1 ? " (mínimo " + minimo + ")" : "") + ": " + string.Join(", ", detalhes.ToArray()) + "; sobra " + _banco);
             return saida;
         }
     }

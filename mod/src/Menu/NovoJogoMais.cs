@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -87,7 +87,8 @@ namespace Bigorna.Menu
                 var de = Encontro.GrupoDoSave.JogoDoSave(s.Slot);
                 if (de == null) return T("Não consegui ler a partida gravada.", "Could not read the saved game.");
                 var salvar = SingletonBehaviour<SaveLoadController>.Instance;
-                if (salvar.GetExistingIndexes(true).Count >= 10) return T("As dez ranhuras de partida do jogo estão ocupadas: apaguem uma partida antes.", "The game's ten save slots are full: delete a saved game first.");
+                // (v267: sem limite de ranhuras; o jogo tem a constante MAX_SAVE_SLOT = 10, mas nao a usa, e a Nova campanha dele
+                //  grava na primeira ranhura livre, como aqui. Com as partidas das campanhas da comunidade, dez se passa logo.)
                 var campanhaId = Act.ActI.AsCampaignId();
                 var nova = new SerializedGame(campanhaId);
                 nova.Initialize();
@@ -95,13 +96,25 @@ namespace Bigorna.Menu
                 if (campanha?.StartingQuest == null) return T("O jogo não deu a campanha do Ato I.", "The game did not give the Act I campaign.");
                 nova.ActiveDestinationIds.Add(campanha.StartingQuest.Id);
                 int ciclo = 1; if (!string.IsNullOrEmpty(de.SaveSlotGUID) && Marcas.TryGetValue(de.SaveSlotGUID, out var antiga)) ciclo = antiga.Ciclo + 1;
-                nova.PartyName = (string.IsNullOrEmpty(de.PartyName) ? "Bigorna" : de.PartyName) + " +" + (ciclo > 1 ? ciclo.ToString() : "");
+                // (v268: um nome que já termina em "+" ou "+N" ganha o número seguinte, sem dobrar: "Equipe +" → "Equipe +2")
+                var baseDoNome = string.IsNullOrEmpty(de.PartyName) ? "Bigorna" : de.PartyName.Trim();
+                var fimDoNome = System.Text.RegularExpressions.Regex.Match(baseDoNome, @"^(.*?)\s*\+(\d*)$");
+                if (fimDoNome.Success && fimDoNome.Groups[1].Value.Length > 0)
+                {
+                    baseDoNome = fimDoNome.Groups[1].Value;
+                    int jaEra = fimDoNome.Groups[2].Value.Length > 0 && int.TryParse(fimDoNome.Groups[2].Value, out var nn) ? nn : 1;
+                    ciclo = Math.Max(ciclo, jaEra + 1);
+                }
+                nova.PartyName = baseDoNome + " +" + (ciclo > 1 ? ciclo.ToString() : "");
 
                 // o grupo: o que a campanha nova da (as virtudes, as pecas iniciais dos herois que o save nao tem) e o do save
                 var virtudes = nova.AllPlayers.Where(p => p != null).ToDictionary(p => p.HeroId, p => new[] { p.VirtueOneValue, p.VirtueTwoValue });
                 var iniciais = (nova.ItemInventory ?? new List<SerializedItem>()).ToList();
                 var noSave = new HashSet<string>((de.AllPlayers ?? new SerializedPlayer[0]).Where(p => p != null).Select(p => p.HeroId));
+                // (v268: as armas e o apetrecho com que cada herói começa a campanha nova, para quem trouxer peças de fora da coleção)
+                var armasIniciais = nova.AllPlayers.Where(p => p != null).ToDictionary(p => p.HeroId, p => JsonUtility.ToJson(new ArmasIniciais { E = p.EquippedWeapons, D = p.DefaultWeaponsBuild, T = p.EquippedTrinketId, I = p.EquippedWeaponIndex }));
                 Encontro.GrupoDoSave.CopiarParaNovoJogo(de, nova);
+                ForaDaColecao(nova, armasIniciais);
                 foreach (var p in nova.AllPlayers.Where(p => p != null))
                 {
                     if (virtudes.TryGetValue(p.HeroId, out var v)) { p.VirtueOneValue = v[0]; p.VirtueTwoValue = v[1]; }
@@ -111,7 +124,20 @@ namespace Bigorna.Menu
                     foreach (var id in Equipados(p)) { var it = iniciais.FirstOrDefault(x => x != null && x.Id == id); if (it != null && !nova.ItemInventory.Any(x => x != null && x.Id == id)) nova.ItemInventory.Add(it); }
                 }
                 // o que pode ser sorteado ou vendido: o do XP do grupo, so do Ato I (o resto entra com o Ato II)
-                try { nova.AddAllAvailableItemsBasedOnXP(); } catch (Exception ex) { Log.Info("Novo jogo +: itens pelo XP " + ex.Message); }
+                // (v267: a mesma conta de SerializedGame.AddAllAvailableItemsBasedOnXP, com o XP desta partida: a do jogo le o XP da
+                //  partida em jogo, que na tela de titulo nao existe, e parava com NullReferenceException; o sorteio ficava vazio)
+                try
+                {
+                    int disponiveis = 0;
+                    foreach (var m in UserCollectionManager.GetAllItemModels(true))
+                    {
+                        if (m == null || m.XPRequiredForDrop > nova.PartyXP) continue;
+                        if (m is RecipeModel) { if (!nova.AvailableRecipeIds.Contains(m.Id) && nova.GetDiscoveredRecipe(m.Id) == null) { nova.AvailableRecipeIds.Add(m.Id); disponiveis++; } }
+                        else if (!(m is ConsumableModel) && !nova.AvailableItemIds.Contains(m.Id) && nova.GetDiscoveredItem(m.Id) == null) { nova.AvailableItemIds.Add(m.Id); disponiveis++; }
+                    }
+                    Log.Info("Novo jogo +: " + disponiveis + " item(ns) e receita(s) entram no sorteio pelo XP " + nova.PartyXP);
+                }
+                catch (Exception ex) { Log.Info("Novo jogo +: itens pelo XP " + ex.Message); }
                 ForaDeAtosPosteriores(nova);
 
                 var marca = new Marca { Origem = de.PartyName, Xp = nova.PartyXP, Itens = nova.ItemInventory.Where(x => x != null).Select(x => x.Id).Distinct().ToList(), Ciclo = ciclo };
@@ -132,6 +158,47 @@ namespace Bigorna.Menu
             foreach (var w in (p.EquippedWeapons ?? new List<SerializedWeapon>()).Where(w => w != null))
                 foreach (var id in new[] { w.PartAId, w.PartBId, w.PartCId }) if (!string.IsNullOrEmpty(id)) yield return id;
             if (!string.IsNullOrEmpty(p.EquippedTrinketId)) yield return p.EquippedTrinketId;
+        }
+
+        /// <summary>v268: o que o save tem e a coleção do jogo não (uma partida de outro computador, de uma caixa desmarcada na
+        /// Coleção, ou editada): fica de fora da partida nova. Uma proeza de fora travava a fase das trevas (o FeatsController do
+        /// jogo quebrava a cada interação: «FeatModel ... is not owned», relato de 04/11/2026); um herói com arma ou apetrecho de
+        /// fora volta às peças com que a campanha nova o faz começar.</summary>
+        [Serializable] class ArmasIniciais { public List<SerializedWeapon> E, D; public string T; public int I; }
+        static void ForaDaColecao(SerializedGame g, Dictionary<string, string> iniciais)
+        {
+            bool Fora<TM>(Func<string, bool, TM> pegar, string id) where TM : class
+            {
+                if (string.IsNullOrEmpty(id)) return false;
+                try { return pegar(id, false) != null && pegar(id, true) == null; } catch { return false; }
+            }
+            int n = 0;
+            int Tirar<TX>(List<TX> l, Func<TX, bool> fora) { if (l == null) return 0; int k = l.RemoveAll(x => x != null && fora(x)); n += k; return k; }
+            Tirar(g.RealCompletedFeats, id => Fora(UserCollectionManager.GetFeat, id));
+            Tirar(g.PendingNewFeatIds, id => Fora(UserCollectionManager.GetFeat, id));
+            Tirar(g.FeatProgresses, x => Fora(UserCollectionManager.GetFeat, x.RealFeatId));
+            Tirar(g.UnlockedSkills, id => Fora(UserCollectionManager.GetSkill, id));
+            Tirar(g.UnlockedLegends, id => Fora(UserCollectionManager.GetLegend, id));
+            Tirar(g.UnlockedCompanions, id => Fora(UserCollectionManager.GetCompanion, id));
+            Tirar(g.ItemInventory, x => Fora(UserCollectionManager.GetItem, x.Id));
+            Tirar(g.DiscoveredRecipes, x => Fora(UserCollectionManager.GetRecipe, x.Id));
+            Tirar(g.CraftingMaterials, x => Fora(UserCollectionManager.GetCraftingMaterial, x.Id));
+            Tirar(g.SharedWeaponIds, id => Fora(UserCollectionManager.GetWeapon, id));
+            foreach (var p in g.AllPlayers.Where(p => p != null))
+            {
+                bool armaFora = (p.EquippedWeapons ?? new List<SerializedWeapon>()).Concat(p.DefaultWeaponsBuild ?? new List<SerializedWeapon>())
+                    .Any(w => w != null && (Fora(UserCollectionManager.GetWeapon, w.Id) || Fora(UserCollectionManager.GetWeaponPart, w.PartAId) || Fora(UserCollectionManager.GetWeaponPart, w.PartBId) || Fora(UserCollectionManager.GetWeaponPart, w.PartCId)))
+                    || Fora(UserCollectionManager.GetTrinket, p.EquippedTrinketId);
+                if (!armaFora || !iniciais.TryGetValue(p.HeroId, out var json)) continue;
+                try
+                {
+                    var antes = JsonUtility.FromJson<ArmasIniciais>(json);
+                    p.EquippedWeapons = antes.E; p.DefaultWeaponsBuild = antes.D; p.EquippedTrinketId = antes.T; p.EquippedWeaponIndex = antes.I;
+                    n++; Log.Info("Novo jogo +: " + p.HeroId + " tinha arma ou apetrecho de fora da coleção; volta às peças iniciais");
+                }
+                catch (Exception ex) { Log.Info("Novo jogo +: armas de " + p.HeroId + ": " + ex.Message); }
+            }
+            if (n > 0) Log.Info("Novo jogo +: " + n + " coisa(s) de fora da coleção do jogo ficaram de fora (proezas, perícias, itens, receitas, armas)");
         }
 
         static void ForaDeAtosPosteriores(SerializedGame d)

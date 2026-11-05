@@ -66,50 +66,123 @@ namespace Bigorna.Menu
         public static readonly string[] Dificuldades = { "facil", "normal", "dificil" };
 
         /// <summary>As caixas da colecao do jogo: 2 com o Ato II (uma expansao, ou um produto com missoes do Ato II), senao 1.</summary>
+        static bool _avisouAto2;   // (o quadro pergunta a cada desenho: o registro diz uma vez)
         public static int Atos()
         {
+            // (v268: o Ato II conta só com o conteúdo dele marcado na Coleção do jogo: as missões do Ato II entre as possuídas e os
+            //  monstros dele também. Antes, um produto qualquer do tipo Expansion ou com "II" no nome bastava: um jogador só com
+            //  o Ato I recebia mapas com monstros e escadas do Ato II, e um monstro de fora da coleção travava a fase das trevas
+            //  (relato de 04/11/2026: «EnemyModel ENEMY_HARBINGER_SELLSWORD is not owned», GetAllLogicDTTimings quebrando))
             try
             {
-                foreach (var p in UserCollectionManager.GetProducts(true))
-                {
-                    if (p == null) continue;
-                    if (p.Type == ProductType.Expansion) return 2;
-                    if (!string.IsNullOrEmpty(p.ActName) && p.ActName.IndexOf("II", StringComparison.OrdinalIgnoreCase) >= 0) return 2;
-                    if (p.Quests != null && p.Quests.Any(q => q != null && q.Act == Act.ActII)) return 2;
-                }
+                var missoes = UserCollectionManager.GetQuestsByAct(true, Act.ActII);
+                if (missoes == null || missoes.Count == 0) return 1;
+                var todos = UserCollectionManager.GetProducts(false) ?? new List<ProductModel>();
+                var meus = UserCollectionManager.GetProducts(true) ?? new List<ProductModel>();
+                // (v295: a caixa do Ato II marcada na Coleção; sem ela, as missões do Ato II que a cópia tiver não bastam: os
+                //  monstros dela ficam fora da coleção («not owned») e saem com o nome errado no tabuleiro. Antes, um produto do Ato
+                //  II sem missões na lista dele deixava passar)
+                if (!meus.Any(p => p != null && p.Act == Act.ActII)) { if (!_avisouAto2) { _avisouAto2 = true; Log.Info("mapa oneshot: a caixa do Ato II está fora da coleção do jogo; só o Ato I"); } return 1; }
+                // (o produto que traz as missões do Ato II precisa estar marcado, com os monstros dele)
+                var doAto2 = todos.Where(p => p != null && p.Quests != null && p.Quests.Any(q => q != null && q.Act == Act.ActII)).ToList();
+                if (doAto2.Count > 0 && !doAto2.Any(p => meus.Contains(p))) return 1;
+                foreach (var p in doAto2.Where(x => meus.Contains(x)))
+                    foreach (var e in p.Enemies ?? new EnemyModel[0])
+                        if (e != null && UserCollectionManager.GetEnemy(e.Id, true) == null) { Log.Info("mapa oneshot: o Ato II está marcado, mas «" + e.Id + "» fica de fora da coleção; só o Ato I"); return 1; }
+                return 2;
             }
             catch (Exception ex) { Log.Info("mapa oneshot: caixas da coleção " + ex.Message); }
             return 1;
         }
 
+        /// <summary>v292: os monstros que o gerador pode usar: só os originais, os que as caixas da coleção do jogo trazem
+        /// (ProductModel.Enemies dos produtos marcados). O jogo guarda outros modelos que nenhuma caixa usa: sem textos próprios,
+        /// o nome deles sai errado no tabuleiro («Remova .», chaves cruas) e o jogo os diz «not owned». Vazia: o jogo não
+        /// respondeu, e o gerador fica com a seleção dele.</summary>
+        static string Resumo(JObject j) { if (j == null) return ""; var c = (JObject)j.DeepClone(); if (c["monstros"] is JArray m) c["monstros"] = m.Count + " das caixas"; return c.ToString(Formatting.None); }
+        public static List<string> MonstrosOriginais()
+        {
+            var r = new List<string>();
+            try
+            {
+                foreach (var p in UserCollectionManager.GetProducts(true) ?? new List<ProductModel>())
+                    foreach (var e in p?.Enemies ?? new EnemyModel[0])
+                        if (e != null && !string.IsNullOrEmpty(e.Id) && !r.Contains(e.Id)) r.Add(e.Id);
+            }
+            catch (Exception ex) { Log.Info("mapa oneshot: monstros das caixas: " + ex.Message); }
+            return r;
+        }
+
         /// <summary>Pede o mapa ao aplicativo e espera (ate 3 min). semente vazia: uma nova. atoGrupo: o ato da equipe do save (1 ou
-        /// 2; 0: equipe nova, vale o ato que o mapa pede), para a vida da simulacao (v261: as cartas do Ato II tem mais vida).</summary>
-        public static IEnumerator Gerar(int duracao, int dificuldade, string semente, Action<Resultado> fim, int atoGrupo = 0)
+        /// 2; 0: equipe nova, vale o ato que o mapa pede), para a vida da simulacao (v261: as cartas do Ato II tem mais vida).
+        /// v272: atosPedidos (1 ou 2) limita as caixas da coleção (a caixa «Usar o Ato II» desmarcada pede 1).</summary>
+        public static IEnumerator Gerar(int duracao, int dificuldade, string semente, Action<Resultado> fim, int atoGrupo = 0, int atosPedidos = 0)
         {
             Gerando = true; var r = new Resultado(); Process pr = null;
-            string pedido = Path.Combine(Pasta, "pedido.json"), resposta = Path.Combine(Pasta, "resposta.json");
-            int atos = Atos(); float inicio = Time.unscaledTime;
+            // (v274: com o gerador aberto, o pedido vai para a pasta que ele vigia; sem ele, um processo só para este mapa, com
+            //  outro nome de pedido, para o aberto nunca pegá-lo)
+            // (v278: no Linux, pela ponte do navegador: a página do gerador, aberta no Chrome ou no Chromium, vigia a pasta e
+            //  responde; nomes de arquivo só dela, que no Windows ninguém escreve)
+            bool ponte = Plataforma.Wine;
+            bool aberto = ponte || GeradorAberto();
+            string pedido = Path.Combine(Pasta, ponte ? "pedido-navegador.json" : aberto ? "pedido.json" : "pedido-avulso.json"), resposta = Path.Combine(Pasta, ponte ? "resposta-navegador.json" : "resposta.json");
+            int atos = Atos(); if (atosPedidos == 1) atos = 1; float inicio = Time.unscaledTime;
+            JObject j = null;
+            // (o processo de um mapa só; v286: também quando o gerador aberto não responde)
+            Process Avulso()
+            {
+                var pa = Path.Combine(Pasta, "pedido-avulso.json"); File.WriteAllText(pa, j.ToString(Formatting.None), new UTF8Encoding(false));
+                Log.Info("mapa oneshot: gerando (" + Resumo(j) + ")");
+                return Process.Start(new ProcessStartInfo(DadosDoEditor.ArquivoApp, "--gerador \"" + pa + "\" \"" + resposta + "\" --editor \"" + DadosDoEditor.Pasta + "\"")
+                { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = DadosDoEditor.PastaApp });
+            }
             try
             {
                 Directory.CreateDirectory(Pasta); if (File.Exists(resposta)) File.Delete(resposta);
-                var j = new JObject { ["duracao"] = Duracoes[Mathf.Clamp(duracao, 0, 2)], ["dificuldade"] = Dificuldades[Mathf.Clamp(dificuldade, 0, 2)], ["atos"] = atos, ["lingua"] = Codigo };   // (v259: a lingua do jogo, qualquer uma: o editor tem as tabelas dos textos do gerador)
+                j = new JObject { ["duracao"] = Duracoes[Mathf.Clamp(duracao, 0, 2)], ["dificuldade"] = Dificuldades[Mathf.Clamp(dificuldade, 0, 2)], ["atos"] = atos, ["lingua"] = Codigo };   // (v259: a lingua do jogo, qualquer uma: o editor tem as tabelas dos textos do gerador)
                 if (!string.IsNullOrEmpty(semente)) j["semente"] = semente;
                 if (atoGrupo == 1 || atoGrupo == 2) j["atoGrupo"] = atoGrupo;
-                File.WriteAllText(pedido, j.ToString(Formatting.None), new UTF8Encoding(false));
-                if (!DadosDoEditor.AppEmDia(true) && AppInstalado) r.Erro = T("O aplicativo Bigorna Editor precisa ser atualizado para gerar o mapa, e está aberto (o arquivo dele fica preso). Fechem o editor e toquem em Gerar de novo.",
+                var originais = MonstrosOriginais(); if (originais.Count > 0) j["monstros"] = new JArray(originais.ToArray());   // (v292)
+                if (aberto)
+                {
+                    // (de uma vez: grava ao lado e troca o nome; o gerador nunca lê um pedido pela metade)
+                    var tmp = pedido + ".tmp"; File.WriteAllText(tmp, j.ToString(Formatting.None), new UTF8Encoding(false));
+                    if (File.Exists(pedido)) File.Delete(pedido); File.Move(tmp, pedido);
+                    Log.Info("mapa oneshot: gerando " + (ponte ? "pela ponte do navegador, " + (PonteAtiva ? "conectada" : "ainda sem a página aberta") : "pelo gerador aberto, " + EstadoDoGerador()) + " (" + Resumo(j) + ")");
+                }
+                else File.WriteAllText(pedido, j.ToString(Formatting.None), new UTF8Encoding(false));
+                if (aberto) { }
+                else if (!DadosDoEditor.AppEmDia(true) && AppInstalado) r.Erro = T("O aplicativo Bigorna Editor precisa ser atualizado para gerar o mapa, e está aberto (o arquivo dele fica preso). Fechem o editor e toquem em Gerar de novo.",
                     "The Bigorna Editor app must be updated to make the map, and it is open (its file is locked). Close the editor and tap Generate again.");
                 else if (!AppInstalado) r.Erro = T("O aplicativo Bigorna Editor ainda não está instalado. Ele é instalado na tela de título, com o aplicativo fechado; tentem de novo em seguida.",
                     "The Bigorna Editor app is not installed yet. It is installed at the title screen, with the app closed; try again in a moment.");
-                else
-                {
-                    Log.Info("mapa oneshot: gerando (" + j.ToString(Formatting.None) + ")");
-                    pr = Process.Start(new ProcessStartInfo(DadosDoEditor.ArquivoApp, "--gerador \"" + pedido + "\" \"" + resposta + "\" --editor \"" + DadosDoEditor.Pasta + "\"")
-                    { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = DadosDoEditor.PastaApp });
-                }
+                else pr = Avulso();
             }
             catch (Exception ex) { Log.Erro("mapa oneshot: pedido", ex); r.Erro = T("Não consegui chamar o gerador: ", "Could not call the generator: ") + ex.Message; }
-            float ate = Time.unscaledTime + 180f;
+            float ate = Time.unscaledTime + 420f;   // (v271: o editor pronto pode levar 4 min num computador lento, e o mapa mais 1 a 2)
             while (r.Erro == null && pr != null && !Saiu(pr) && Time.unscaledTime < ate) yield return new WaitForSecondsRealtime(0.25f);
+            while (r.Erro == null && aberto && !(ponte ? RespostaInteira(resposta) : File.Exists(resposta)) && (ponte || GeradorAberto()) && Time.unscaledTime < ate) yield return new WaitForSecondsRealtime(0.25f);
+            // (v286: o gerador aberto caiu ou travou sem responder: o mesmo pedido vai ao processo de um mapa só)
+            if (r.Erro == null && aberto && !ponte && !File.Exists(resposta) && !GeradorAberto() && Time.unscaledTime < ate && j != null)
+            {
+                Log.Info("mapa oneshot: o gerador aberto não respondeu; o mapa vai por um processo só para ele");
+                try { File.Delete(pedido); } catch { }
+                aberto = false;
+                try { pr = Avulso(); } catch (Exception ex) { r.Erro = T("Não consegui chamar o gerador: ", "Could not call the generator: ") + ex.Message; }
+                while (r.Erro == null && pr != null && !Saiu(pr) && Time.unscaledTime < ate) yield return new WaitForSecondsRealtime(0.25f);
+            }
+            if (r.Erro == null && ponte && !RespostaInteira(resposta))
+            {
+                r.Erro = T("O gerador do navegador não respondeu. Abram no Chrome ou no Chromium o arquivo «Abrir-o-gerador.html» (o caminho está no quadro) e toquem em Gerar de novo.",
+                    "The browser generator did not answer. Open the file “Abrir-o-gerador.html” in Chrome or Chromium (the path is in the window) and tap Generate again.");
+                try { File.Delete(pedido); } catch { }
+            }
+            else if (r.Erro == null && aberto && !File.Exists(resposta))
+            {
+                r.Erro = GeradorAberto() ? T("O gerador não respondeu a tempo.", "The generator did not answer in time.") : T("O gerador fechou antes de responder. Toquem em Gerar de novo.", "The generator closed before answering. Tap Generate again.");
+                try { File.Delete(pedido); } catch { }
+                if (GeradorAberto()) FecharGerador("sem resposta");
+            }
             if (r.Erro == null)
             {
                 try
@@ -142,6 +215,111 @@ namespace Bigorna.Menu
         }
 
         static bool Saiu(Process p) { try { return p.HasExited; } catch { return true; } }
+
+        // ------------------------------------------------ v274: o gerador que fica aberto
+        // (o mod o abre quando o quadro do mapa oneshot aparece: o motor e a página carregam enquanto o jogador escolhe a equipe,
+        //  a duração e a dificuldade; depois, cada mapa leva só o tempo dele. Ele fecha quando a tela de título fica para trás,
+        //  quando o jogo fecha, ou sozinho depois de 30 min sem pedido)
+        static Process _gerador; static float _abertoEm = -100f;
+        static string ArquivoDoGerador => Path.Combine(Pasta, "gerador.json");
+
+        static JObject FichaDoGerador() { try { return File.Exists(ArquivoDoGerador) ? JObject.Parse(File.ReadAllText(ArquivoDoGerador, Encoding.UTF8)) : null; } catch { return null; } }
+
+        /// <summary>O gerador aberto está de pé (o processo que o mod abriu, ou o da ficha gerador.json).</summary>
+        public static bool GeradorAberto()
+        {
+            // (v286: aberto e sem dar sinal (a ficha gerador.json) em 45 s, ele travou antes de começar: fecha, e o mapa vai pelo
+            //  processo de um mapa só. Visto em 05/11/2026: o processo ficou de pé sem escrever nada, e o quadro esperava sem fim)
+            if (_gerador != null && !Saiu(_gerador) && !File.Exists(ArquivoDoGerador) && Time.unscaledTime - _abertoEm > 45f)
+            {
+                Log.Info("mapa oneshot: o gerador aberto não deu sinal em 45 s; fechado");
+                try { _gerador.Kill(); } catch { }
+                _gerador = null; return false;
+            }
+            if (_gerador != null && !Saiu(_gerador)) return true;
+            var f = FichaDoGerador(); int pid = (int?)f?["pid"] ?? 0; if (pid <= 0) return false;
+            try { var p = Process.GetProcessById(pid); return !p.HasExited && p.ProcessName.IndexOf("Bigorna", StringComparison.OrdinalIgnoreCase) >= 0; } catch { return false; }
+        }
+        /// <summary>O estado do gerador aberto para o registro: abrindo, carregando, pronto, gerando.</summary>
+        public static string EstadoDoGerador() => (string)FichaDoGerador()?["estado"] ?? (GeradorAberto() ? "abrindo" : "fechado");
+        public static bool GeradorPronto => GeradorAberto() && EstadoDoGerador() == "pronto";
+
+        /// <summary>Abre o gerador, se ainda não está aberto (com o aplicativo instalado e em dia). v278: no Linux, só deixa pronto
+        /// o arquivo que abre a página do gerador no navegador (o aplicativo não roda lá).</summary>
+        public static void AbrirGerador()
+        {
+            if (Plataforma.Wine) { PrepararPonte(); return; }
+            try
+            {
+                if (GeradorAberto() || Time.unscaledTime - _abertoEm < 15f) return;
+                if (!AppInstalado || !DadosDoEditor.AppEmDia(true)) return;
+                Directory.CreateDirectory(Pasta);
+                foreach (var n in new[] { "sair", "pedido.json", "resposta.json", "gerador.json" }) { try { File.Delete(Path.Combine(Pasta, n)); } catch { } }
+                _abertoEm = Time.unscaledTime;
+                _gerador = Process.Start(new ProcessStartInfo(DadosDoEditor.ArquivoApp, "--gerador-residente \"" + Pasta + "\" --editor \"" + DadosDoEditor.Pasta + "\" --jogo " + Process.GetCurrentProcess().Id + " --lingua " + Codigo)
+                    { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = DadosDoEditor.PastaApp });
+                Log.Info("mapa oneshot: gerador aberto ao fundo (" + Codigo + ")");
+            }
+            catch (Exception ex) { Log.Info("mapa oneshot: o gerador não abriu ao fundo (" + ex.Message + ")"); }
+        }
+
+        // ------------------------------------------------ v278: a ponte do navegador (Linux)
+        /// <summary>O arquivo que abre a página do gerador no modo de ponte, na língua do jogo (ao lado do editor).</summary>
+        public static string ArquivoDaPonte => Path.Combine(DadosDoEditor.Pasta, "Abrir-o-gerador.html");
+        /// <summary>A página do gerador está aberta no navegador: ela grava gerador-navegador.json a cada 2 s.</summary>
+        public static bool PonteAtiva
+        {
+            get
+            {
+                try
+                {
+                    var f = Path.Combine(Pasta, "gerador-navegador.json"); if (!File.Exists(f)) return false;
+                    var j = JObject.Parse(File.ReadAllText(f, Encoding.UTF8)); long q = (long?)j["quando"] ?? 0;
+                    long agora = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
+                    return Math.Abs(agora - q) < 8000;
+                }
+                catch { return false; }
+            }
+        }
+        /// <summary>A resposta do navegador já está inteira (o navegador cria o arquivo vazio antes de escrever nele).</summary>
+        static bool RespostaInteira(string f) { try { if (!File.Exists(f) || new FileInfo(f).Length == 0) return false; JObject.Parse(File.ReadAllText(f, Encoding.UTF8)); return true; } catch { return false; } }
+        public static void PrepararPonte()
+        {
+            try
+            {
+                Directory.CreateDirectory(Pasta); Directory.CreateDirectory(DadosDoEditor.Pasta);
+                var html = "<!doctype html><meta charset=\"utf-8\"><title>Bigorna</title><script>location.replace('Bigorna-Gerador.html?gerador=1&ponte=1&lingua=" + Codigo + "');</script>"
+                    + "<p><a href=\"Bigorna-Gerador.html?gerador=1&amp;ponte=1&amp;lingua=" + Codigo + "\">Bigorna</a></p>";
+                if (!File.Exists(ArquivoDaPonte) || File.ReadAllText(ArquivoDaPonte, Encoding.UTF8) != html) File.WriteAllText(ArquivoDaPonte, html, new UTF8Encoding(false));
+            }
+            catch (Exception ex) { Log.Info("mapa oneshot: ponte do navegador (" + ex.Message + ")"); }
+        }
+        /// <summary>Tenta abrir a página no navegador do Linux (winebrowser, do Wine, passa ao xdg-open); se não abrir, fica o
+        /// caminho no quadro.</summary>
+        public static void AbrirPonteNoNavegador()
+        {
+            PrepararPonte();
+            try
+            {
+                var url = "file://" + Plataforma.CaminhoNoSistema(ArquivoDaPonte);
+                Process.Start(new ProcessStartInfo("winebrowser.exe", "\"" + url + "\"") { UseShellExecute = false, CreateNoWindow = true });
+                Log.Info("mapa oneshot: ponte do navegador aberta (" + url + ")");
+            }
+            catch (Exception ex) { Log.Info("mapa oneshot: o navegador não abriu (" + ex.Message + ")"); }
+        }
+
+        /// <summary>Pede ao gerador aberto que feche (o arquivo "sair" na pasta que ele vigia).</summary>
+        public static void FecharGerador(string porque)
+        {
+            try
+            {
+                if (!GeradorAberto()) return;
+                File.WriteAllText(Path.Combine(Pasta, "sair"), porque ?? "", new UTF8Encoding(false));
+                Log.Info("mapa oneshot: gerador fechando (" + porque + ")");
+                _gerador = null;
+            }
+            catch (Exception ex) { Log.Info("mapa oneshot: fechando o gerador (" + ex.Message + ")"); }
+        }
 
         /// <summary>A simulacao em linhas para a tela (TMP, colunas por posicao), como a tabela do editor.</summary>
         public static string TextoDaSimulacao(Resultado r)

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -34,7 +34,7 @@ namespace Bigorna.Menu
             return Directory.Exists(p) ? p : null;
         }
 
-        /// <summary>Traz os arquivos do Bigorna de Downloads para CustomMaps. Devolve quantos mapas e campanhas vieram.</summary>
+        /// <summary>Traz os arquivos do Bigorna de Downloads para a pasta de mapas (v270: Bigorna\Mapas, com os nomes novos). Devolve quantos mapas e campanhas vieram.</summary>
         public static int Recolher(string destino)
         {
             var origem = PastaDownloads(); if (origem == null || string.IsNullOrEmpty(destino)) return 0;
@@ -43,32 +43,32 @@ namespace Bigorna.Menu
             {
                 Directory.CreateDirectory(destino);
                 // (a copia mais nova de cada nome, quando o navegador baixou o mesmo arquivo mais de uma vez)
-                var arquivos = Directory.GetFiles(origem).Where(f => f.EndsWith(".dcamp", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".dmap", StringComparison.OrdinalIgnoreCase))
+                var arquivos = Directory.GetFiles(origem).Where(f => Formato.Arquivos.EhCampanha(f) || Formato.Arquivos.EhMapa(f))   // (v270: .bcamp/.bmap e os nomes antigos)
                     .GroupBy(f => Copia.Replace(Path.GetFileName(f), ""), StringComparer.OrdinalIgnoreCase).Select(g => g.OrderByDescending(File.GetLastWriteTimeUtc).ToList()).ToList();
                 var usados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 // campanhas primeiro: levam os seus mapas
-                foreach (var g in arquivos.Where(g => g[0].EndsWith(".dcamp", StringComparison.OrdinalIgnoreCase)))
+                foreach (var g in arquivos.Where(g => Formato.Arquivos.EhCampanha(g[0])))
                 {
                     var j = Ler(g[0]); if (j == null || (string)j["format"] != "dcamp") continue;
                     var cid = (string)j["meta"]?["id"]; if (string.IsNullOrEmpty(cid)) cid = Path.GetFileNameWithoutExtension(Copia.Replace(Path.GetFileName(g[0]), ""));
                     var pasta = Path.Combine(destino, Limpo(cid)); Directory.CreateDirectory(pasta);
-                    Mover(g, Path.Combine(pasta, Copia.Replace(Path.GetFileName(g[0]), "")), usados);
+                    Mover(g, Path.Combine(pasta, Formato.Arquivos.NomeNovo(Copia.Replace(Path.GetFileName(g[0]), ""))), usados);
                     foreach (var no in (j["nodes"] as JArray) ?? new JArray())
                     {
                         var m = (string)no["map"]; if (string.IsNullOrEmpty(m)) continue;
-                        var dele = arquivos.FirstOrDefault(x => string.Equals(Copia.Replace(Path.GetFileName(x[0]), ""), m, StringComparison.OrdinalIgnoreCase));
+                        var dele = arquivos.FirstOrDefault(x => string.Equals(Formato.Arquivos.NomeNovo(Copia.Replace(Path.GetFileName(x[0]), "")), Formato.Arquivos.NomeNovo(m), StringComparison.OrdinalIgnoreCase));
                         if (dele == null) continue;
-                        var jm = Ler(dele[0]); Mover(dele, Path.Combine(pasta, m), usados);
+                        var jm = Ler(dele[0]); Mover(dele, Path.Combine(pasta, Formato.Arquivos.NomeNovo(m)), usados);
                         if (jm != null) MoverCitados(jm, origem, pasta, usados);
                     }
                     MoverCitados(j, origem, pasta, usados);
                     Log.Info("recolhida de Downloads a campanha «" + cid + "»"); n++;
                 }
-                foreach (var g in arquivos.Where(g => g[0].EndsWith(".dmap", StringComparison.OrdinalIgnoreCase)))
+                foreach (var g in arquivos.Where(g => Formato.Arquivos.EhMapa(g[0])))
                 {
                     if (usados.Contains(g[0])) continue;
                     var j = Ler(g[0]); if (j == null || (string)j["format"] != "dmap") continue;
-                    var nome = Copia.Replace(Path.GetFileName(g[0]), "");
+                    var nome = Formato.Arquivos.NomeNovo(Copia.Replace(Path.GetFileName(g[0]), ""));
                     Mover(g, Path.Combine(destino, nome), usados); MoverCitados(j, origem, destino, usados);
                     Log.Info("recolhido de Downloads o mapa «" + nome + "»"); n++;
                 }

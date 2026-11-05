@@ -44,6 +44,33 @@ namespace Bigorna.Encontro
 
         public static string NomeDe(string id) => id != null && _nomes.TryGetValue(id, out var n) ? n : null;
 
+        /// <summary>v268: o id do monstro do jogo com um nome proprio (a figura do vilao de um mapa gerado): o mesmo para o mesmo
+        /// monstro e nome, de uma partida para outra (a gravacao guarda o id).</summary>
+        public static string IdComNome(string id, string nome)
+        {
+            uint h = 2166136261; foreach (var ch in (id ?? "") + "|" + (nome ?? "").Trim()) { h ^= ch; h *= 16777619; }
+            return "BIGORNA_NOME_" + h.ToString("x8");
+        }
+        /// <summary>v268: o monstro do jogo com o nome proprio da figura, registrado uma vez (null: sem nome, ou nao deu).</summary>
+        public static EnemyModel ComNome(string id, string nome)
+        {
+            if (string.IsNullOrWhiteSpace(nome) || string.IsNullOrEmpty(id) || id.StartsWith("BIGORNA_NOME_", StringComparison.OrdinalIgnoreCase)) return null;
+            var novo = IdComNome(id, nome);
+            if (!_registrados.Contains(novo))
+            {
+                try { RegistrarInimigo(new JObject { ["id"] = novo, ["behaviour"] = id, ["name"] = nome.Trim(), ["plural"] = nome.Trim(), ["sameAsBase"] = true }); }
+                catch (Exception ex) { Log.Erro("monstro «" + id + "» com o nome «" + nome + "»", ex); return null; }
+            }
+            try { return UserCollectionManager.GetEnemy(novo, false); } catch { return null; }
+        }
+        /// <summary>v268: as figuras com nome proprio de um mapa, registradas antes de o jogo ler uma gravacao que as tenha.</summary>
+        public static void NomesProprios(Dmap m)
+        {
+            int n = 0;
+            foreach (var e in m?.Spawns?.Inimigos ?? new List<Dmap.Inimigo>()) if (!string.IsNullOrWhiteSpace(e.Nome) && !Balanceado.EhVaga(e) && ComNome(e.Id, e.Nome) != null) n++;
+            if (n > 0) Log.Info("figuras com nome próprio: " + n);
+        }
+
         public static void Registrar(Dmap.Personalizado c, string origem)
         {
             if (c == null) return;
@@ -159,6 +186,14 @@ namespace Bigorna.Encontro
             foreach (var campo in new[] { "SpawnSound", "AttackSound", "DefendSound", "DefeatSound", "DefaultLoot" })
             { try { var f = typeof(EnemyModel).GetField(campo); f.SetValue(m, f.GetValue(basee)); } catch (Exception ex) { Log.Info("copiando " + campo + ": " + ex.Message); } }
             try { VozesProprias.Aplicar(m, id, j["sounds"] as JObject); } catch (Exception ex) { Log.Erro("sons de «" + id + "»", ex); }
+            // (v268: "sameAsBase", a vilã de um mapa gerado: o monstro do jogo com outro nome; o resto vem dele, na língua do jogo)
+            if ((bool?)j["sameAsBase"] == true)
+            {
+                m.KeyNameDescription = basee.KeyNameDescription; m.DefensiveKey = basee.DefensiveKey; m.ShowDefenseAfterAttack = basee.ShowDefenseAfterAttack;
+                m.IsNamed = basee.IsNamed; m.MechanicalTraits = basee.MechanicalTraits; m.ThemeTraits = basee.ThemeTraits; m.StrengthsValue = basee.StrengthsValue;
+                m.WeaknessesAndResistances = basee.WeaknessesAndResistances; m.ImmuneTo = basee.ImmuneTo; m.Tiers = basee.Tiers;
+                m.Size = basee.Size; m.Activations = basee.Activations; m.ManualActivations = basee.ManualActivations;
+            }
             m.DataAssetBundleName = basee.DataAssetBundleName; m.TextureTabAssetPath = basee.TextureTabAssetPath; m.TextureTabBossAssetPath = basee.TextureTabBossAssetPath;
             m.AnimatedPrefabAssetPath = basee.AnimatedPrefabAssetPath; m.AnimatedBossPrefabAssetPath = basee.AnimatedBossPrefabAssetPath; m.PlasticPrefabAssetPath = basee.PlasticPrefabAssetPath;
             m.PreviewPrefabAssetPath = basee.PreviewPrefabAssetPath; m.MaterialAssetPath = basee.MaterialAssetPath; m.LogicAssetPath = basee.LogicAssetPath;

@@ -75,6 +75,8 @@ namespace Bigorna.Encontro
 
         /// <summary>A partida (o estado do jogo) da gravacao mais recente de uma ranhura, ou null.</summary>
         public static SerializedGame JogoDoSave(int slot) => Ler(slot)?.GameSceneData?.GameState;
+        /// <summary>v271: a gravação inteira mais recente de uma ranhura (o quadro "O que vai com a equipe").</summary>
+        public static SerializedSaveData DadosDoSave(int slot) => Ler(slot);
 
         /// <summary>v262, Novo jogo +: o grupo de uma partida oficial passa a outra partida oficial (o que so existe nos mapas
         /// do Bigorna fica de fora, como na volta ao save).</summary>
@@ -173,6 +175,7 @@ namespace Bigorna.Encontro
                 var d = Jogo.DadosJogo?.Data; if (d == null) return;
                 _fim = JsonUtility.ToJson(d); _fimOrigem = Origem; _fimNome = nome; _aviso = null;
                 _situacao = Verificar(_fimOrigem);
+                GuardarPendente();
                 Log.Info("partida de origem «" + _fimOrigem.Nome + "»: " + (_situacao == Situacao.Igual ? "como estava" : _situacao == Situacao.Mudou ? "mudou durante a aventura" : "não está mais lá"));
                 Log.Info("fim de «" + nome + "» com o grupo do save " + Origem.Slot + ": a mesa escolhe o destino do grupo");
             }
@@ -246,9 +249,87 @@ namespace Bigorna.Encontro
 
         // ------------------------------------------------------------ a janela da escolha (no menu, ou no mapa-mundi ao fim de uma campanha)
         static GUIStyle _titulo, _texto, _botao, _janela;
+        /// <summary>v286: com o quadro «O que fazer com o grupo?» na tela, a interface do jogo por baixo não recebe cliques (o
+        /// quadro é desenhado pelo mod, por cima dela: um clique nele também caía no botão do menu embaixo, e abria os Mapas da
+        /// comunidade). O sistema de eventos do jogo fica desligado enquanto o quadro está aberto.</summary>
+        static UnityEngine.EventSystems.EventSystem _eventosDesligados;
+        public static void Batimento()
+        {
+            var cena = Jogo.CenaAtual();
+            bool aberto = _fim != null && !NoQuadroDoJogo && cena != Scene.Game && !(Jogo.Carregador != null && Jogo.Carregador.IsLoading);
+            if (aberto && _eventosDesligados == null)
+            {
+                var es = UnityEngine.EventSystems.EventSystem.current;
+                if (es != null && es.enabled) { es.enabled = false; _eventosDesligados = es; }
+            }
+            else if (!aberto && _eventosDesligados != null) { try { _eventosDesligados.enabled = true; } catch { } _eventosDesligados = null; }
+        }
+        // ------------------------------------------------ v287: a pergunta no quadro do próprio jogo (TelaDeMapas.PerguntarGrupo)
+        /// <summary>A pergunta está no quadro do jogo: o desenho do mod (o reserva) fica de lado.</summary>
+        public static bool NoQuadroDoJogo;
+        public class Opcao { public string Rotulo; public Func<string> Fazer; }
+        public static string TituloDoFim => T("O que fazer com o grupo?", "What to do with the party?");
+        public static List<string> TextosDoFim()
+        {
+            var r = new List<string>(); if (_fim == null) return r;
+            r.Add(T("«", "“") + (_fimNome ?? "") + T("» terminou. O grupo veio da partida gravada «", "” is over. The party came from the saved game “") + _fimOrigem.Rotulo + T("» (", "” (") + _fimOrigem.Detalhe + ").");
+            if (_situacao == Situacao.Mudou)
+                r.Add(T("A partida «", "The game “") + _fimOrigem.Rotulo + T("» mudou depois que o grupo saiu dela", "” changed after the party left it") + (_mudouEm == DateTime.MinValue ? "" : T(" (gravada em ", " (saved on ") + DataHora(_mudouEm) + ")")
+                    + T(". O butim desta aventura fica fora dela: o grupo voltaria por cima do que aconteceu lá nesse meio-tempo, e isso se perderia. Vocês podem gravar uma cópia da partida, como ela está agora, com o grupo desta aventura; a original fica como está.",
+                        ". This adventure's loot stays out of it: the party would go back over what happened there in the meantime, and that would be lost. You can create a copy of that game, as it is now, with this adventure's party; the original stays as it is."));
+            else if (_situacao == Situacao.Sumiu)
+                r.Add(T("A partida «", "The game “") + _fimOrigem.Rotulo + T("» foi apagada (ou a ranhura dela guarda outra partida). O grupo desta aventura só pode ser descartado.", "” was deleted (or its slot holds another game). This adventure's party can only be discarded."));
+            if (_aviso != null) r.Add("<color=#ff9a7a>" + _aviso + "</color>");
+            return r;
+        }
+        /// <summary>As escolhas do fim; cada uma devolve o erro (e o quadro fica, com o erro) ou null (e a pergunta acaba).</summary>
+        public static List<Opcao> OpcoesDoFim()
+        {
+            var r = new List<Opcao>(); if (_fim == null) return r;
+            Func<string> acabou(Func<string> f) => () => { string erro; try { erro = f(); } catch (Exception ex) { Log.Erro("o destino do grupo", ex); erro = ex.Message; } if (erro != null) _aviso = erro; else Terminar(); return erro; };
+            if (_situacao == Situacao.Igual) r.Add(new Opcao { Rotulo = T("Levar o grupo de volta à partida gravada «", "Take the party back to the save “") + _fimOrigem.Rotulo + T("»", "”"), Fazer = acabou(LevarAoSave) });
+            if (_situacao != Situacao.Sumiu) r.Add(new Opcao { Rotulo = _situacao == Situacao.Mudou ? T("Gravar uma cópia da partida com o grupo desta aventura", "Create a copy of the game with this adventure's party") : T("Gravar o grupo numa partida nova", "Create a new save with the party"), Fazer = acabou(NovoSave) });
+            r.Add(new Opcao { Rotulo = T("Descartar (a partida gravada fica como estava)", "Discard (the save stays as it was)"), Fazer = acabou(() => { Log.Info("grupo do fim descartado"); return null; }) });
+            return r;
+        }
+        static void Terminar() { _fim = null; _fimOrigem = null; _fimNome = null; _aviso = null; NoQuadroDoJogo = false; ApagarPendente(); try { Menu.PainelMapas.Reler(); } catch { } }
+
+        // ------------------------------------------------ v289: a pergunta guardada em disco
+        /// <summary>v289: o grupo no fim do mapa fica também num arquivo até a mesa escolher: se o jogo fechar antes (queda,
+        /// Alt+F4, falta de luz), a pergunta volta na próxima tela de título, e o butim da aventura não se perde.</summary>
+        static string ArquivoPendente => Path.Combine(Application.persistentDataPath, "Bigorna", "GrupoPendente.json");
+        class Pendencia { public string Fim, Nome; public Save Origem; public long Quando; }
+        static void GuardarPendente()
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(ArquivoPendente));
+                var tmp = ArquivoPendente + ".tmp";
+                File.WriteAllText(tmp, Newtonsoft.Json.JsonConvert.SerializeObject(new Pendencia { Fim = _fim, Nome = _fimNome, Origem = _fimOrigem, Quando = DateTime.Now.Ticks }));
+                if (File.Exists(ArquivoPendente)) File.Delete(ArquivoPendente);
+                File.Move(tmp, ArquivoPendente);
+            }
+            catch (Exception ex) { Log.Erro("guardando a pergunta do grupo", ex); }
+        }
+        static void ApagarPendente() { try { if (File.Exists(ArquivoPendente)) File.Delete(ArquivoPendente); } catch (Exception ex) { Log.Erro("apagando a pergunta do grupo", ex); } }
+        /// <summary>Na tela de título: uma pergunta que ficou sem resposta (o jogo fechou antes) volta.</summary>
+        public static void RecuperarPendente()
+        {
+            if (_fim != null || !File.Exists(ArquivoPendente)) return;
+            try
+            {
+                var p = Newtonsoft.Json.JsonConvert.DeserializeObject<Pendencia>(File.ReadAllText(ArquivoPendente));
+                if (p == null || string.IsNullOrEmpty(p.Fim) || p.Origem == null) { ApagarPendente(); return; }
+                _fim = p.Fim; _fimNome = p.Nome; _fimOrigem = p.Origem; _aviso = null; NoQuadroDoJogo = false;
+                _situacao = Verificar(_fimOrigem);
+                Log.Info("o destino do grupo de «" + (_fimNome ?? "") + "» ficou sem resposta da outra vez; a pergunta volta");
+            }
+            catch (Exception ex) { Log.Erro("lendo a pergunta do grupo", ex); }
+        }
+
         public static void Desenhar()
         {
-            if (_fim == null) return;
+            if (_fim == null || NoQuadroDoJogo) return;
             var cena = Jogo.CenaAtual(); if (cena == Scene.Game || (Jogo.Carregador != null && Jogo.Carregador.IsLoading)) return;
             if (_botao == null)
             {

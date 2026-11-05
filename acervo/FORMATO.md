@@ -43,11 +43,11 @@ primeira, e com `edicao` maior.
 
 ## O zip
 
-Plano (sem pastas), com a ficha e só estes tipos: `.dmap .dcamp .bigorna .json .ogg .mp3 .wav .mp4 .webm .png .jpg .jpeg
+Plano (sem pastas), com a ficha e só estes tipos: `.bmap .bcamp .dmap .dcamp .bigorna .json .ogg .mp3 .wav .mp4 .webm .png .jpg .jpeg
 .webp .glb .gltf .obj .bin .mtl`. A única pasta aceita é `imagens/`, com as imagens da obra (`imagens/<32 hex>.png|jpg|webp|gif`).
 
-- **mapa**: `bigorna-acervo.json`, o `.dmap`, as mídias dele e `imagens/`.
-- **campanha**: `bigorna-acervo.json`, o `.dcamp`, os `.dmap`, as mídias e `imagens/`.
+- **mapa**: `bigorna-acervo.json`, o `.bmap` (ou `.dmap`, das versões antes da 0.2.2), as mídias dele e `imagens/`.
+- **campanha**: `bigorna-acervo.json`, o `.bcamp`, os `.bmap` (ou `.dcamp` e `.dmap`, das versões antes da 0.2.2), as mídias e `imagens/`.
 - **pacote**: `bigorna-acervo.json`, `pacote.bigorna` (o pacote da Oficina, para o editor), `pacote.json` (o conteúdo pronto
   para o mod: `{ "format": "bigorna-pacote", "version": 1, "id", "edition", "name", "custom": { …como o "custom" de um .dmap… } }`)
   as mídias (modelos, sons) e `imagens/`.

@@ -1,10 +1,10 @@
 /* Shared settings of the Bigorna editors (all UI text in English).
-   For now, one setting: the folder the exported files go to (the CustomMaps folder
+   For now, one setting: the folder the exported files go to (the Bigorna\\Mapas folder
    of Descent). Uses the File System Access API (Chrome/Edge); the chosen folder handle
    is kept in the browser's IndexedDB. Without a folder, or in a browser without the
    API, the file is downloaded as usual. */
 /* Bigorna Editor (the Windows app, app/): the editor runs at https://bigorna.app/ and the app gives it the files of the game's
-   data folder (CustomMaps, Pacotes, Editor), with nothing to allow: GET /api/ler, POST /api/gravar, GET /api/lista, POST
+   data folder (Bigorna\\Mapas, Pacotes, Editor), with nothing to allow: GET /api/ler, POST /api/gravar, GET /api/lista, POST
    /api/apagar (paths relative to that folder). In a plain browser, Arquivos.ativo is false and nothing here is used. */
 const Arquivos = (() => {
   // (v258: the page the mod's one-shot generator opens in the app, ?gerador=1, works as in a browser: none of the user's files)
@@ -28,7 +28,7 @@ const Arquivos = (() => {
   return { ativo, ler, gravar, lista, apagar };
 })();
 /* a folder of the app looking like a folder the browser gave (FileSystemDirectoryHandle): what the export, the autosave
-   and "Files in the folder" do with the CustomMaps folder works the same, with no permission to ask */
+   and "Files in the folder" do with the Bigorna\\Mapas folder works the same, with no permission to ask */
 class PastaApp {
   constructor(rel, nome) { this.rel = rel; this.name = nome; this.kind = 'directory'; }
   async queryPermission() { return 'granted'; }
@@ -69,12 +69,12 @@ const Config = (() => {
   const suportado = () => Arquivos.ativo || typeof window.showDirectoryPicker === 'function';
 
   async function carregar() {
-    if (!pronto) pronto = (async () => { if (Arquivos.ativo) { pasta = new PastaApp('CustomMaps', 'CustomMaps'); return; } const h = await ler('pastaExport'); if (h && typeof h.queryPermission === 'function') pasta = h; })();
+    if (!pronto) pronto = (async () => { if (Arquivos.ativo) { pasta = new PastaApp('Bigorna/Mapas', 'Mapas'); return; } const h = await ler('pastaExport'); if (h && typeof h.queryPermission === 'function') pasta = h; })();
     return pronto;
   }
 
   async function escolherPasta() {
-    if (Arquivos.ativo) { pasta = new PastaApp('CustomMaps', 'CustomMaps'); return pasta.name; }   // (the app: always the game's CustomMaps)
+    if (Arquivos.ativo) { pasta = new PastaApp('Bigorna/Mapas', 'Mapas'); return pasta.name; }   // (the app: always the game's Bigorna\Mapas; before v270, CustomMaps)
     if (!suportado()) throw new Error('This browser does not let the page write into a folder. Use Chrome or Edge.');
     const h = await window.showDirectoryPicker({ mode: 'readwrite', id: 'bigorna-custommaps', startIn: 'documents' });
     pasta = h; await gravar('pastaExport', h);
@@ -164,16 +164,16 @@ const Config = (() => {
       const botoesDe = sec => `<div style="display:flex;gap:8px;flex-wrap:wrap">${extras.map((x, i) => x.campo || x.opcoes || (x.secao || 'Work in progress') !== sec ? '' : `<button data-extra="${i}" style="${b}">${x.rotulo}</button>`).join('')}</div>
         <p style="margin:6px 0 0;color:#a89b88;font-size:12px">${extras.filter(x => !x.campo && !x.opcoes && (x.secao || 'Work in progress') === sec).map(x => x.ajuda || '').filter(Boolean).join(' ')}</p>`;
       const pastaCorpo = Arquivos.ativo ? `
-        <p style="margin:0 0 8px">In the Bigorna Editor app, exported files go straight into the game's <b>CustomMaps</b> folder, and the Workshop is kept in the <b>Pacotes</b> folder, next to it.</p>
-        <label style="display:flex;gap:8px;align-items:center;margin:0 0 8px;cursor:pointer"><input type="checkbox" id="cfgAuto" ${autoSalvar() ? 'checked' : ''}> Autosave: keep the files in <b>CustomMaps</b> up to date as you work (no need to export)</label>
+        <p style="margin:0 0 8px">In the Bigorna Editor app, exported files go straight into the game's <b>Bigorna\\Mapas</b> folder, and the Workshop is kept in the <b>Pacotes</b> folder, next to it.</p>
+        <label style="display:flex;gap:8px;align-items:center;margin:0 0 8px;cursor:pointer"><input type="checkbox" id="cfgAuto" ${autoSalvar() ? 'checked' : ''}> Autosave: keep the files in <b>Bigorna\\Mapas</b> up to date as you work (no need to export)</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="cfgArquivos" style="${b}" title="Everything in the folder (maps, campaigns and their folders), with the option to delete">Files in the folder…</button><button id="cfgEscolher" hidden></button></div>` : `
         <p style="margin:0 0 8px">${pasta ? 'Exported files go straight into <b>' + pasta.name + '</b>.' : 'No folder chosen: exported files are downloaded, and the game (with the mod) brings them from Downloads into its maps list by itself. Choosing the folder is only needed for autosave and the list of files.'}</p>
         ${pasta ? `<label style="display:flex;gap:8px;align-items:center;margin:0 0 8px;cursor:pointer"><input type="checkbox" id="cfgAuto" ${autoSalvar() ? 'checked' : ''}> Autosave: keep the files in <b>${pasta.name}</b> up to date as you work (no need to export)</label>` : ''}
-        <p style="margin:0 0 12px;color:#a89b88;font-size:12px">The maps folder of Descent is <code>C:\\Users\\&lt;${typeof L2 === 'function' ? L2('you', 'você') : 'you'}&gt;\\AppData\\LocalLow\\Fantasy Flight Games\\Descent - Legends of the Dark\\CustomMaps</code>. The AppData folder is hidden: paste that path into the address bar of the folder picker.${suportado() ? '' : '<br><b>This browser cannot write into folders; use Chrome or Edge.</b>'}</p>
+        <p style="margin:0 0 12px;color:#a89b88;font-size:12px">The maps folder of Descent is <code>C:\\Users\\&lt;${typeof L2 === 'function' ? L2('you', 'você') : 'you'}&gt;\\AppData\\LocalLow\\Fantasy Flight Games\\Descent - Legends of the Dark\\Bigorna\\Mapas</code>. The AppData folder is hidden: paste that path into the address bar of the folder picker.${suportado() ? '' : '<br><b>This browser cannot write into folders; use Chrome or Edge.</b>'}</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button id="cfgEscolher" style="${b};background:#d98a2b;color:#1d1a17;font-weight:600" ${suportado() ? '' : 'disabled'}>${pasta ? 'Change folder…' : 'Choose folder…'}</button>
           ${pasta ? `<button id="cfgArquivos" style="${b}" title="Everything in the folder (maps, campaigns and their folders), with the option to delete">Files in the folder…</button><button id="cfgLimpar" style="${b}">Download instead</button>` : ''}
-          <button id="cfgCopiar" style="${b}" title="Copies the CustomMaps path; paste it in Explorer's address bar">Copy CustomMaps path</button>
+          <button id="cfgCopiar" style="${b}" title="Copies the Bigorna\\Mapas path; paste it in Explorer's address bar">Copy Bigorna\\Mapas path</button>
         </div>`;
       const autor = extras ? extras.map((x, i) => x.campo ? `<label style="display:block">${x.campo}<input data-extra-campo="${i}" value="${String(x.valor() || '').replace(/"/g, '&quot;')}" style="display:block;width:100%;box-sizing:border-box;margin-top:4px;font:inherit;padding:6px 8px;background:#1d1a17;color:#e8e0d2;border:1px solid #3b342d;border-radius:6px"></label>` : '').join('') : '';
       const nomeAutor = extras && extras.find(x => x.campo) ? String(extras.find(x => x.campo).valor() || '') : '';
@@ -198,7 +198,7 @@ const Config = (() => {
       const l = cx.querySelector('#cfgLimpar'); if (l) l.onclick = async () => { await limparPasta(); pintar(); aoMudar && aoMudar(); };
       const ar = cx.querySelector('#cfgArquivos'); if (ar) ar.onclick = () => arquivos();
       const cc = cx.querySelector('#cfgCopiar'); if (cc) cc.onclick = async () => {
-        const caminho = '%USERPROFILE%\\AppData\\LocalLow\\Fantasy Flight Games\\Descent - Legends of the Dark\\CustomMaps';
+        const caminho = '%USERPROFILE%\\AppData\\LocalLow\\Fantasy Flight Games\\Descent - Legends of the Dark\\Bigorna\\Mapas';
         try { await navigator.clipboard.writeText(caminho); cx.querySelector('#cfgErro').style.color = '#6cbf6c'; cx.querySelector('#cfgErro').textContent = 'Copied: ' + caminho + ' (paste it in the Explorer address bar).'; }
         catch (e) { cx.querySelector('#cfgErro').textContent = 'Could not copy: ' + (e.message || e); }
       };
@@ -219,7 +219,7 @@ const Config = (() => {
     async function arquivos(msg) {
       if (!pasta) return pintar();
       cx.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin:0 0 10px"><button id="arqVoltar" style="${b}">‹ Back</button><h2 style="margin:0;font-size:17px;flex:1"><span>Files in the folder</span> <span data-sem-traducao style="color:#d9a35a">${pasta.name}</span></h2><button id="arqAtualizar" style="${b}">Refresh</button></div>
-        <p style="margin:0 0 8px;color:#a89b88;font-size:12px">Delete what you no longer want in the folder: maps (.dmap), campaigns (.dcamp) and their folders. What is deleted here is gone for good.</p>
+        <p style="margin:0 0 8px;color:#a89b88;font-size:12px">Delete what you no longer want in the folder: maps (.bmap), campaigns (.bcamp) and their folders. What is deleted here is gone for good.</p>
         <div id="arqLista" style="max-height:52vh;overflow:auto;border:1px solid #3b342d;border-radius:6px;padding:4px 0">…</div>
         <p id="arqMsg" style="margin:8px 0 0;color:#6cbf6c;font-size:13px">${msg || ''}</p>`;
       cx.querySelector('#arqVoltar').onclick = () => pintar();

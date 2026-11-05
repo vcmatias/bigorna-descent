@@ -1,6 +1,6 @@
 # Bigorna
 
-Bigorna é um mod feito por fã para *Descent: Legends of the Dark* (Windows, Steam) que joga mapas e campanhas da
+Bigorna é um mod feito por fã para *Descent: Legends of the Dark* (Steam: Windows, ou Linux pelo Proton) que joga mapas e campanhas da
 comunidade, junto com o **Bigorna Rooms**, editor que monta esses mapas sala por sala.
 
 Projeto não oficial. *Descent: Legends of the Dark* pertence à Fantasy Flight Games e à Asmodee; o Bigorna não tem
@@ -10,13 +10,14 @@ vínculo com elas nem aval delas. É preciso ter o jogo.
 
 - `Bigorna.dll`: o mod, com o editor Bigorna Rooms dentro dele.
 - `Bigorna-Salas.html`: o mesmo editor, que o instalador coloca na pasta `Editor`.
-- `Install-Bigorna.bat`, `Uninstall-Bigorna.bat`, `install-bigorna.ps1`: o instalador.
+- `Install-Bigorna.bat`, `Uninstall-Bigorna.bat`, `install-bigorna.ps1`: o instalador do Windows.
+- `install-bigorna.sh`: o instalador do Linux (Steam com Proton).
 - `source/`: o código do mod e do editor.
 
 O pacote traz só código próprio. Textos, imagens, sons, peças e listas do jogo saem da cópia instalada de quem joga,
 no computador dessa pessoa.
 
-## Instalar
+## Instalar no Windows
 
 1. Descompacte o pacote em qualquer pasta.
 2. Dê dois cliques em `Install-Bigorna.bat`. Uma janela guia a instalação:
@@ -43,6 +44,25 @@ internet sem assinatura paga: clique em "Mais informações" e "Executar assim m
 
 Sem janela: `powershell -ExecutionPolicy Bypass -File install-bigorna.ps1 -Console [-DisableForge] [-GameFolder "..."]`.
 
+## Instalar no Linux (Steam com Proton)
+
+1. Na Steam, abra **Propriedades › Compatibilidade** do jogo e escolha o Proton. Abra o jogo uma vez (a Steam cria o
+   prefixo do Proton) e feche.
+2. Num terminal, nesta pasta: `bash install-bigorna.sh --lingua pt` (precisa do `python3`; `--jogo "<pasta de Legends of
+   the Dark>"` se ele não achar). Ele copia a `Bigorna.dll`, registra o mod em `ScriptingAssemblies.json` e
+   `RuntimeInitializeOnLoads.json` (cópias de segurança `*.bigorna-bak`) e põe o editor na pasta `Editor` dos dados do
+   jogo, dentro do prefixo
+   (`~/.steam/steam/steamapps/compatdata/1611070/pfx/drive_c/users/steamuser/AppData/LocalLow/Fantasy Flight Games/Descent - Legends of the Dark`).
+3. Abra o jogo pela Steam e espere na tela de título enquanto o mod lê a sua cópia.
+4. O editor, `Bigorna-Salas.html` nessa pasta `Editor`, abre no **Chrome ou no Chromium** (o Firefox não grava em
+   pastas). O aplicativo Bigorna Editor não roda no Proton.
+5. **Mapa oneshot**: o gerador roda no navegador. O quadro do mapa oneshot mostra o caminho do `Abrir-o-gerador.html` e
+   tem um botão **Abrir no navegador**. Abra no Chrome ou no Chromium, escolha a pasta `Bigorna/Oneshot` e deixe a aba
+   aberta enquanto joga; **Gerar** no jogo faz o mapa lá.
+
+Depois de uma atualização do jogo, rode `bash install-bigorna.sh` de novo; `bash install-bigorna.sh --desinstalar` tira o
+Bigorna.
+
 ## O editor
 
 Na tela de título, na primeira vez (e de novo depois de uma atualização do jogo), o mod lê a cópia do jogo e grava em
@@ -56,7 +76,7 @@ Na tela de título, na primeira vez (e de novo depois de uma atualização do jo
 O aplicativo **Bigorna Editor** fica em `%LOCALAPPDATA%\Bigorna\App` (o mod o põe lá na tela de título; o atalho e o botão
 "Abrir editor" do jogo o abrem). A janela dele usa o motor do Microsoft Edge, que já vem no Windows. Ele grava tudo em
 arquivos, sem pedir autorização: a Oficina (uma só, para todos os mapas e campanhas) fica em `Pacotes\<id>\pacote.bigorna`,
-os mapas exportados vão direto para `CustomMaps`. Ao abrir, ele lê todos os pacotes da pasta `Pacotes` (os importados e os
+os mapas exportados vão direto para `Bigorna\Mapas`. Ao abrir, ele lê todos os pacotes da pasta `Pacotes` (os importados e os
 baixados do acervo); as entradas desses pacotes mudam numa cópia, que vai para a sua Oficina. (Ele fica fora da `LocalLow`
 de propósito: ali o Windows rodaria o aplicativo com integridade baixa, onde o motor do Edge não abre.)
 
@@ -69,18 +89,18 @@ O mod segue a língua do jogo, nas 13 línguas dele. O editor fala português e 
 quando o jogo está em outra) e tem a própria escolha nas configurações dele.
 
 **Guarde `bigorna-game-data.js` e `bigorna-worldmap.js` só para você**: eles têm textos e imagens do jogo.
-Compartilhe os mapas e campanhas que fizer (`.dmap`, `.dcamp`); quem abrir usa a própria cópia do jogo.
+Compartilhe os mapas e campanhas que fizer (`.bmap`, `.bcamp`); quem abrir usa a própria cópia do jogo.
 
 ## Jogar mapas da comunidade
 
-Ponha os `.dmap` e `.dcamp` em `%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of the Dark\CustomMaps`
+Ponha os `.bmap` e `.bcamp` em `%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of the Dark\Bigorna\Mapas`
 (o editor exporta direto para lá). Na tela de título, "Mapas da comunidade" lista todos.
 
 ## O acervo
 
 Em "Mapas da comunidade", as abas **Baixar mapas** e **Pacotes** listam o que outros autores compartilharam no acervo
 (https://github.com/vcmatias/bigorna-acervo). Baixar, atualizar, jogar ou remover; um mapa traz os pacotes que exige. Os mapas baixados vão para
-`CustomMaps\<id>\` e os pacotes para `Pacotes\<id>\`, ao lado. Para publicar os seus, use **📚 Acervo** no editor.
+`Bigorna\Mapas\<id>\` e os pacotes para `Pacotes\<id>\`, ao lado. Para publicar os seus, use **📚 Acervo** no editor.
 
 ## Relatar um problema
 
@@ -93,7 +113,7 @@ registros do jogo (`bigorna.log`, `Player.log`), com o nome do seu usuário do W
 
 ## Desinstalar
 
-Dois cliques em `Uninstall-Bigorna.bat` (ou o link na primeira página do instalador): tira o Bigorna das duas
+No Linux: `bash install-bigorna.sh --desinstalar`. No Windows, dois cliques em `Uninstall-Bigorna.bat` (ou o link na primeira página do instalador): tira o Bigorna das duas
 listas, renomeia a DLL para `Bigorna.dll.off` e apaga o atalho da Área de Trabalho. Os mapas e a pasta `Editor`
 ficam onde estão.
 

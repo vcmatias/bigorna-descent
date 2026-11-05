@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -11,6 +11,10 @@ namespace Bigorna.Formato
     public class Dcamp
     {
         [JsonProperty("format")] public string Formato;
+        /// <summary>v270: a assinatura do Bigorna ("bigorna").</summary>
+        [JsonProperty("app")] public string App;
+        /// <summary>v270: o arquivo é do Bigorna; uma campanha de outro editor fica fora das listas.</summary>
+        [JsonIgnore] public bool DoBigorna;
         [JsonProperty("version")] public int Versao;
         /// <summary>A versao do formato que este mod conhece (como Dmap.VersaoAtual).</summary>
         public const int VersaoAtual = 2;
@@ -150,7 +154,7 @@ namespace Bigorna.Formato
 
         public No NoPorId(string id) => string.IsNullOrEmpty(id) ? null : Nos.FirstOrDefault(n => string.Equals(n.Id, id, StringComparison.OrdinalIgnoreCase));
         public Dialogo DialogoPorId(string id) => string.IsNullOrEmpty(id) ? null : Dialogos.FirstOrDefault(d => string.Equals(d.Id, id, StringComparison.OrdinalIgnoreCase));
-        public string CaminhoDoMapa(No n) { if (n == null || string.IsNullOrEmpty(n.Mapa)) return null; var c = Path.Combine(Pasta, n.Mapa); return File.Exists(c) ? c : null; }
+        public string CaminhoDoMapa(No n) { if (n == null || string.IsNullOrEmpty(n.Mapa)) return null; return Arquivos.Existente(Path.Combine(Pasta, n.Mapa)); }   // (v270: "x.dmap" acha também x.bmap)
 
         /// <summary>As linguas da campanha (a original primeiro) e a que esta em uso; os mapas dela seguem a mesma escolha.</summary>
         [JsonIgnore] public List<string> Linguas = new List<string>();
@@ -179,6 +183,7 @@ namespace Bigorna.Formato
             d.Linguas = linguas ?? (string.IsNullOrEmpty(d.Metadados?.Lingua) ? new List<string>() : new List<string> { Traducao.Codigo(d.Metadados.Lingua) });
             d.LinguaEmUso = lingua ?? (d.Linguas.Count > 0 ? d.Linguas[0] : null);
             if (d.Formato != "dcamp") throw new Exception("não é um .dcamp (format=" + d.Formato + ")");
+            d.DoBigorna = Dmap.EhDoBigorna(d.App, null, texto, caminho);
             if (d.Versao > VersaoAtual) Log.Info("«" + Path.GetFileName(caminho) + "» foi feita num editor mais novo (formato v" + d.Versao + "; este mod lê até v" + VersaoAtual + "): o que ele não conhece fica de fora. Atualize o Bigorna.");
             d.Caminho = caminho;
             d.Nos = d.Nos ?? new List<No>(); d.Dialogos = d.Dialogos ?? new List<Dialogo>();
@@ -195,11 +200,15 @@ namespace Bigorna.Formato
         {
             var lista = new List<Dcamp>();
             if (!Directory.Exists(pasta)) return lista;
-            var arquivos = Directory.GetFiles(pasta, "*.dcamp").ToList();
-            foreach (var sub in Directory.GetDirectories(pasta)) arquivos.AddRange(Directory.GetFiles(sub, "*.dcamp"));
+            var arquivos = Arquivos.Campanhas(pasta);   // (v270: .bcamp e .dcamp)
+            foreach (var sub in Directory.GetDirectories(pasta)) arquivos.AddRange(Arquivos.Campanhas(sub));
             foreach (var arq in arquivos.OrderBy(x => x))
             {
-                try { lista.Add(soFicha ? Dmap.Lembrado(arq, extra, CarregarFicha, "ficha") : Dmap.Lembrado(arq, extra, Carregar)); }
+                try
+                {
+                    var c = soFicha ? Dmap.Lembrado(arq, extra, CarregarFicha, "ficha") : Dmap.Lembrado(arq, extra, Carregar);
+                    if (c.DoBigorna) lista.Add(c); else Log.Info("«" + Path.GetFileName(arq) + "» é de outro editor (sem a marca do Bigorna): fica fora da lista; renomeie para " + Arquivos.Campanha + " se for do Bigorna");
+                }
                 catch (Exception ex) { Log.Info("campanha ilegível " + Path.GetFileName(arq) + ": " + ex.Message); }
             }
             return lista;

@@ -80,6 +80,18 @@ namespace Bigorna.Menu
             Nucleo.Instancia.StartCoroutine(Fade(cg, 0f, () => { _tela.SetActive(false); try { Cena.MainCameraBlur.enabled = false; Cena.Titlescreen.Show(true); } catch (Exception ex) { Log.Erro("voltando ao menu", ex); } }));
         }
 
+        /// <summary>v267: a seta de voltar do jogo, no canto da tela: com um quadro do mod aberto (o oneshot, a lista de partidas,
+        /// um aviso), fecha o quadro e volta ao menu, como o Voltar do primeiro quadro; durante a geracao de um mapa, espera.</summary>
+        static void VoltarPelaSeta()
+        {
+            if (_gerandoOS) return;
+            if (_bagagem != null) { FecharBagagem(); return; }   // (v271: a seta fecha só o quadro da bagagem, como o Voltar dele)
+            _avisoOS = null; _descartar = null;
+            if (_alerta != null) { UnityEngine.Object.Destroy(_alerta); _alerta = null; }
+            if (_missao != null) FecharMissao();
+            Fechar();
+        }
+
         static IEnumerator Fade(CanvasGroup cg, float alvo, Action fim)
         {
             if (cg != null) { float de = cg.alpha, t = 0f; while (t < 0.35f) { t += Time.unscaledDeltaTime; cg.alpha = Mathf.Lerp(de, alvo, t / 0.35f); yield return null; } cg.alpha = alvo; }
@@ -87,7 +99,7 @@ namespace Bigorna.Menu
         }
 
         /// <summary>A cena de titulo saiu: a copia sai com ela (a proxima visita monta de novo).</summary>
-        public static void Esquecer() { _titulo = null; _doMapas.Clear(); _oneshot = false; _missao = null; _alerta = null; _tela = null; _grade = null; _fichas.Clear(); _abas.Clear(); _modeloBotao = null; _vazio = null; _bandejaAberta = null; }
+        public static void Esquecer() { _bagagem = null; _titulo = null; _doMapas.Clear(); _oneshot = false; _missao = null; _alerta = null; _tela = null; _grade = null; _fichas.Clear(); _abas.Clear(); _modeloBotao = null; _vazio = null; _bandejaAberta = null; }
 
         /// <summary>Os sons dos botoes do proprio jogo (clique; "embarcar" ao jogar).</summary>
         static void Som(string ev) { try { Jogo.Persistente?.Audio?.PostEvent(ev); } catch { } }
@@ -146,7 +158,18 @@ namespace Bigorna.Menu
             foreach (var b in _tela.GetComponentsInChildren<Button>(true))
             {
                 var m = Metodo(b);
-                if (m == "OnBackClicked") { b.onClick = new Button.ButtonClickedEvent(); b.onClick.AddListener(Fechar); if (_modeloBotao == null) _modeloBotao = b; }
+                if (m == "OnBackClicked")
+                {
+                    b.onClick = new Button.ButtonClickedEvent(); b.onClick.AddListener(VoltarPelaSeta); if (_modeloBotao == null) _modeloBotao = b;
+                    // (v267: a seta fica por cima dos quadros do mod, que cobrem a tela inteira; antes o toque nela caía no quadro)
+                    try
+                    {
+                        var pai = b.GetComponentInParent<Canvas>();
+                        var cv = b.gameObject.GetComponent<Canvas>() ?? b.gameObject.AddComponent<Canvas>(); cv.overrideSorting = true; cv.sortingOrder = (pai != null ? pai.sortingOrder : 0) + 100;
+                        if (b.gameObject.GetComponent<GraphicRaycaster>() == null) b.gameObject.AddComponent<GraphicRaycaster>();
+                    }
+                    catch (Exception ex) { Log.Info("tela de mapas: a seta de voltar por cima: " + ex.Message); }
+                }
             }
             // o titulo: o maior texto fora da grade e das janelas desligadas
             var titulo = _tela.GetComponentsInChildren<TMP_Text>(true).Where(t => t.gameObject.activeInHierarchy || EmCaminhoLigado(t.transform, raiz)).Where(t => !t.transform.IsChildOf(_grade) && (_vazio == null || !t.transform.IsChildOf(_vazio.transform)) && t.GetComponentInParent<Button>(true) == null)
@@ -329,7 +352,7 @@ namespace Bigorna.Menu
                 // o texto inteiro, na bandeja: o resumo, os pacotes exigidos, o que esta acontecendo
                 var det = new List<string>();
                 if (!string.IsNullOrEmpty(f.Resumo)) det.Add(f.Resumo);
-                if (!pacotes && f.Requer.Count > 0) det.Add(T("Precisa de: ", "Needs: ") + string.Join(", ", f.Requer.Select(q => (q.Nome ?? q.Id) + (Acervo.Pacotes.EdicaoInstalada(q.Id) >= q.Edicao ? " ✓" : "")).ToArray()));
+                if (!pacotes && f.Requer.Count > 0) det.Add(T("Precisa de: ", "Needs: ") + string.Join(", ", f.Requer.Select(q => (q.Nome ?? q.Id) + (Acervo.Pacotes.EdicaoInstalada(q.Id) >= q.Edicao ? T(" (instalado)", " (installed)") : "")).ToArray()));
                 if (pacotes) { var quem = Acervo.Acervo.QuemExige(f.Id); if (quem.Count > 0) det.Add(T("Usado por: ", "Used by: ") + string.Join(", ", quem.ToArray())); }
                 det.Add(T("Edição ", "Edition ") + f.Edicao + (tem > 0 && tem < f.Edicao ? T(" (você tem a ", " (you have ") + tem + ")" : ""));
                 if (sit != null) det.Insert(0, sit);
@@ -513,7 +536,7 @@ namespace Bigorna.Menu
                     var grupo = herois.Where(h => _grupo.Contains(h.Id)).ToList();
                     Log.Info("«Jogar» mapa oficial " + q.Id + " (" + NomesDosNiveis[_nivel] + ", " + grupo.Count + " heróis)");
                     var erro = MapasOficiais.Jogar(q, grupo, Niveis[Mathf.Clamp(_nivel, 0, 3)]);
-                    if (erro == null) { var go = _missao; _missao = null; if (go != null) UnityEngine.Object.Destroy(go); }
+                    if (erro == null) { var go = _missao; _missao = null; if (go != null) UnityEngine.Object.Destroy(go); _avisoOS = null; _gerado = null; _verSimulacao = false; }   // (v268: o mapa jogado sai do quadro: na volta, Gerar; o mesmo mapa, pela semente)
                     Lancou(erro);
                 });
                 Atualizar();
@@ -535,6 +558,10 @@ namespace Bigorna.Menu
         static readonly List<GameObject> _doMapas = new List<GameObject>();
         static Encontro.GrupoDoSave.Save _equipe;
         static int _duracaoOS = 1, _dificuldadeOS = 1;
+        /// <summary>v272: com equipe nova e o Ato II na coleção, a caixa «Usar o Ato II» (marcada de início): desmarcada, o mapa sai
+        /// só com o Ato I. v285: também com uma equipe gravada (a dificuldade cuida do equilíbrio).</summary>
+        static bool _usarAto2 = true;
+        static int AtosEscolhidos() { int a = Oneshot.Atos(); return a == 2 && !_usarAto2 ? 1 : a; }   // (v285: com equipe nova ou gravada)
         static string _sementeDigitada = "", _avisoOS;
         static Oneshot.Resultado _gerado;
         static bool _gerandoOS, _verSimulacao;
@@ -644,7 +671,7 @@ namespace Bigorna.Menu
                         Som("UI_Embark"); _descartar = null;
                         Log.Info("«Continuar» a partida de mapa oneshot " + id + " («" + esta.Dados.Mapa + "», rodada " + esta.Dados.Rodada + ")");
                         var erro = Encontro.Lancador.Retomar(esta);
-                        if (erro == null) { var go = _missao; _missao = null; if (go != null) UnityEngine.Object.Destroy(go); }
+                        if (erro == null) { var go = _missao; _missao = null; if (go != null) UnityEngine.Object.Destroy(go); _avisoOS = null; _gerado = null; _verSimulacao = false; }   // (v268: o mapa jogado sai do quadro: na volta, Gerar; o mesmo mapa, pela semente)
                         Lancou(erro);
                     });
                     Botao(fl.transform, _descartar == id ? T("Descartar mesmo?", "Discard it?") : T("Descartar", "Discard"), new Vector2(300f, 52f), () =>
@@ -693,13 +720,35 @@ namespace Bigorna.Menu
             catch (Exception ex) { Log.Erro("Novo jogo +", ex); return false; }
         }
 
+        /// <summary>v280: o Novo jogo + espera o quadro de dificuldade do jogo. Se ele fecha sem a partida começar (o jogador
+        /// voltou), a tela de título volta: no fluxo do jogo, atrás dele fica a tela do nome do grupo; no do mod, nada, e a tela
+        /// ficava vazia (relato do Victor, 04/11/2026).</summary>
+        static bool _dificuldadeDoNovoJogoMais; static float _desdeDificuldade;
+        public static void Batimento()
+        {
+            if (!_dificuldadeDoNovoJogoMais) return;
+            try
+            {
+                if (Jogo.CenaAtual() != Scene.Titlescene || (Jogo.Carregador != null && Jogo.Carregador.IsLoading)) { _dificuldadeDoNovoJogoMais = false; return; }
+                if (Time.unscaledTime - _desdeDificuldade < 1.5f) return;
+                var d = SingletonBehaviour<UIGame>.Instance?.DifficultySelectDialog;
+                if (d != null && (d.IsVisible || d.IsTweening)) return;
+                _dificuldadeDoNovoJogoMais = false;
+                Log.Info("Novo jogo +: o quadro de dificuldade fechou sem a partida começar; de volta ao menu");
+                Cena.Titlescreen.Show(true);
+            }
+            catch (Exception ex) { _dificuldadeDoNovoJogoMais = false; Log.Erro("Novo jogo +: de volta ao menu", ex); }
+        }
+
         static void EscolherNovoJogoMais()
         {
             _paginaSaves = 0;
             AbrirSaves(T("Novo jogo + · a partida terminada", "New Game + · the finished game"), null, s =>
                 {
                     var erro = NovoJogoMais.Comecar(s);
+                    if (erro != null && _tela != null) { Log.Info("Novo jogo +: " + erro); Alerta(erro, T("Entendi", "OK"), EscolherNovoJogoMais); return; }   // (v267: o aviso na propria tela, e de volta a lista)
                     Lancou(erro);   // (sem erro: a tela sai, e o quadro de dificuldade do jogo segue para a introdução)
+                    if (erro == null) { _dificuldadeDoNovoJogoMais = true; _desdeDificuldade = Time.unscaledTime; }
                 }, null, () => { FecharMissao(); Fechar(); },
                 T("A campanha oficial de novo, desde a primeira missão do Ato I, com as regras e a história do jogo. O grupo de uma partida que venceu um ato vem como está: heróis, armas, itens, ouro, XP, materiais, receitas, perícias, lendas, companheiros e proezas. A história recomeça do zero, e os monstros vêm mais fortes. Vencido o Ato I, a campanha segue para o Ato II.",
                   "The official campaign again, from the first quest of Act I, with the game's rules and story. The party of a game that won an act comes as it is: heroes, weapons, items, gold, XP, materials, recipes, skills, legends, companions and feats. The story starts over, and the monsters come stronger. Once Act I is won, the campaign goes on to Act II."),
@@ -707,21 +756,23 @@ namespace Bigorna.Menu
                 T("Começa uma partida nova, numa ranhura livre, com o grupo desta. Em seguida o jogo pede a dificuldade e abre a introdução da primeira missão. A partida de origem fica como está.",
                   "A new game starts, in a free slot, with this game's party. Then the game asks for the difficulty and opens the introduction of the first quest. The original game stays as it is."),
                 T("Escolham a partida terminada (venceu o Ato I ou o Ato II)", "Choose the finished game (it won Act I or Act II)"),
-                T("Nenhuma partida terminada: o Novo jogo + começa de uma partida que venceu o Ato I ou o Ato II.", "No finished game: New Game + starts from a game that won Act I or Act II."));
+                T("Nenhuma partida terminada: o Novo jogo + começa de uma partida que venceu o Ato I ou o Ato II.", "No finished game: New Game + starts from a game that won Act I or Act II."), true);
         }
 
         static void EscolherEquipe()
         {
             _paginaSaves = 0;
+            Oneshot.AbrirGerador();   // (v274: o gerador carrega ao fundo enquanto a equipe, a duração e a dificuldade são escolhidas)
             AbrirSaves(T("Mapa oneshot · a equipe", "One-shot map · the party"), () => { _equipe = null; DialogoOneshot(true); }, s => { _equipe = s; DialogoOneshot(true); },
                 null, VoltarDoOneshot,
                 T("Um mapa novo, feito na hora pelo gerador do Bigorna, com as mesmas regras do editor. Joguem com uma equipe nova ou com a equipe de uma partida gravada; nesse caso, no fim do mapa vocês escolhem se a partida gravada recebe o que a equipe ganhou.",
                   "A new map, made on the spot by Bigorna's generator, with the same rules as the editor. Play with a new party or with the party of a saved game; then, at the end of the map, you choose whether the saved game gets what the party won."),
-                T("Equipe nova", "New party"));
+                T("Equipe nova", "New party"), bagagem: false);
         }
 
         static void DialogoOneshot(bool fade)
         {
+            if (!_gerandoOS) Oneshot.AbrirGerador();   // (v274: se fechou, abre de novo)
             try
             {
                 if (_missao != null) UnityEngine.Object.Destroy(_missao);
@@ -772,8 +823,23 @@ namespace Bigorna.Menu
                 // (uma escolha nova pede outro mapa: o gerado sai)
                 void Mudou() { if (_gerandoOS) return; _gerado = null; _verSimulacao = false; DialogoOneshot(false); }
 
-                int atos = Oneshot.Atos();
-                Linha(T("Equipe: ", "Party: ") + "<b>" + (_equipe == null ? T("nova", "new") : _equipe.Rotulo) + "</b>     " + T("Caixas: ", "Boxes: ") + "<b>" + (atos == 2 ? T("Atos I e II", "Acts I and II") : T("Ato I", "Act I")) + "</b> " + T("(as da coleção do jogo)", "(those of the game's collection)"), 44f, 22f);
+                int atosColecao = Oneshot.Atos(), atos = AtosEscolhidos();
+                // (v267: com um mapa gerado, as caixas que ele usa; a semente de 7 caracteres pode pedir só o Ato I)
+                int atosDoMapa = _gerado != null && _gerado.Erro == null && (_gerado.Atos == 1 || _gerado.Atos == 2) ? _gerado.Atos : atos;
+                Linha(T("Equipe: ", "Party: ") + "<b>" + (_equipe == null ? T("nova", "new") : _equipe.Rotulo) + "</b>     " + T("Caixas: ", "Boxes: ") + "<b>" + (atosDoMapa == 2 ? T("Atos I e II", "Acts I and II") : T("Ato I", "Act I")) + "</b> " + (atosDoMapa != atos ? T("(pela semente)", "(from the seed)") : atos != atosColecao ? T("(escolhidas)", "(chosen)") : T("(as da coleção do jogo)", "(those of the game's collection)")), 44f, 22f);
+                // (v272: com o Ato II na coleção, a caixa para usar ou deixar de fora o Ato II; v285: com equipe nova ou gravada)
+                if (atosColecao == 2)
+                {
+                    var fa = Fileira(52f);
+                    var caixa = Botao(fa.transform, _usarAto2 ? "<b>X</b>" : " ", new Vector2(52f, 48f), () => { if (_gerandoOS) return; _usarAto2 = !_usarAto2; Log.Info("mapa oneshot: usar o Ato II " + (_usarAto2 ? "sim" : "não")); Mudou(); });
+                    var tc = caixa.GetComponentInChildren<TMP_Text>(true); if (tc != null) { tc.enableAutoSizing = false; tc.fontSize = 28f; tc.alignment = TextAlignmentOptions.Center; }
+                    Marcar(caixa, true, _gerandoOS);
+                    var rot = Copia(rotuloModelo, fa.transform, "usar o Ato II"); var trot = rot.GetComponent<TMP_Text>();
+                    Texto(trot, T("Usar o Ato II (missões, monstros e peças dele)", "Use Act II (its quests, monsters and tiles)")); trot.fontSize = 22f; trot.enableAutoSizing = false; trot.alignment = TextAlignmentOptions.Left; trot.enableWordWrapping = false;
+                    var ler = rot.GetComponent<RectTransform>(); ler.sizeDelta = new Vector2(560f, 48f);
+                    var lel = rot.GetComponent<LayoutElement>() ?? rot.AddComponent<LayoutElement>(); lel.preferredWidth = 560f; lel.preferredHeight = 48f;
+                    var brot = rot.GetComponent<Button>() ?? rot.AddComponent<Button>(); brot.transition = Selectable.Transition.None; brot.onClick.AddListener(() => { if (_gerandoOS) return; Som("UI_Click"); _usarAto2 = !_usarAto2; Log.Info("mapa oneshot: usar o Ato II " + (_usarAto2 ? "sim" : "não")); Mudou(); });
+                }
                 Divisoria();
                 Linha(T("Duração", "Length"), 34f, 28f);
                 var fd = Fileira(60f); var bd = new List<Button>();
@@ -790,9 +856,21 @@ namespace Bigorna.Menu
                 string estado = _gerandoOS ? T("Gerando o mapa…", "Generating the map…")
                     : _gerado == null ? T("Escolham a duração e a dificuldade e toquem em Gerar.", "Pick the length and the difficulty and tap Generate.")
                     : _gerado.Erro != null ? "<color=#ff9a7a>" + _gerado.Erro + "</color>"
-                    : T("Semente: ", "Seed: ") + "<b>" + _gerado.Semente + "</b>";
+                    : T("Semente: ", "Seed: ") + "<b>" + _gerado.Semente + "</b>" + (string.IsNullOrEmpty(_gerado.Nome) ? "" : "  ·  " + TF("«{0}»", "“{0}”", _gerado.Nome));   // (v288: e o nome do mapa)
                 Linha(estado, 50f, _gerado != null && _gerado.Erro == null && !_gerandoOS ? 34f : 22f);
                 if (_avisoOS != null) Linha("<color=#a8e6a1>" + _avisoOS + "</color>", 30f, 20f);
+                // (v278: no Linux, o gerador é a página do gerador aberta no Chrome ou no Chromium; o quadro diz onde ela está)
+                if (Plataforma.Wine)
+                {
+                    if (Oneshot.PonteAtiva) Linha("<color=#a8e6a1>" + T("Gerador do navegador conectado.", "Browser generator connected.") + "</color>", 28f, 18f);
+                    else
+                    {
+                        Linha(TF("No Linux, o gerador roda no Chrome ou no Chromium. Abram <b>{0}</b> e, na página, escolham a pasta <b>{1}</b>.", "On Linux, the generator runs in Chrome or Chromium. Open <b>{0}</b> and, on the page, choose the folder <b>{1}</b>.",
+                            Plataforma.CaminhoNoSistema(Oneshot.ArquivoDaPonte), Plataforma.CaminhoNoSistema(Oneshot.Pasta)), 66f, 15f);
+                        var fp = Fileira(50f);
+                        Botao(fp.transform, T("Abrir no navegador", "Open in the browser"), new Vector2(300f, 46f), () => { Oneshot.AbrirPonteNoNavegador(); });
+                    }
+                }
                 // (v266: uma semente digitada: a de 7 caracteres traz a duracao, a dificuldade e as caixas; outra vale com o que esta escolhido)
                 if (!_gerandoOS)
                 {
@@ -832,7 +910,7 @@ namespace Bigorna.Menu
                     if (m == null) { _gerado = new Oneshot.Resultado { Erro = T("O mapa gerado não abriu. Gerem outro.", "The generated map did not open. Generate another.") }; DialogoOneshot(false); return; }
                     Log.Info("«Jogar» mapa oneshot " + _gerado.Semente + (_equipe != null ? " com a equipe do save " + _equipe.Slot : " com equipe nova"));
                     var erro = Encontro.Lancador.Lancar(m, _equipe, new Encontro.Lancador.InfoOneshot { Semente = _gerado.Semente, Duracao = _duracaoOS, Dificuldade = _dificuldadeOS, Equipe = _equipe?.Rotulo });
-                    if (erro == null) { var go = _missao; _missao = null; if (go != null) UnityEngine.Object.Destroy(go); }
+                    if (erro == null) { var go = _missao; _missao = null; if (go != null) UnityEngine.Object.Destroy(go); _avisoOS = null; _gerado = null; _verSimulacao = false; }   // (v268: o mapa jogado sai do quadro: na volta, Gerar; o mesmo mapa, pela semente)
                     Lancou(erro);
                 });
                 Marcar(principal, !_gerandoOS, _gerandoOS);
@@ -850,19 +928,23 @@ namespace Bigorna.Menu
             if (!perguntado)
             {
                 Oneshot.Garantir(); var u = Oneshot.Ultimo();
-                if (u != null && Formato.MapasJogados.Pendente(u.Semente))
+                // (v267: so quando o oneshot.dmap e a ultima copia; uma partida em andamento desse mapa ainda o guarda, e a pergunta
+                //  vem quando ela sair: no fim do mapa ou ao descartar)
+                bool noAndamento = u != null && Encontro.Retomada.Partidas().Any(a => string.Equals(a.Dados?.Semente, u.Semente, StringComparison.OrdinalIgnoreCase));
+                if (u != null && Formato.MapasJogados.Pendente(u.Semente) && !noAndamento)
                 {
                     DialogoGuardar(u.Nome, u.Semente, Oneshot.CaminhoDoMapa, T("Gerar outro mapa escreve por cima dele.", "Generating another map writes over it."), () => GerarOneshot(semente, true), () => DialogoOneshot(false));
                     return;
                 }
             }
+            if (!perguntado) _avisoOS = null;   // (v288: o aviso do mapa guardado vale só para a geração que vem logo depois dele)
             _gerandoOS = true; _gerado = null; _verSimulacao = false; DialogoOneshot(false);
             Nucleo.Instancia.StartCoroutine(Oneshot.Gerar(_duracaoOS, _dificuldadeOS, semente, r =>
             {
                 _gerandoOS = false; _gerado = r;
                 if (r != null && r.Erro == null) { if (r.Duracao >= 0) _duracaoOS = r.Duracao; if (r.Dificuldade >= 0) _dificuldadeOS = r.Dificuldade; }   // (v266: a semente digitada manda)
                 if (_tela != null && _oneshot && _tela.activeSelf) DialogoOneshot(false);
-            }, _equipe == null ? 0 : _equipe.Ato >= Act.ActII ? 2 : 1));   // (v261: a vida da simulacao e a do ato da equipe do save)
+            }, _equipe == null ? 0 : _equipe.Ato >= Act.ActII ? 2 : 1, AtosEscolhidos()));   // (v261: a vida da simulacao e a do ato da equipe do save; v272: as caixas escolhidas)
         }
 
         // ------------------------------------------------ v266: a semente digitada e a pergunta antes de um mapa jogado sair
@@ -971,6 +1053,65 @@ namespace Bigorna.Menu
             catch (Exception ex) { Log.Erro("mapa oneshot: guardar o mapa", ex); if (_missao != null) UnityEngine.Object.Destroy(_missao); _missao = null; seguir?.Invoke(); }
         }
 
+        /// <summary>v287: na tela de título, depois de um mapa jogado com a equipe de uma partida gravada: o que fazer com o grupo,
+        /// no quadro do próprio jogo (antes, desenhado pelo mod, fora da estética do jogo, e o clique passava ao menu por baixo).</summary>
+        public static bool PerguntarGrupo()
+        {
+            if (!Encontro.GrupoDoSave.Pendente || _falhou) return false;
+            try
+            {
+                if (!Montar()) { _falhou = true; return false; }
+                ModoOneshot(true);
+                Cena.Titlescreen.Hide(true, t => { Mostrar(); QuadroDoGrupo(); });
+                return true;
+            }
+            catch (Exception ex) { Log.Erro("o destino do grupo: quadro", ex); return false; }
+        }
+        static void QuadroDoGrupo()
+        {
+            try
+            {
+                if (_missao != null) UnityEngine.Object.Destroy(_missao);
+                var raiz = _tela.transform;
+                var editar = Achar(raiz, "Canvas_EditSaveSlot"); if (editar == null) throw new Exception("sem o quadro do jogo");
+                _missao = Copia(editar, raiz, "destino do grupo");
+                var cg = _missao.GetComponent<CanvasGroup>(); if (cg != null) { cg.alpha = 1f; cg.interactable = true; cg.blocksRaycasts = true; }
+                var bg = Achar(_missao.transform, "Image_BG") as RectTransform; if (bg == null) throw new Exception("sem Image_BG");
+                bg.sizeDelta = new Vector2(1260f, 700f); bg.anchoredPosition = Vector2.zero;
+                var bgBtn = bg.gameObject.AddComponent<Button>(); bgBtn.transition = Selectable.Transition.None;
+                var tituloT = Achar(bg, "Text_PartyName")?.GetComponent<TMP_Text>();
+                if (tituloT != null) { var r = tituloT.transform as RectTransform; r.sizeDelta = new Vector2(1150f, 56f); r.anchoredPosition = new Vector2(0f, -60f); }
+                Texto(tituloT, Encontro.GrupoDoSave.TituloDoFim);
+                var opcoes = Achar(bg, "Layout_Options");
+                var rotuloModelo = Achar(opcoes, "Label_RestoreDesc"); var botaoModelo = Achar(opcoes, "Button_Restore"); var divisoria = Achar(opcoes, "Imade_Divider");
+                if (opcoes != null) opcoes.gameObject.SetActive(false);
+                if (rotuloModelo == null || botaoModelo == null) throw new Exception("sem os modelos de texto e botão");
+                var col = new GameObject("Bigorna coluna", typeof(RectTransform)); col.transform.SetParent(bg, false);
+                var rc = col.GetComponent<RectTransform>(); rc.anchorMin = new Vector2(0f, 0f); rc.anchorMax = new Vector2(1f, 1f); rc.offsetMin = new Vector2(70f, 60f); rc.offsetMax = new Vector2(-70f, -110f);
+                var v = col.AddComponent<VerticalLayoutGroup>(); v.spacing = 14f; v.childAlignment = TextAnchor.UpperCenter; v.childControlWidth = true; v.childControlHeight = true; v.childForceExpandWidth = false; v.childForceExpandHeight = false;
+                foreach (var linha in Encontro.GrupoDoSave.TextosDoFim())
+                {
+                    var go = Copia(rotuloModelo, col.transform, "texto"); var t = go.GetComponent<TMP_Text>(); Texto(t, linha);
+                    t.fontSize = 22f; t.enableAutoSizing = false; t.alignment = TextAlignmentOptions.Center; t.enableWordWrapping = true; t.overflowMode = TextOverflowModes.Overflow; t.richText = true;
+                    var le = go.GetComponent<LayoutElement>() ?? go.AddComponent<LayoutElement>(); le.preferredWidth = 1080f; le.preferredHeight = -1f; le.minHeight = 40f;
+                }
+                if (divisoria != null) { var d = Copia(divisoria, col.transform, "divisória"); var le = d.GetComponent<LayoutElement>() ?? d.AddComponent<LayoutElement>(); le.preferredHeight = 4f; le.preferredWidth = 1080f; }
+                foreach (var op in Encontro.GrupoDoSave.OpcoesDoFim())
+                {
+                    var o = op;
+                    var go = Copia(botaoModelo, col.transform, "opção"); var r = go.GetComponent<RectTransform>(); r.sizeDelta = new Vector2(820f, 64f);
+                    var le = go.GetComponent<LayoutElement>() ?? go.AddComponent<LayoutElement>(); le.preferredWidth = 820f; le.preferredHeight = 64f;
+                    foreach (var dd in go.GetComponentsInChildren<TMP_Dropdown>(true)) dd.gameObject.SetActive(false);
+                    var t = go.GetComponentInChildren<TMP_Text>(true); if (t != null) { Texto(t, o.Rotulo); t.enableAutoSizing = true; t.fontSizeMin = 14f; t.fontSizeMax = 24f; }
+                    var b = go.GetComponent<Button>(); b.interactable = true;
+                    b.onClick.AddListener(() => { Som("UI_Click"); var erro = o.Fazer(); if (erro != null) QuadroDoGrupo(); else { FecharMissao(); Fechar(); } });
+                }
+                _missao.transform.SetAsLastSibling();
+                Log.Info("o destino do grupo: a pergunta no quadro do jogo");
+            }
+            catch (Exception ex) { Log.Erro("o destino do grupo: quadro", ex); if (_missao != null) UnityEngine.Object.Destroy(_missao); _missao = null; Encontro.GrupoDoSave.NoQuadroDoJogo = false; Fechar(); }
+        }
+
         /// <summary>Na tela de titulo, depois de um mapa jogado que terminou com a ultima copia dele (Oneshot.FimPendente): a tela
         /// abre so com a pergunta. Falso se nao deu.</summary>
         public static bool PerguntarFim()
@@ -992,7 +1133,7 @@ namespace Bigorna.Menu
         // cabe) e as partidas gravadas, dez por pagina, a mais recente primeiro; tocar numa joga com o grupo dela.
         static int _paginaSaves;
         static void AbrirSaves(string titulo, Action novo, Action<Encontro.GrupoDoSave.Save> escolher, Action continuar = null, Action aoVoltar = null, string explicacao = null, string rotuloNovo = null,
-            Func<Encontro.GrupoDoSave.Save, bool> filtro = null, string avisoOficial = null, string chamada = null, string semNenhuma = null)
+            Func<Encontro.GrupoDoSave.Save, bool> filtro = null, string avisoOficial = null, string chamada = null, string semNenhuma = null, bool? bagagem = null)
         {
             try
             {
@@ -1015,7 +1156,7 @@ namespace Bigorna.Menu
                 if (rotuloModelo == null || botaoModelo == null) throw new Exception("sem os modelos de texto e botão");
                 var col = new GameObject("Bigorna coluna", typeof(RectTransform)); col.transform.SetParent(bg, false);
                 var rc = col.GetComponent<RectTransform>(); rc.anchorMin = new Vector2(0f, 0f); rc.anchorMax = new Vector2(1f, 1f); rc.offsetMin = new Vector2(70f, 150f); rc.offsetMax = new Vector2(-70f, -110f);
-                var v = col.AddComponent<VerticalLayoutGroup>(); v.spacing = 10f; v.childAlignment = TextAnchor.UpperCenter; v.childControlWidth = true; v.childControlHeight = true; v.childForceExpandWidth = true; v.childForceExpandHeight = false;
+                var v = col.AddComponent<VerticalLayoutGroup>(); v.spacing = 8f; v.childAlignment = TextAnchor.UpperCenter; v.childControlWidth = true; v.childControlHeight = true; v.childForceExpandWidth = true; v.childForceExpandHeight = false;
                 TMP_Text Linha(string texto, float altura, float tamanho)
                 {
                     var go = Copia(rotuloModelo, col.transform, "texto"); var t = go.GetComponent<TMP_Text>(); Texto(t, texto);
@@ -1055,9 +1196,9 @@ namespace Bigorna.Menu
                 var saves = Encontro.GrupoDoSave.Saves().Where(x => filtro == null || filtro(x)).OrderBy(x => x.Campanha == null ? 0 : 1).ThenByDescending(x => x.Quando).ToList();   // (v262: o Novo jogo + lista só as partidas terminadas)
                 var selo = SeloAsmodee();
                 Linha(saves.Count == 0 ? (semNenhuma ?? T("Nenhuma partida gravada do jogo.", "No saved games of the game.")) : (chamada ?? T("Usar meus heróis: escolham a partida gravada", "Use my heroes: choose the saved game")), 40f, 26f);
-                const int porPagina = 10;
+                const int porPagina = 8;   // (v267: 4 fileiras; com 5, a última ficava embaixo do Voltar e do Mais)
                 int paginas = Mathf.Max(1, Mathf.CeilToInt(saves.Count / (float)porPagina)); _paginaSaves = Mathf.Clamp(_paginaSaves, 0, paginas - 1);
-                var grade = Grade(5 * 80f);
+                var grade = Grade(4 * 80f);
                 foreach (var sv in saves.Skip(_paginaSaves * porPagina).Take(porPagina))
                 {
                     var este = sv;
@@ -1073,6 +1214,8 @@ namespace Bigorna.Menu
                         else ir();
                     });
                     if (este.Campanha == null) Destacar(bt, selo);
+                    // (v271: o mini botão ao lado: o que vai com a equipe desta partida)
+                    if (bagagem.HasValue) MiniBotao(bt, botaoModelo, () => MostrarBagagem(este, bagagem.Value));
                 }
                 // embaixo: voltar e as paginas
                 var cancelar = aviso != null ? Achar(aviso, "Button_Cancel") : null; var seguir = aviso != null ? Achar(aviso, "Button_Proceed") : null;
@@ -1085,12 +1228,113 @@ namespace Bigorna.Menu
                     return b;
                 }
                 Embaixo(cancelar, T("Voltar", "Back"), new Vector2(220f, 80f), () => (aoVoltar ?? FecharMissao)());
-                if (paginas > 1) Embaixo(seguir, T("Mais ▸ ", "More ▸ ") + (_paginaSaves + 1) + "/" + paginas, new Vector2(-220f, 80f), () => { Som("UI_Click"); _paginaSaves = (_paginaSaves + 1) % paginas; AbrirSaves(titulo, novo, escolher, continuar, aoVoltar, explicacao, rotuloNovo, filtro, avisoOficial, chamada, semNenhuma); });
+                if (paginas > 1) Embaixo(seguir, T("Mais » ", "More » ") + (_paginaSaves + 1) + "/" + paginas, new Vector2(-220f, 80f), () => { Som("UI_Click"); _paginaSaves = (_paginaSaves + 1) % paginas; AbrirSaves(titulo, novo, escolher, continuar, aoVoltar, explicacao, rotuloNovo, filtro, avisoOficial, chamada, semNenhuma, bagagem); });
                 _missao.transform.SetAsLastSibling();
                 if (cg != null) { if (_paginaSaves == 0) Nucleo.Instancia.StartCoroutine(Fade(cg, 1f, null)); else cg.alpha = 1f; }
                 Log.Info("usar meus heróis: " + saves.Count + " partida(s) gravada(s)");
             }
             catch (Exception ex) { Log.Erro("lista de partidas gravadas", ex); if (_missao != null) UnityEngine.Object.Destroy(_missao); _missao = null; Lancou(T("Não consegui abrir a lista de partidas gravadas.", "Could not open the list of saved games.")); }
+        }
+
+        // ------------------------------------------------ v271: o que vai com a equipe
+        static GameObject _bagagem;
+        static void FecharBagagem() { if (_bagagem == null) return; var b = _bagagem; _bagagem = null; var c = b.GetComponent<CanvasGroup>(); if (c != null) Nucleo.Instancia.StartCoroutine(Fade(c, 0f, () => UnityEngine.Object.Destroy(b))); else UnityEngine.Object.Destroy(b); }
+
+        /// <summary>v275: a cor do mini botão (âmbar, sobre a arte do botão do jogo).</summary>
+        static readonly Color CorDoMiniBotao = new Color(1f, 0.72f, 0.22f);
+        /// <summary>O mini botão no canto esquerdo da ficha de uma partida (v275; antes, no direito): abre o quadro do que vai com a equipe.</summary>
+        static void MiniBotao(Button ficha, Transform modelo, Action acao)
+        {
+            try
+            {
+                // (v282: menor)
+                float largura = 8f + 40f + 8f;
+                // (o texto da ficha da partida abre espaço à esquerda para eles)
+                foreach (var tx in ficha.GetComponentsInChildren<TMP_Text>(true)) { var rt = tx.rectTransform; rt.offsetMin = new Vector2(rt.offsetMin.x + largura, rt.offsetMin.y); }
+                var go = Copia(modelo, ficha.transform, "mini bagagem");
+                var le = go.GetComponent<LayoutElement>() ?? go.AddComponent<LayoutElement>(); le.ignoreLayout = true;
+                // (v275: no canto esquerdo, e em outra cor, para se ver que é um botão)
+                var r = go.GetComponent<RectTransform>(); r.anchorMin = r.anchorMax = new Vector2(0f, 0.5f); r.pivot = new Vector2(0f, 0.5f); r.sizeDelta = new Vector2(40f, 40f); r.anchoredPosition = new Vector2(8f, 0f);
+                foreach (var dd in go.GetComponentsInChildren<TMP_Dropdown>(true)) dd.gameObject.SetActive(false);
+                foreach (var img in go.GetComponentsInChildren<Image>(true)) img.color = CorDoMiniBotao;
+                var t = go.GetComponentInChildren<TMP_Text>(true); if (t != null) { Texto(t, "<b>?</b>"); t.enableAutoSizing = false; t.fontSize = 24f; t.alignment = TextAlignmentOptions.Center; t.color = new Color(0.16f, 0.09f, 0.02f); }   // (v279: «?» em vez de «i», mais claro como botão)
+                var b = go.GetComponent<Button>(); b.onClick.AddListener(() => { Som("UI_Click"); acao(); }); b.interactable = true;
+            }
+            catch (Exception ex) { Log.Info("mini botão da bagagem: " + ex.Message); }
+        }
+
+
+        /// <summary>O quadro "O que vai com a equipe": o ouro, as proezas, a Caveira Imortal, as armas, as armaduras, os itens e as
+        /// fraquezas e resistências descobertas da partida, numa lista que rola, no quadro de partida do proprio jogo.</summary>
+        static void MostrarBagagem(Encontro.GrupoDoSave.Save save, bool novoJogoMais)
+        {
+            try
+            {
+                if (_bagagem != null) UnityEngine.Object.Destroy(_bagagem);
+                var raiz = _tela.transform;
+                var editar = Achar(raiz, "Canvas_EditSaveSlot"); var aviso = Achar(raiz, "Canvas_LoadBackupWarning");
+                if (editar == null) throw new Exception("sem o quadro do jogo");
+                _bagagem = Copia(editar, raiz, "bagagem");
+                var fundoBtn = _bagagem.GetComponent<Button>(); if (fundoBtn != null) fundoBtn.onClick.AddListener(FecharBagagem);
+                var cg = _bagagem.GetComponent<CanvasGroup>(); if (cg != null) { cg.alpha = 0f; cg.interactable = true; cg.blocksRaycasts = true; }
+                var bg = Achar(_bagagem.transform, "Image_BG") as RectTransform; if (bg == null) throw new Exception("sem Image_BG");
+                bg.sizeDelta = new Vector2(1260f, 860f); bg.anchoredPosition = Vector2.zero;
+                var bgBtn = bg.gameObject.AddComponent<Button>(); bgBtn.transition = Selectable.Transition.None;
+                var tituloT = Achar(bg, "Text_PartyName")?.GetComponent<TMP_Text>();
+                if (tituloT != null) { var rt = tituloT.transform as RectTransform; rt.sizeDelta = new Vector2(1150f, 56f); rt.anchoredPosition = new Vector2(0f, -60f); }
+                Texto(tituloT, save.Rotulo + T(" · o que vai com a equipe", " · what goes with the party"));
+                var cor = tituloT != null ? tituloT.color : new Color(0.93f, 0.8f, 0.55f);
+                var opcoes = Achar(bg, "Layout_Options");
+                var rotuloModelo = Achar(opcoes, "Label_RestoreDesc"); var divisoria = Achar(opcoes, "Imade_Divider");
+                if (opcoes != null) opcoes.gameObject.SetActive(false);
+                if (rotuloModelo == null) throw new Exception("sem o modelo de texto");
+
+                // a lista que rola: a janela (com máscara) e o conteúdo, que cresce com as linhas
+                var janela = new GameObject("Bigorna rolagem", typeof(RectTransform)); janela.transform.SetParent(bg, false);
+                var rj = janela.GetComponent<RectTransform>(); rj.anchorMin = Vector2.zero; rj.anchorMax = Vector2.one; rj.offsetMin = new Vector2(70f, 140f); rj.offsetMax = new Vector2(-70f, -110f);
+                var img = janela.AddComponent<Image>(); img.color = new Color(0f, 0f, 0f, 0.001f); janela.AddComponent<RectMask2D>();
+                var conteudo = new GameObject("Bigorna conteúdo", typeof(RectTransform)); conteudo.transform.SetParent(janela.transform, false);
+                var rcn = conteudo.GetComponent<RectTransform>(); rcn.anchorMin = new Vector2(0f, 1f); rcn.anchorMax = new Vector2(1f, 1f); rcn.pivot = new Vector2(0.5f, 1f); rcn.offsetMin = rcn.offsetMax = Vector2.zero;
+                var v = conteudo.AddComponent<VerticalLayoutGroup>(); v.spacing = 6f; v.padding = new RectOffset(10, 24, 4, 12); v.childAlignment = TextAnchor.UpperLeft; v.childControlWidth = true; v.childControlHeight = true; v.childForceExpandWidth = true; v.childForceExpandHeight = false;
+                var csf = conteudo.AddComponent<ContentSizeFitter>(); csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                var sr = janela.AddComponent<ScrollRect>(); sr.content = rcn; sr.viewport = rj; sr.horizontal = false; sr.vertical = true; sr.movementType = ScrollRect.MovementType.Clamped; sr.scrollSensitivity = 40f; sr.inertia = true;
+                TMP_Text Linha(string texto, float tamanho, TextAlignmentOptions alinha, Color? c = null, bool italico = false)
+                {
+                    var go = Copia(rotuloModelo, conteudo.transform, "texto"); var t = go.GetComponent<TMP_Text>(); Texto(t, italico ? "<i>" + texto + "</i>" : texto);
+                    t.fontSize = tamanho; t.enableAutoSizing = false; t.alignment = alinha; t.enableWordWrapping = true; t.overflowMode = TextOverflowModes.Overflow; if (c.HasValue) t.color = c.Value;
+                    var le = go.GetComponent<LayoutElement>() ?? go.AddComponent<LayoutElement>(); le.preferredHeight = -1f; le.minHeight = -1f; le.flexibleHeight = -1f;   // (a altura é a do texto: o TMP diz quanto precisa)
+                    var f = go.GetComponent<ContentSizeFitter>(); if (f != null) UnityEngine.Object.Destroy(f);
+                    return t;
+                }
+                void Divisoria() { if (divisoria == null) return; var go = Copia(divisoria, conteudo.transform, "divisória"); var le = go.GetComponent<LayoutElement>() ?? go.AddComponent<LayoutElement>(); le.preferredHeight = 4f; le.minHeight = 4f; }
+
+                // (v279: o texto que explica a lista)
+                Linha(novoJogoMais ? T("Lista de coisas que serão aproveitadas da sua equipe na partida nova do Novo jogo +. O save de onde ela vem fica como está.", "List of the things from your party that will be used in the new New Game + game. The save it comes from stays as it is.")
+                                   : T("Lista de coisas que serão aproveitadas da sua equipe. Ao final da aventura, você pode optar por levar o que adquiriu nela e adicionar ao seu save.", "List of the things from your party that will be used. At the end of the adventure, you can choose to take what you got in it and add it to your save."),
+                    20f, TextAlignmentOptions.Center);
+                bool primeira = true;
+                foreach (var secao in Encontro.Bagagem.Montar(save, novoJogoMais))
+                {
+                    if (!primeira) Divisoria(); primeira = false;
+                    Linha(secao.Titulo, 26f, TextAlignmentOptions.Left, cor);
+                    foreach (var l in secao.Linhas) Linha(l, 19f, TextAlignmentOptions.Left);
+                    if (!string.IsNullOrEmpty(secao.Nota)) Linha(secao.Nota, 17f, TextAlignmentOptions.Left, new Color(0.75f, 0.72f, 0.66f), true);
+                }
+
+                // embaixo: voltar
+                var cancelar = aviso != null ? Achar(aviso, "Button_Cancel") : null;
+                if (cancelar != null)
+                {
+                    var go = Copia(cancelar, bg, "voltar"); var r = go.GetComponent<RectTransform>(); r.anchorMin = r.anchorMax = new Vector2(0.5f, 0f); r.anchoredPosition = new Vector2(0f, 80f); r.sizeDelta = new Vector2(280f, 90f);
+                    Texto(go.GetComponentInChildren<TMP_Text>(true), T("Voltar", "Back"));
+                    var b = go.GetComponent<Button>(); b.onClick.AddListener(() => { Som("UI_Click"); FecharBagagem(); }); b.interactable = true;
+                }
+                _bagagem.transform.SetAsLastSibling();
+                Canvas.ForceUpdateCanvases(); sr.verticalNormalizedPosition = 1f;
+                if (cg != null) Nucleo.Instancia.StartCoroutine(Fade(cg, 1f, null));
+                Log.Info("o que vai com a equipe: save " + save.Slot + " («" + save.Nome + "»)" + (novoJogoMais ? ", Novo jogo +" : ", mapa oneshot"));
+            }
+            catch (Exception ex) { Log.Erro("o que vai com a equipe", ex); if (_bagagem != null) UnityEngine.Object.Destroy(_bagagem); _bagagem = null; }
         }
 
         /// <summary>Um aviso no quadro de aviso do proprio jogo (o de carregar a copia de seguranca): o texto, voltar e seguir.</summary>
@@ -1141,6 +1385,8 @@ namespace Bigorna.Menu
 
         static void Lancou(string erro)
         {
+            // (v267: no Mapa oneshot e no Novo jogo +, o erro fica num aviso na propria tela; antes abria o painel antigo dos mapas)
+            if (erro != null && _oneshot && _tela != null && _tela.activeSelf) { Log.Info("tela de mapas: " + erro); Alerta(erro, T("Entendi", "OK"), () => { }); return; }
             if (erro != null) { Log.Info("tela de mapas: " + erro); Fechar(); Nucleo.Visivel = true; PainelMapas.MostrarErro(erro, _aba > 2 ? 1 : _aba); return; }
             if (_tela != null) _tela.SetActive(false);
             try { Cena.MainCameraBlur.enabled = false; } catch { }

@@ -183,6 +183,13 @@ namespace Bigorna.Motor
             return false;
         }
 
+        /// <summary>v288: o item está na coleção do jogo (as caixas marcadas): o jogo acha o modelo pedindo só os da coleção.</summary>
+        public static bool DaColecao(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return false;
+            try { return UserCollectionManager.GetItem(id, true) != null; } catch { return true; }
+        }
+
         static void Item(SerializedGame d, string id, int qtd, Recebido r)
         {
             ItemModel m = null; try { m = UserCollectionManager.GetItem(id, false); } catch { }
@@ -215,7 +222,8 @@ namespace Bigorna.Motor
                 d.AddTreasureDuringQuest(new SerializedItem(m));
                 r.Digitais.Add(nome);
             }
-            try { d.QuestSummary?.AddToObtainedItems(id, qtd); } catch { }
+            // (v288: o resumo do fim da missão só mostra itens da coleção do jogo: um de fora dela, ali, derrubava o resumo)
+            if (DaColecao(id)) { try { d.QuestSummary?.AddToObtainedItems(id, qtd); } catch { } }
             r.Ganhos.Add(new InventoryChange(m, qtd));
             Log.Info("  o grupo recebe «" + nome + "»" + (qtd > 1 ? " ×" + qtd : ""));
         }
@@ -275,7 +283,7 @@ namespace Bigorna.Motor
             var pool = Pool();
             if (pool != null && pool.Count > 0 && d != null)
             {
-                var livres = pool.Where(id => { if (string.IsNullOrEmpty(id) || _doPool.Contains(id)) return false; bool tem; try { tem = d.GetDiscoveredItem(id) != null; } catch { tem = d.GetItem(id) != null; } if (tem) return false; try { return !(UserCollectionManager.GetItem(id, false) is CraftingMaterialModel); } catch { return true; } }).ToList();
+                var livres = pool.Where(id => { if (string.IsNullOrEmpty(id) || _doPool.Contains(id) || !DaColecao(id)) return false; bool tem; try { tem = d.GetDiscoveredItem(id) != null; } catch { tem = d.GetItem(id) != null; } if (tem) return false; try { return !(UserCollectionManager.GetItem(id, false) is CraftingMaterialModel); } catch { return true; } }).ToList();
                 if (livres.Count == 0) { r.Avisos.Add(T("Todos os itens da reserva de itens deste mapa já foram obtidos.", "All items in this map's item pool have already been obtained.")); return; }
                 var id = livres[UnityEngine.Random.Range(0, livres.Count)];
                 ItemModel m = null; try { m = UserCollectionManager.GetItem(id, false); } catch { }

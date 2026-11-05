@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -70,7 +70,7 @@ namespace Bigorna.Formato
             Gravar(l);
         }
 
-        /// <summary>Copia o mapa para a pasta de mapas como um mapa novo (oneshot-&lt;semente&gt;.dmap; a mesma semente guardada de novo
+        /// <summary>Copia o mapa para a pasta de mapas como um mapa novo (oneshot-&lt;semente&gt;.bmap; a mesma semente guardada de novo
         /// fica no mesmo arquivo). Devolve o caminho.</summary>
         public static string GuardarComoNovo(string mapa, string pastaDeMapas, string semente)
         {
@@ -78,7 +78,7 @@ namespace Bigorna.Formato
             Directory.CreateDirectory(pastaDeMapas);
             var nome = "oneshot-" + new string(Chave(semente).Where(c => char.IsLetterOrDigit(c) || c == '-' || c == '_').ToArray());
             if (nome == "oneshot-") nome = "oneshot-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");
-            var destino = Path.Combine(pastaDeMapas, nome + ".dmap");
+            var destino = Path.GetFullPath(Path.Combine(pastaDeMapas, nome + Arquivos.Mapa));   // (v267: as barras do sistema, sem misturar / e \\; v270: .bmap)
             var tmp = destino + ".tmp"; File.Copy(mapa, tmp, true);
             if (File.Exists(destino)) File.Delete(destino);
             File.Move(tmp, destino);

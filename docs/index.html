@@ -59,6 +59,8 @@ html[lang=pt-BR] [data-en]{display:none}
   <nav>
     <a href="#recursos"><span data-en>Features</span><span data-pt>Recursos</span></a>
     <a href="#instalar"><span data-en>Install</span><span data-pt>Instalar</span></a>
+    <a href="#linux">Linux</a>
+    <a href="#acervo"><span data-en>Library</span><span data-pt>Acervo</span></a>
     <a href="https://github.com/vcmatias/bigorna-descent">GitHub</a>
     <div class="idioma"><button data-l="en">EN</button><button data-l="pt">PT</button></div>
   </nav>
@@ -70,18 +72,18 @@ html[lang=pt-BR] [data-en]{display:none}
   <p class="sub" data-en>A fan-made mod for <i>Descent: Legends of the Dark</i> that plays community maps and campaigns, with <b>Bigorna Rooms</b>, an editor that builds them room by room.</p>
   <p class="sub" data-pt>Mod feito por fã para <i>Descent: Legends of the Dark</i> que joga mapas e campanhas da comunidade, com o <b>Bigorna Rooms</b>, editor que monta esses mapas sala por sala.</p>
   <div class="botoes">
-    <a class="btn prim" href="https://github.com/vcmatias/bigorna-descent/releases/latest"><span data-en>Download for Windows</span><span data-pt>Baixar para Windows</span></a>
+    <a class="btn prim" href="https://github.com/vcmatias/bigorna-descent/releases/latest"><span data-en>Download (Windows · Linux)</span><span data-pt>Baixar (Windows · Linux)</span></a>
     <a class="btn" href="https://github.com/vcmatias/bigorna-descent"><span data-en>Source code</span><span data-pt>Código-fonte</span></a>
   </div>
-  <div class="versao"><span data-en>Version</span><span data-pt>Versão</span> 0.2.1 · <span data-en>English and Portuguese</span><span data-pt>português e inglês</span> · <span data-en>requires the game on Steam</span><span data-pt>precisa do jogo na Steam</span></div>
+  <div class="versao"><span data-en>Version</span><span data-pt>Versão</span> 0.2.2 · <span data-en>English and Portuguese</span><span data-pt>português e inglês</span> · <span data-en>requires the game on Steam</span><span data-pt>precisa do jogo na Steam</span></div>
 </div></div>
 
 <section id="recursos"><div class="wrap">
   <h2 data-en>What it does</h2><h2 data-pt>O que ele faz</h2>
   <div class="grade">
     <div class="card"><h3 data-en>Community maps</h3><h3 data-pt>Mapas da comunidade</h3>
-      <p data-en>Plays <code>.dmap</code> maps and <code>.dcamp</code> campaigns inside the game, with its own tiles, monsters, heroes, items, sounds and narration.</p>
-      <p data-pt>Joga mapas <code>.dmap</code> e campanhas <code>.dcamp</code> dentro do jogo, com as peças, monstros, heróis, itens, sons e narração do próprio jogo.</p></div>
+      <p data-en>Plays <code>.bmap</code> maps and <code>.bcamp</code> campaigns inside the game, with its own tiles, monsters, heroes, items, sounds and narration.</p>
+      <p data-pt>Joga mapas <code>.bmap</code> e campanhas <code>.bcamp</code> dentro do jogo, com as peças, monstros, heróis, itens, sons e narração do próprio jogo.</p></div>
     <div class="card"><h3 data-en>Room by room</h3><h3 data-pt>Sala por sala</h3>
       <p data-en>Draw each room with the game's tiles, place monsters, chests, doors and objects, write texts and triggers, and test the flow. Runs in Chrome or Edge, offline.</p>
       <p data-pt>Desenhe cada sala com as peças do jogo, coloque monstros, baús, portas e objetos, escreva textos e gatilhos e teste o andamento. Roda no Chrome ou no Edge, sem internet.</p></div>
@@ -101,9 +103,9 @@ html[lang=pt-BR] [data-en]{display:none}
 </div></section>
 
 <section id="instalar"><div class="wrap">
-  <h2 data-en>Install</h2><h2 data-pt>Instalar</h2>
+  <h2 data-en>Install on Windows</h2><h2 data-pt>Instalar no Windows</h2>
   <ol class="passos">
-    <li><span data-en>Download <code>Bigorna-0.2.1.zip</code> from <a href="https://github.com/vcmatias/bigorna-descent/releases/latest">Releases</a> and unzip it anywhere.</span><span data-pt>Baixe o <code>Bigorna-0.2.1.zip</code> em <a href="https://github.com/vcmatias/bigorna-descent/releases/latest">Releases</a> e descompacte em qualquer pasta.</span></li>
+    <li><span data-en>Download <code>Bigorna-0.2.2.zip</code> from <a href="https://github.com/vcmatias/bigorna-descent/releases/latest">Releases</a> and unzip it anywhere.</span><span data-pt>Baixe o <code>Bigorna-0.2.2.zip</code> em <a href="https://github.com/vcmatias/bigorna-descent/releases/latest">Releases</a> e descompacte em qualquer pasta.</span></li>
     <li><span data-en>Double-click <code>Install-Bigorna.bat</code>. The window finds the game through Steam and installs the mod, keeping a backup of each file it changes.</span><span data-pt>Dê dois cliques em <code>Install-Bigorna.bat</code>. A janela acha o jogo pela Steam e instala o mod, com cópia de segurança de cada arquivo que muda.</span></li>
     <li><span data-en>Start the game and wait on the title screen while the mod reads your copy (a few minutes the first time). Then open the world map of a campaign once.</span><span data-pt>Abra o jogo e espere na tela de título enquanto o mod lê a sua cópia (alguns minutos na primeira vez). Depois abra uma vez o mapa-múndi de uma campanha.</span></li>
     <li><span data-en>Open <b>Bigorna Rooms</b> from the desktop shortcut or from the <b>Community maps</b> panel on the title screen.</span><span data-pt>Abra o <b>Bigorna Rooms</b> pelo atalho da Área de Trabalho ou pelo painel <b>Mapas da comunidade</b> na tela de título.</span></li>
@@ -112,10 +114,40 @@ html[lang=pt-BR] [data-en]{display:none}
   <p class="nota" data-pt>Se o Windows mostrar "O Windows protegeu o computador", o pacote apenas está sem assinatura paga: clique em "Mais informações" e "Executar assim mesmo". O instalador é um script do PowerShell em texto simples e trabalha sem internet. Rode de novo depois de cada atualização do jogo.</p>
 </div></section>
 
+<section id="linux"><div class="wrap">
+  <h2 data-en>Install on Linux</h2><h2 data-pt>Instalar no Linux</h2>
+  <p data-en>The game runs on Linux through Steam's Proton, and Bigorna runs with it.</p>
+  <p data-pt>O jogo roda no Linux pelo Proton da Steam, e o Bigorna roda junto.</p>
+  <p data-en><b>You need:</b> the game on Steam with Proton, <code>python3</code> (it comes with most distributions) and Chrome or Chromium. Steam installed by the distribution, by Flatpak or by Snap is found by itself.</p>
+  <p data-pt><b>Vocês vão precisar de:</b> o jogo na Steam com o Proton, o <code>python3</code> (vem na maioria das distribuições) e o Chrome ou o Chromium. A Steam instalada pela distribuição, pelo Flatpak ou pelo Snap é achada sozinha.</p>
+  <ol class="passos">
+    <li><span data-en>In Steam, open the game's <b>Properties › Compatibility</b> and pick Proton. Start the game once, then close it.</span><span data-pt>Na Steam, abra <b>Propriedades › Compatibilidade</b> do jogo e escolha o Proton. Abra o jogo uma vez e feche.</span></li>
+    <li><span data-en>Unzip <code>Bigorna-0.2.2.zip</code> and run <code>bash install-bigorna.sh</code> in a terminal (it needs <code>python3</code>; <code>--game "&lt;folder&gt;"</code> if Steam keeps the game elsewhere).</span><span data-pt>Descompacte o <code>Bigorna-0.2.2.zip</code> e rode <code>bash install-bigorna.sh --lingua pt</code> num terminal (precisa do <code>python3</code>; <code>--jogo "&lt;pasta&gt;"</code> se a Steam guarda o jogo em outro lugar).</span></li>
+    <li><span data-en>Start the game through Steam and wait on the title screen while the mod reads your copy.</span><span data-pt>Abra o jogo pela Steam e espere na tela de título enquanto o mod lê a sua cópia.</span></li>
+    <li><span data-en>Open the editor, <code>Bigorna-Salas.html</code>, in <b>Chrome or Chromium</b>: it is in <code>~/.steam/steam/steamapps/compatdata/1611070/pfx/drive_c/users/steamuser/AppData/LocalLow/Fantasy Flight Games/Descent - Legends of the Dark/Editor</code>.</span><span data-pt>Abra o editor, <code>Bigorna-Salas.html</code>, no <b>Chrome ou no Chromium</b>: ele fica em <code>~/.steam/steam/steamapps/compatdata/1611070/pfx/drive_c/users/steamuser/AppData/LocalLow/Fantasy Flight Games/Descent - Legends of the Dark/Editor</code>.</span></li>
+    <li><span data-en><b>One-shot map</b>: the generator runs in the browser. The one-shot window in the game shows the path of <code>Abrir-o-gerador.html</code> (and an <b>Open in the browser</b> button): open it in Chrome or Chromium, choose the <code>Bigorna/Oneshot</code> folder and keep the tab open while you play.</span><span data-pt><b>Mapa oneshot</b>: o gerador roda no navegador. O quadro do oneshot, no jogo, mostra o caminho do <code>Abrir-o-gerador.html</code> (e um botão <b>Abrir no navegador</b>): abra no Chrome ou no Chromium, escolha a pasta <code>Bigorna/Oneshot</code> e deixe a aba aberta enquanto joga.</span></li>
+  </ol>
+  <p class="nota" data-en>Firefox cannot write to folders, so the editor and the generator need Chrome or Chromium. Run the installer again after a game update; <code>bash install-bigorna.sh --uninstall</code> takes Bigorna out. Linux support is new and not yet tried on a Linux computer: please report what works and what breaks.</p>
+  <p class="nota" data-pt>O Firefox não grava em pastas; por isso o editor e o gerador pedem o Chrome ou o Chromium. Depois de uma atualização do jogo, rode o instalador de novo; <code>bash install-bigorna.sh --desinstalar</code> tira o Bigorna. O suporte ao Linux é novo e ainda sem teste num computador com Linux: contem o que funciona e o que quebra.</p>
+</div></section>
+
+<section id="acervo"><div class="wrap">
+  <h2 data-en>The community library and its bot</h2><h2 data-pt>O acervo da comunidade e o robô</h2>
+  <p data-en>The <a href="https://github.com/vcmatias/bigorna-acervo">community library</a> gathers maps, campaigns and Workshop packages made with Bigorna. Players download them inside the game, in <b>Community maps › Download maps</b> and <b>Packages</b>; a work that needs packages asks for them first. The editor downloads packages too (<b>📚 Library › Community packages…</b>).</p>
+  <p data-pt>O <a href="https://github.com/vcmatias/bigorna-acervo">acervo da comunidade</a> reúne mapas, campanhas e pacotes da Oficina feitos com o Bigorna. Quem joga baixa tudo dentro do jogo, em <b>Mapas da comunidade › Baixar mapas</b> e <b>Pacotes</b>; uma obra que exige pacotes pede esses pacotes antes. O editor também baixa pacotes (<b>📚 Acervo › Pacotes do acervo…</b>).</p>
+  <ol class="passos">
+    <li><span data-en>In the editor, <b>📚 Library › Publish this map</b> (or campaign, or one of your packages). The editor saves a <code>bigorna-acervo-….zip</code> file and opens a form on GitHub, already filled.</span><span data-pt>No editor, <b>📚 Acervo › Publicar este mapa</b> (ou campanha, ou um pacote seu). O editor salva um arquivo <code>bigorna-acervo-….zip</code> e abre no GitHub um formulário já preenchido.</span></li>
+    <li><span data-en>Drag the <code>.zip</code> into the <b>File</b> box and create the request. You need a free GitHub account.</span><span data-pt>Arraste o <code>.zip</code> para o campo <b>Arquivo</b> e crie o pedido. É preciso uma conta (gratuita) no GitHub.</span></li>
+    <li><span data-en>The bot checks the file right away and answers in the request. When all is right, the work enters the library and shows up in the game and in the editor within minutes. When something is wrong, the answer says what to fix: edit the request and the bot runs again.</span><span data-pt>O robô confere o arquivo na hora e responde no pedido. Com tudo certo, a obra entra no acervo e aparece no jogo e no editor em alguns minutos. Com algum problema, a resposta diz o que corrigir: edite o pedido e o robô roda de novo.</span></li>
+  </ol>
+  <p class="nota" data-en>There is no curation: what passes the check goes in. The bot checks that the file was made in the editor, carries only Bigorna's file types and every image it uses, and that the packages it needs are already in the library (publish a package before the maps that use it). Only who published the first edition sends the next ones, up to 10 publications per person per day. Share only your own work, with no art or text copied from the game.</p>
+  <p class="nota" data-pt>Não há curadoria: vale o que passa na conferência. O robô confere se o arquivo foi feito no editor, se traz só os tipos de arquivo do Bigorna e cada imagem que usa, e se os pacotes exigidos já estão no acervo (publique o pacote antes dos mapas que o usam). Só quem publicou a primeira edição manda as seguintes, até 10 publicações por pessoa por dia. Compartilhe só trabalho seu, sem arte nem texto copiados do jogo.</p>
+</div></section>
+
 <section id="compartilhar"><div class="wrap">
-  <h2 data-en>Share your maps</h2><h2 data-pt>Compartilhe seus mapas</h2>
-  <p data-en>Share the <code>.dmap</code> and <code>.dcamp</code> files you make. Players put them in <code>%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of the Dark\CustomMaps</code> and find them in the <b>Community maps</b> panel.</p>
-  <p data-pt>Compartilhe os arquivos <code>.dmap</code> e <code>.dcamp</code> que fizer. Quem joga coloca em <code>%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of the Dark\CustomMaps</code> e encontra no painel <b>Mapas da comunidade</b>.</p>
+  <h2 data-en>Share files by hand</h2><h2 data-pt>Compartilhar à mão</h2>
+  <p data-en>You can also pass the <code>.bmap</code> and <code>.bcamp</code> files around yourself. Players put them in <code>%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of the Dark\Bigorna\Mapas</code> (on Linux, the <code>Bigorna/Mapas</code> folder next to the editor's <code>Editor</code> folder, in the path above) and find them in the <b>Community maps</b> panel.</p>
+  <p data-pt>Também dá para passar os arquivos <code>.bmap</code> e <code>.bcamp</code> de mão em mão. Quem joga coloca em <code>%USERPROFILE%\AppData\LocalLow\Fantasy Flight Games\Descent - Legends of the Dark\Bigorna\Mapas</code> (no Linux, a pasta <code>Bigorna/Mapas</code> ao lado da pasta <code>Editor</code> do editor, no caminho acima) e encontra no painel <b>Mapas da comunidade</b>.</p>
   <p class="nota" data-en>Bigorna carries nothing from the game. The mod reads your installed copy and writes the editor's data on your computer: keep <code>bigorna-game-data.js</code> and <code>bigorna-worldmap.js</code> to yourself. Maps carry only your own work.</p>
   <p class="nota" data-pt>O Bigorna não traz nada do jogo. O mod lê a sua cópia instalada e grava os dados do editor no seu computador: guarde <code>bigorna-game-data.js</code> e <code>bigorna-worldmap.js</code> só para você. Os mapas levam só o trabalho de quem os fez.</p>
 </div></section>

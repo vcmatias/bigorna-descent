@@ -19,7 +19,7 @@ CATALOGO = os.path.join(RAIZ, 'CATALOGO.md')
 LINGUAS = {'en': '🇺🇸', 'pt': '🇧🇷', 'es': '🇪🇸', 'fr': '🇫🇷', 'de': '🇩🇪', 'it': '🇮🇹', 'pl': '🇵🇱', 'hu': '🇭🇺', 'cs': '🇨🇿', 'ru': '🇷🇺', 'ko': '🇰🇷', 'zh-cn': '🇨🇳', 'zh-tw': '🇹🇼'}
 ID = re.compile(r'^[a-z0-9][a-z0-9-]{1,58}[a-z0-9]$')
 TIPOS = ('mapa', 'campanha', 'pacote')
-EXTENSOES = ('.dmap', '.dcamp', '.bigorna', '.json', '.ogg', '.mp3', '.wav', '.mp4', '.webm', '.png', '.jpg', '.jpeg', '.webp', '.glb', '.gltf', '.obj', '.bin', '.mtl')
+EXTENSOES = ('.dmap', '.dcamp', '.bmap', '.bcamp', '.bigorna', '.json', '.ogg', '.mp3', '.wav', '.mp4', '.webm', '.png', '.jpg', '.jpeg', '.webp', '.glb', '.gltf', '.obj', '.bin', '.mtl')
 NOME = re.compile(r'^[^/\\:*?"<>|\x00-\x1f]{1,120}$')
 IMAGEM_DA_OBRA = re.compile(r'^imagens/[0-9a-f]{32}\.(png|jpg|webp|gif)$')
 MAX_ZIP = 60 * 1024 * 1024          # o arquivo enviado
@@ -136,15 +136,15 @@ def conferir(zip_bytes, ficha_pedido, autor, publicadas=None):
     ls = [x.strip() for x in str(f.get('lingua') or '').split(',') if x.strip()]
     if not ls or any(x not in LINGUAS for x in ls): raise Recusa('língua não aceita: %r (uma das do jogo: %s)' % (f.get('lingua'), ', '.join(LINGUAS)))
     # o que cada tipo traz
-    docs = [n for n in nomes if n.endswith(('.dmap', '.dcamp'))]
+    docs = [n for n in nomes if n.endswith(('.dmap', '.dcamp', '.bmap', '.bcamp'))]
     for n in docs:
         d = ler_json(z.read(n), n)
-        fmt = 'dmap' if n.endswith('.dmap') else 'dcamp'
+        fmt = 'dmap' if n.endswith(('.dmap', '.bmap')) else 'dcamp'
         if d.get('format') != fmt: raise Recusa('%s não é um .%s' % (n, fmt))
         if 'bigornaSalas' not in d: raise Recusa('%s não foi feito no editor Bigorna' % n)
-    if tipo == 'mapa' and not any(n.endswith('.dmap') for n in nomes): raise Recusa('o mapa não traz o .dmap')
-    if tipo == 'mapa' and any(n.endswith('.dcamp') for n in nomes): raise Recusa('um mapa avulso não leva .dcamp (publique como campanha)')
-    if tipo == 'campanha' and sum(n.endswith('.dcamp') for n in nomes) != 1: raise Recusa('a campanha traz um .dcamp (e só um)')
+    if tipo == 'mapa' and not any(n.endswith(('.dmap', '.bmap')) for n in nomes): raise Recusa('o mapa não traz o .bmap (ou .dmap)')
+    if tipo == 'mapa' and any(n.endswith(('.dcamp', '.bcamp')) for n in nomes): raise Recusa('um mapa avulso não leva .bcamp nem .dcamp (publique como campanha)')
+    if tipo == 'campanha' and sum(n.endswith(('.dcamp', '.bcamp')) for n in nomes) != 1: raise Recusa('a campanha traz um .bcamp ou .dcamp (e só um)')
     if tipo == 'pacote':
         if 'pacote.json' not in nomes or 'pacote.bigorna' not in nomes: raise Recusa('o pacote traz pacote.json e pacote.bigorna')
         pj = ler_json(z.read('pacote.json'), 'pacote.json'); pb = ler_json(z.read('pacote.bigorna'), 'pacote.bigorna')
@@ -193,7 +193,7 @@ def conferir(zip_bytes, ficha_pedido, autor, publicadas=None):
     # as imagens (v240): os arquivos levam referências "imagens/<nome>"; cada uma vem no zip, na pasta imagens
     imagens = {n for n in nomes if IMAGEM_DA_OBRA.match(n)}
     for n in nomes:
-        if not n.endswith(('.dmap', '.dcamp', '.bigorna')) and n != 'pacote.json': continue
+        if not n.endswith(('.dmap', '.dcamp', '.bmap', '.bcamp', '.bigorna')) and n != 'pacote.json': continue
         for r in sorted(set(REFERENCIA.findall(z.read(n).decode('utf-8-sig', 'replace')))):
             if r not in imagens: raise Recusa('%s usa a imagem %s, que não veio no zip (salve o arquivo de novo pelo editor)' % (n, r))
     final = {k: f[k] for k in ('formato', 'versao', 'id', 'tipo', 'nome', 'autor', 'resumo', 'lingua', 'ato', 'edicao', 'requer', 'conteudo', 'editor', 'data') if k in f}

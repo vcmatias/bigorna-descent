@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -53,7 +53,7 @@ namespace Bigorna.Formato
             try
             {
                 var pasta = Path.GetDirectoryName(caminho);
-                if (!string.IsNullOrEmpty(pasta) && Directory.Exists(pasta) && Directory.GetFiles(pasta, "*.dcamp").Length > 0) return Path.GetFullPath(pasta).ToLowerInvariant();
+                if (!string.IsNullOrEmpty(pasta) && Directory.Exists(pasta) && Arquivos.Campanhas(pasta).Count > 0) return Path.GetFullPath(pasta).ToLowerInvariant();
                 return Path.GetFullPath(caminho).ToLowerInvariant();
             }
             catch { return caminho.ToLowerInvariant(); }

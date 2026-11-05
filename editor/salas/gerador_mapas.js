@@ -83,12 +83,12 @@ const PREMISSAS_MAPA = [
     truques: [null], faccao: 'bandidos', final: 'counter', alvo: { en: 'the cargo', pt: 'a carga' },
     titulo: { en: ['The Raided Caravan', 'Crates of {lugar}', 'What {vilao} Took'], pt: ['A Caravana Saqueada', 'Os Caixotes de {lugar}', 'O Que {vilao} Levou'] },
     intro: { en: ['Three wagons of medicine and grain never reached the village. The raiders of {vilao} dragged the crates into {lugar}. Bring them back, all of them.'], pt: ['Três carroças de remédios e grãos nunca chegaram à aldeia. Os saqueadores de {vilao} arrastaram os caixotes para {lugar}. Tragam todos de volta.'] },
-    climax: { en: ['{vilao} sits on the last crates like a dragon on its hoard.'], pt: ['{vilao} está sentado sobre os últimos caixotes como um dragão sobre o tesouro.'] },
+    climax: { en: ['{vilao} sits on the last crates like a dragon on its hoard.'], pt: ['{vilao} guarda os últimos caixotes como um dragão guarda o tesouro.'] },
     fim: { en: ['The crates are loaded again. The village will eat this winter.'], pt: ['Os caixotes estão carregados de novo. A aldeia vai comer neste inverno.'] } },
-  { id: 'tenente', nome: { en: 'The lieutenant', pt: 'O tenente' }, resumo: { en: 'An enemy officer carries the orders: catch him before he flees.', pt: 'Um oficial inimigo carrega as ordens: peguem-no antes que fuja.' },
+  { id: 'tenente', nome: { en: 'The lieutenant', pt: 'O tenente' }, resumo: { en: 'An enemy officer carries the orders: take them before the escape.', pt: 'Um oficial inimigo carrega as ordens: tomem-nas antes da fuga.' },
     truques: [null], faccao: 'legiao', final: 'boss', alvo: { en: 'the orders', pt: 'as ordens' },
-    titulo: { en: ['The Lieutenant’s Orders', 'Catch {vilao}', 'Sealed Orders'], pt: ['As Ordens do Tenente', 'Peguem {vilao}', 'Ordens Lacradas'] },
-    intro: { en: ['{vilao} carries sealed orders for the whole Legion and hides in {lugar} until nightfall. Catch the lieutenant there: once you are seen, there will be little time before the escape.'], pt: ['{vilao} carrega ordens lacradas para toda a Legião e se esconde em {lugar} até o anoitecer. Peguem o tenente lá: depois que vocês forem vistos, sobrará pouco tempo antes da fuga.'] },
+    titulo: { en: ['The Legion’s Orders', 'Stop {vilao}', 'Sealed Orders'], pt: ['As Ordens da Legião', 'Detenham {vilao}', 'Ordens Lacradas'] },
+    intro: { en: ['{vilao} carries sealed orders for the whole Legion and hides in {lugar} until nightfall. Go in and take the orders: once you are seen, there will be little time before the escape.'], pt: ['{vilao} carrega ordens lacradas para toda a Legião e se esconde em {lugar} até o anoitecer. Entrem e tomem as ordens: depois que vocês forem vistos, sobrará pouco tempo antes da fuga.'] },
     climax: { en: ['{vilao} sees you and shouts for the guard. There is little time.'], pt: ['{vilao} vê vocês e grita pela guarda. Há pouco tempo.'] },
     fim: { en: ['The seal breaks. The Legion’s plans are in your hands now.'], pt: ['O lacre se rompe. Os planos da Legião estão nas mãos de vocês.'] } },
   { id: 'pocos', nome: { en: 'Poisoned wells', pt: 'Poços envenenados' }, resumo: { en: 'A plague of the dead fouls the water: purify the springs.', pt: 'Uma praga dos mortos contamina a água: purifiquem as fontes.' },
@@ -724,7 +724,8 @@ function aplicarComplicacoes(pm, plano, rng, notas, salasDe) {
       const objetivoClaro = x => { const t = String(x).replace(/\s*\([^)]*\)\s*$/, '').replace(/hold out against (\d+) waves/, 'defeat the $1 waves of monsters that come').replace(/aguentem (\d+) ondas/, 'derrotem as $1 ondas de monstros que vierem');
         return alvo === null ? t : L2('To open ' + oQue + ': ', 'Para abrir ' + oQue + ': ') + t.charAt(0).toLowerCase() + t.slice(1); };
       const nome = nomeLivre(TXT(R.contador), TXT(R.contador));
-      const sp = () => casas.length ? [{ uid: uid(), tipo: 'spawn', fonte: 'pool', cells: casas.map(c2 => [c2.x, c2.y, c2.nivel]), inimigos: [], intensidade: Math.max(1, Math.min(10, plano.base - (possuido ? 2 : 1))), requisitos: [] }] : [];
+      // (v268: a wave brings at least two figures, where the room has two places: one monster a round was no horde)
+      const sp = () => casas.length ? [{ uid: uid(), tipo: 'spawn', fonte: 'pool', cells: casas.map(c2 => [c2.x, c2.y, c2.nivel]), inimigos: [], intensidade: Math.max(1, Math.min(10, plano.base - (possuido ? 2 : 1))), ...(casas.length > 1 ? { minimo: 2 } : {}), requisitos: [] }] : [];
       if (possuido) {
         // possessed: from the moment its room is open it calls monsters (every two rounds; every round on Hard), until a hero
         // frees it (a long test); the way on opens once it is free and its room is clear
@@ -908,6 +909,25 @@ function pousoDoPonto(pm, k) {
 }
 /* the leader of the last room: in most maps a monster of the pool with a twist (more lives, reinforcements, it heals);
    now and then (1 in 20) a boss of the Workshop */
+/* v268: the villain's figure carries the villain's name (the game shows the monster's name in the placement, activation
+   and attack windows: before, the figure's game name where the story said the Siege Mistress Varra). The figure stays the
+   game's monster (its card, its texts, in the game's language); the mod gives it the name ("name" of the figure in the
+   map). Not a monster the game has named already (a boss of the Workshop, a lieutenant) */
+const nomeDeFigura = n => { const t = String(n || '').trim().replace(/^(the|o|a|os|as|el|la|los|las|le|les|il|lo|gli|der|die|das)\s+/i, '').replace(/^l'/i, ''); return t.charAt(0).toUpperCase() + t.slice(1); };
+function nomeDoVilao(plano, e, nome) {
+  if (!e || !nome || plano.chefeReal) return e; const m = monstro(e.enemy); if (!m || m.named || m.villain) return e;
+  e.nomeProprio = nomeDeFigura(nome); return e;
+}
+/* v286: the villain's figure fits the villain: «the Wolf-Father» is a wolf, not a golem (seen in play, 05/11/2026). From the
+   villain's name and profile, the kind of monster it is; the leader takes a monster of that kind from the map's pool when
+   there is one (the pool is the collection's), and stays as it was otherwise */
+const FIGURA_DO_VILAO = [[/\b(wolf|hound|pack)/i, 'Wolf'], [/\b(golem|stone|rock|construct)/i, 'Golem'], [/\b(salamander|serpent|ember|wyrm|dragon|flame)/i, 'Salamander'],
+  [/\b(fae|moth|briar|thorn|sprite|fairy|stag)/i, 'Fae'], [/\b(vampire|blood)/i, 'Vampire'], [/\b(specter|spectre|ghost|wraith|phantom)/i, 'Specter'], [/\b(wight|barrow)/i, 'Wight'], [/\b(corpse|reanimat)/i, 'Reanimate']];
+function tipoDaFiguraDoVilao(vilao) {
+  // (só os vilões que são criaturas, pelo nome em inglês: «the Salt Hounds' captain» é gente, e «Brannoc the one-eyed» também)
+  if (!vilao || !vilao.nome || !(vilao.f || []).some(f => f === 'feras' || f === 'mortos')) return null;
+  const r = FIGURA_DO_VILAO.find(([re]) => re.test(vilao.nome.en || '')); return r ? r[1] : null;
+}
 function chefeDaSala(pm, si, plano, rng, chefeReal) {
   const s = pm.salas[si]; const v = plano.rival ? { ...plano.vocab, vilao: plano.rival } : plano.vocab;
   // the villain's own lines (a skin of HISTORIAS.viloes), unless the leader is a rival band's
@@ -917,13 +937,20 @@ function chefeDaSala(pm, si, plano, rng, chefeReal) {
   if (!e) { const vaga = (s.inimigos || []).filter(x => ehPool(x.enemy)).pop(); const pool = (pm.reserva || []).map(monstro).filter(Boolean); if (!vaga || !pool.length) return null; vaga.enemy = rng.pick(pool).id; e = vaga; }
   // (the villain who hunted the heroes on the way waits here: the same figure)
   if (plano.tipoDoVilao && !plano.chefeFixo && !plano.rival && monstro(plano.tipoDoVilao)) e.enemy = plano.tipoDoVilao;
+  // (v286: a figure of the villain's kind, from the pool)
+  else if (!plano.chefeFixo && !plano.rival && !chefeReal) { const t = tipoDaFiguraDoVilao(plano.vilao); const atual = monstro(e.enemy);
+    if (t && atual && atual.tipo !== t) { const doTipo = l => l.filter(m => m && m.tipo === t && !m.villain && !m.named).sort((a, b) => (b.tiers || []).length - (a.tiers || []).length)[0];
+      const certo = doTipo((pm.reserva || []).map(monstro)) || doTipo(daOficina(plano.atos || 2).monstros); if (certo) e.enemy = certo.id; } }
   // (a large one (2x2) only where it can move: in a cramped room, the strongest of the others)
   if (ehGrande(e.enemy) && !plano.chefeFixo) { const L = lugarGrande(pm, si, e); if (!L || L.volta < 8) { const outro = (pm.reserva || []).map(monstro).filter(m => m && !ehGrande(m.id)).sort((a, b) => (b.tiers || []).length - (a.tiers || []).length)[0]; if (outro) e.enemy = outro.id; } }
-  const m = monstro(e.enemy); if (!m) return null; const maxT = tierDoLider(m, plano); e.tier = maxT; e.uid = e.uid || uid();
+  const m = monstro(e.enemy); if (!m) return null; const maxT = tierDoLider(m, plano); e.tier = maxT; e.uid = e.uid || uid(); nomeDoVilao(plano, e, v.vilao);
   const tipo = plano.chefeTipo || rng.pesado({ vidas: 3, reforcos: 3, regenera: 2 }); const ab = abridorDe(pm, si);
+  // (v268: a leader of one figure holds a little longer, +1 defence (not on Easy): in play, one fell in two rounds, before its
+  // story (an escape, the reinforcements) had time to happen. The one with lives already comes back)
+  if (tipo !== 'vidas' && plano.dificuldade !== 'facil') e.bonusDefesa = Math.max(1, e.bonusDefesa || 0);
   if (tipo === 'vidas') {
     const vidas = plano.dificuldade === 'facil' ? 2 : rng.int(2, 3); let atual = e;
-    for (let k = 1; k < vidas; k++) { const copia = { enemy: e.enemy, pos: e.pos.slice(), tier: maxT, level: e.level || 0, uid: uid(), gatilhos: [], senao: [] };
+    for (let k = 1; k < vidas; k++) { const copia = { enemy: e.enemy, pos: e.pos.slice(), tier: maxT, level: e.level || 0, uid: uid(), gatilhos: [], senao: [], ...(e.nomeProprio ? { nomeProprio: e.nomeProprio } : {}) };
       atual.gatilhos = (atual.gatilhos || []).concat([gatilhoTexto(preencher(F.levanta || { en: '{vilao} falls… and rises again!', pt: '{vilao} cai… e se ergue de novo!' }, v)), { uid: uid(), tipo: 'spawn', fonte: 'list', inimigos: [copia], cells: [], requisitos: [] }]);
       atual = copia; }
     return { id: 'vidas', n: vidas, alvo: atual };
@@ -1510,14 +1537,14 @@ function tenenteFoge(pm, plano, fim) {
   const ab = abridorDe(pm, fim); if (!ab || !plano.chefe?.alvo) return false;
   const lista = Object.keys(ab.o).find(k => Array.isArray(ab.o[k]) && ab.o[k].includes(ab.g)); if (!lista) return false;
   const v = plano.vocab; const R = { facil: 5, normal: 4, dificil: 3 }[DIFICULDADE_TESTES.dif] || 4;
-  const cont = novoContadorMapa(pm, L2('Lieutenant', 'Tenente'), 1, ''); delete cont.missao; const tem = () => [{ tipo: 'counter', contador: cont.nome, meta: 1 }];
+  const cont = novoContadorMapa(pm, L2('Escape', 'Fuga'), 1, ''); delete cont.missao; const tem = () => [{ tipo: 'counter', contador: cont.nome, meta: 1 }];
   const req = () => clone(ab.g.requisitos || []);
   const aviso = { uid: uid(), tipo: 'rounds', modo: 'uma', n: Math.max(1, R - 1), vezes: 0, requisitos: req() };
   const fuga = { uid: uid(), tipo: 'rounds', modo: 'uma', n: R, vezes: 0, requisitos: req() };
   ab.o[lista].splice(ab.o[lista].indexOf(ab.g) + 1, 0, { uid: uid(), tipo: 'counter', contador: cont.nome, acao: 'add', n: 1, texto: '', requisitos: req() },
-    gatilhoTexto(preencher({ en: '{vilao} runs for the far exit: in ' + R + ' rounds the lieutenant is gone, and the orders with it!', pt: '{vilao} corre para a saída do fundo: em ' + R + ' rodadas o tenente some, e as ordens com ele!' }, v), req()), aviso, fuga);
+    gatilhoTexto(preencher({ en: '{vilao} runs for the far exit: in ' + R + ' rounds {vilao} is gone, and the orders too!', pt: '{vilao} corre para a saída do fundo: em ' + R + ' rodadas {vilao} some, e as ordens também!' }, v), req()), aviso, fuga);
   ab.o['rodada:' + aviso.uid] = [gatilhoTexto(preencher({ en: '{vilao} is almost at the exit. Last round!', pt: '{vilao} está quase na saída. Última rodada!' }, v), tem())];
-  ab.o['rodada:' + fuga.uid] = [gatilhoTexto(L2('Too late: the lieutenant escaped with the orders.', 'Tarde demais: o tenente escapou com as ordens.'), tem()), { uid: uid(), tipo: 'end_map', resultado: 'derrota', requisitos: tem() }];
+  ab.o['rodada:' + fuga.uid] = [gatilhoTexto(preencher({ en: 'Too late: {vilao} got away with the orders.', pt: 'Tarde demais: {vilao} fugiu com as ordens.' }, v), tem()), { uid: uid(), tipo: 'end_map', resultado: 'derrota', requisitos: tem() }];
   const e = plano.chefe.alvo; e.gatilhos = (e.gatilhos || []).concat([{ uid: uid(), tipo: 'counter', contador: cont.nome, acao: 'set', n: 0, texto: '', requisitos: [] }]);
   return true;
 }
@@ -1569,7 +1596,7 @@ function aplicarPressao(pm, plano, rng, o, notas) {
     const excesso = L ? L2(' In the dark, a hero past the fatigue limit stumbles: the excess fatigue is suffered as damage.', ' No escuro, o herói que passar do limite de fadiga tropeça: o excesso de fadiga vira dano.') : L2(' A hero past the fatigue limit suffers the excess as damage.', ' O herói que passar do limite de fadiga sofre o excesso como dano.');
     const avisos = L ? [T(L.aviso)] : (R && (R.abalo || []).length ? R.abalo.map(a => RT(a, vd) + L2(' In [n] rounds, it starts to wear you down: 1 fatigue each round.', ' Em [n] rodadas, isso começa a cobrar: 1 de fadiga por rodada.')) : [L2('Time is pressing: in [n] rounds, every hero starts to suffer 1 fatigue each round.', 'O tempo aperta: em [n] rodadas, cada herói começa a sofrer 1 de fadiga por rodada.')]);
     pm.meta.pressao = { tipo, desde, pior, texto: (R ? RT(R.fadiga, vd) : L2('Time weighs on you: every hero suffers 1 fatigue.', 'O tempo pesa: cada herói sofre 1 de fadiga.')) + excesso,
-      avisos, avisoUltimo: L ? T(L.ultimo) : null, piora: L ? T(L.piora) : L2('It is getting worse: in [n] rounds, 2 fatigue each round.', 'Está piorando: em [n] rodadas, 2 de fadiga por rodada.'),
+      avisos, avisoGeral: R && (R.abalo || []).length ? L2('Time is pressing: in [n] rounds, every hero starts to suffer 1 fatigue each round.', 'O tempo aperta: em [n] rodadas, cada herói começa a sofrer 1 de fadiga por rodada.') : null, avisoUltimo: L ? T(L.ultimo) : null, piora: L ? T(L.piora) : L2('It is getting worse: in [n] rounds, 2 fatigue each round.', 'Está piorando: em [n] rodadas, 2 de fadiga por rodada.'),
       textoPior: (L ? T(L.pior) : L2('It gets worse: every hero suffers 2 fatigue.', 'Piorou: cada herói sofre 2 de fadiga.')) + excesso };
     pm.meta.intro += '\n\n' + (R ? RT(R.fadigaIntro, vd) : L2('Do not linger: from round ' + desde + ' on, every hero suffers 1 fatigue at the start of each round.', 'Não se demorem: a partir da rodada ' + desde + ', cada herói sofre 1 de fadiga no começo de cada rodada.'))
       + L2(' From round ' + pior + ', it gets worse: 2 fatigue each round. Fatigue past a hero\'s limit is suffered as damage.', ' A partir da rodada ' + pior + ', piora: 2 de fadiga por rodada. Fadiga além do limite do herói vira dano.');
@@ -1605,7 +1632,11 @@ function linhasDaFadiga(pr) {
   if (!pr || pr.tipo !== 'fadiga' || !(pr.desde > 0) || !(pr.pior > pr.desde)) return null;
   const um = []; const avisos = (pr.avisos || []).filter(Boolean);
   const comN = (t, n) => t.replace('[n] rodadas', n === 1 ? '1 rodada' : n + ' rodadas').replace('[n] rounds', n === 1 ? '1 round' : n + ' rounds').replace('[n]', n);
-  for (let r = 2; r < pr.desde; r++) { const n = pr.desde - r; const t = n === 1 && pr.avisoUltimo ? pr.avisoUltimo : avisos.length ? avisos[(r - 2) % avisos.length] : ''; if (t) um.push({ rodada: r, texto: comN(t, n) }); }
+  // (v268: the lines of the story go in order, each once, the last ones closest to the end: they grow worse, and starting
+  // over read as a repeat ("a crack shoots across the ice" again). With more rounds than lines, the first rounds say it plainly)
+  const total = pr.desde - 2 - (pr.avisoUltimo ? 1 : 0); const sobra = pr.avisoGeral ? Math.max(0, total - avisos.length) : 0;
+  for (let r = 2; r < pr.desde; r++) { const n = pr.desde - r; const k = r - 2;
+    const t = n === 1 && pr.avisoUltimo ? pr.avisoUltimo : !avisos.length ? '' : pr.avisoGeral ? (k < sobra ? pr.avisoGeral : avisos[Math.min(avisos.length - 1, k - sobra + Math.max(0, avisos.length - total))]) : avisos[k % avisos.length]; if (t) um.push({ rodada: r, texto: comN(t, n) }); }
   for (let r = pr.desde; r < pr.pior; r++) um.push({ rodada: r, texto: pr.texto + (pr.piora ? ' ' + comN(pr.piora, pr.pior - r) : '') });
   return { um, desde: pr.pior, sempre: pr.textoPior || pr.texto };
 }
@@ -2271,9 +2302,12 @@ function campeao(pm, plano, rng, si, dif) {
   const perde = tr[0]; const gp = grupoPoolDe(s); gp.gatilhos = (gp.gatilhos || []).concat([txtT('Without its pack, ' + nome + ' falters: it loses "' + perde.en.split(':')[0] + '".', 'Sem a matilha, ' + nome + ' vacila: perde "' + perde.pt.split(':')[0] + '".')],
     noApp(perde) ? [{ uid: uid(), tipo: 'enemy_condition', acao: 'bonus', alvo: 'group', grupo: 'room-' + (si + 1), enemy: m.id, ataque: -(perde.at || 0), defesa: -(perde.df || 0), requisitos: [] }] : []);
   const linha = t => L2(t.en + (noApp(t) ? ' (already in the app)' : ' (apply it at the table)'), t.pt + (noApp(t) ? ' (o app já aplica)' : ' (apliquem à mesa)'));
-  s.textoDepois = ((s.textoDepois || '') + ' ' + L2('The champion ' + nome + ' (the ' + quem + ') leads the pack here. Only the champion has: ', 'O campeão ' + nome + ' (o ' + quem + ') lidera a matilha aqui. Só o campeão tem: ') + tr.map(linha).join('; ') + '.').trim();
+  s.textoDepois = ((s.textoDepois || '') + ' ' + L2('The champion ' + nome + ' (' + comArtigo(quem, 'the') + ') leads the pack here. Only the champion has: ', 'O campeão ' + nome + ' (' + comArtigo(quem, 'o') + ') lidera a matilha aqui. Só o campeão tem: ') + tr.map(linha).join('; ') + '.').trim();
   return nome;
 }
+/* v294: a name of the game with its article: the game's own names often bring one («O Golem Caminhante»), and the text then
+   said «o O Golem»; a name with an article keeps it (in small letters), one without gets the one given */
+function comArtigo(nome, art) { const n = String(nome || ''); const m = /^(o|a|os|as|the|el|la|los|las|le|les|der|die|das|il|lo|gli)\s+/i.exec(n); return m ? n.charAt(0).toLowerCase() + n.slice(1) : (art ? art + ' ' : '') + n; }
 /* the pursuer: from a round on, a strong monster comes in at the start and follows the heroes (the game's monsters walk
    to them); it heals every round. Its room left behind (a point of no return), it is left behind too */
 /* the introduction only tells the story (the title of its box is the name of the map); what is a rule of this map (rounds,
@@ -2317,8 +2351,8 @@ function perseguidor(pm, plano, rng, dif) {
   const v = plano.vocab; const fac = plano.premissa.faccao; const desde = { facil: 5, normal: 4, dificil: 3 }[dif] || 4; const nome = v.vilao;
   const vd = { ...v, desde, alvo: v.alvo || TXT(plano.premissa.alvo) };
   if (!plano.chefeReal) plano.tipoDoVilao = tipo;
-  const recua = L2('{vilao} staggers, hurt, and falls back into the depths of {lugar}. The hunt is over; the reckoning will be at the end of the way.', '{vilao} cambaleia, ferido, e recua para o fundo de {lugar}. A caçada acabou; o acerto de contas vai ser no fim do caminho.');
-  const u = uid(); const inimigo = { enemy: tipo, pos: [casa[0], casa[1]], tier: maxT, level: casa[2] || 0, uid: uid(), gatilhos: [gatilhoTexto(preencher(recua, vd))], senao: [] };
+  const recua = L2('{vilao} staggers, hurt, and falls back into the depths of {lugar}. The hunt is over; the reckoning will be at the end of the way.', '{vilao} cambaleia, sangrando, e recua para o fundo de {lugar}. A caçada acabou; o acerto de contas vai ser no fim do caminho.');
+  const u = uid(); const inimigo = { enemy: tipo, pos: [casa[0], casa[1]], tier: maxT, level: casa[2] || 0, uid: uid(), gatilhos: [gatilhoTexto(preencher(recua, vd))], senao: [] }; nomeDoVilao(plano, inimigo, nome);
   // where it comes in: the entrance of the heroes; past a point of no return (the rooms behind gone), where the heroes landed.
   // The latest one whose room is open (a requirement each, and its "else" the one before it)
   const entradas = [{ k: 0, casa }].concat((plano.pontos || []).map(k => ({ k, casa: ((plano.chegada && plano.chegada[k]) || pousoDoPonto(pm, k) || casasParaHerois(pm, k, 4))[0] })).filter(e => e.casa && pm.salas[e.k]));
@@ -2329,7 +2363,7 @@ function perseguidor(pm, plano, rng, dif) {
     if (j) senoes['senao:' + gr] = chegada; chegada = [sp]; });
   // the scene: someone at the entrance; the villain's own words; one of the heroes answers
   const fala = (FALAS_DO_CACADOR[fac] || FALAS_DO_CACADOR.bandidos); const besta = fac === 'feras';
-  const cx = (id, speaker, title, text, next) => ({ id, type: 'normal', speaker, title, text, cast: speaker === '@hero1' ? [] : ['@hero1'], background: FUNDO_PADRAO, next, options: [] });
+  const cx = (id, speaker, title, text, next) => ({ id, type: 'normal', speaker, title, text, cast: speaker === '@hero1' || title ? [] : ['@hero1'], background: FUNDO_PADRAO, next, options: [] });   // (v268: the villain's line (its name as the title) without a hero's portrait, which read as the hero speaking)
   const cena = { uid: uid(), tipo: 'scene', inicio: 'p1', requisitos: [], caixas: [
     cx('p1', '', '', besta ? L2('Something heavy moves at the entrance, behind you.', 'Algo pesado se move na entrada, atrás de vocês.') : L2('Steps at the entrance, behind you. Someone followed you in, and is in no hurry.', 'Passos na entrada, atrás de vocês. Alguém entrou atrás de vocês, e sem nenhuma pressa.'), 'p2'),
     cx('p2', '', titulo1(nome), preencher(L2(...rng.pick(fala)), vd) + (besta ? '' : ' ' + preencher(L2(...(['reliquia', 'investigacao', 'carga', 'tenente', 'maquina', 'rei'].includes(plano.premissa.id) ? rng.pick(MOTIVO_DO_CACADOR) : MOTIVO_DO_CACADOR[1])), vd)), 'p3'),
@@ -2701,10 +2735,10 @@ function textoDaTransicao(t, plano, rng) {
    a note, a last word, a token of the villain */
 const PISTAS_DO_MONSTRO = [
   ['In its pouch, a crumpled note: "{vilao} wants it all done before nightfall. Nobody leaves."', 'Na bolsa da criatura, um bilhete amassado: «{vilao} quer tudo pronto antes do anoitecer. Ninguém sai.»'],
-  ['With its last breath it hisses: "{vilao}... is waiting for you... deeper in..."', 'No último suspiro, a criatura sibila: «{vilao}... espera vocês... mais para dentro...»'],
+  ['With its last breath it rasps: "{vilao}... is waiting for you... deeper in..."', 'No último suspiro, a criatura murmura: «{vilao}... espera vocês... mais para dentro...»'],
   ['Around its neck hangs a medallion with the mark of {vilao}. It is still warm.', 'No pescoço dela pende um medalhão com a marca de {vilao}. Ainda está morno.'],
   ['Among its things, a scrap of map: an arrow points deeper, toward {alvo}.', 'Entre as coisas dela, um pedaço de mapa: uma seta aponta mais fundo, rumo a {alvo}.'],
-  ['Its claws are stained with fresh ash. Whatever {vilao} is doing, it is happening now.', 'As garras dela estão sujas de cinza fresca. O que quer que {vilao} esteja fazendo, está acontecendo agora.'],
+  ['The creature is covered in fresh ash. Whatever {vilao} is doing, it is happening now.', 'A criatura está coberta de cinza fresca. O que quer que {vilao} esteja fazendo, está acontecendo agora.'],
   ['Before it falls it laughs: "You are too late. {vilao} already has {alvo}."', 'Antes de cair, ela ri: «Vocês chegaram tarde. {vilao} já tem {alvo}.»']];
 function temMonstro(pm, si) { const s = pm.salas[si]; if (!s) return false; if ((s.inimigos || []).length) return true;
   if (s.objetos.some(o => todosGatilhos(o).some(g => g.tipo === 'spawn'))) return true;
@@ -2733,7 +2767,7 @@ const VOZ_DO_VILAO = {
   mortos: { fala: [['The living always run. And they always end here, with me.', 'Os vivos sempre correm. E sempre acabam aqui, comigo.'], ['I have waited longer than your kingdoms have stood. I can wait for your corpses too.', 'Esperei mais do que os seus reinos existem. Posso esperar pelos seus cadáveres também.']],
     queda: [['{vilao} crumbles to dust, and the cold that filled the place begins to lift.', '{vilao} se desfaz em pó, e o frio que enchia o lugar começa a ceder.']] },
   bandidos: { fala: [['Stubborn lot. I like that: it will be worth more to bury you.', 'Gente teimosa. Gosto disso: vai valer mais enterrar vocês.'], ['You want {alvo}? Come and take it. Nobody leaves my den alive.', 'Querem {alvo}? Venham pegar. Ninguém sai vivo do meu covil.']],
-    queda: [['{vilao} drops to the floor with a curse. With their leader down, the rest of the band fights on in a rage.', '{vilao} cai ao chão com um palavrão. Com o chefe caído, o resto do bando continua lutando, com raiva.']] },
+    queda: [['{vilao} drops to the floor with a curse. With their leader down, the rest of the band fights on in a rage.', '{vilao} cai ao chão com um palavrão. Sem quem os comande, o resto do bando continua lutando, com raiva.']] },
   feras: { fala: [['(A growl so deep the walls tremble. {vilao} lowers its head, eyes fixed on you.)', '(Um rosnado tão fundo que as paredes tremem. {vilao} baixa a cabeça, os olhos cravados em vocês.)']],
     queda: [['{vilao} lets out one last howl and falls still. Silence, at last.', '{vilao} solta um último uivo e fica imóvel. Silêncio, enfim.']] },
   legiao: { fala: [['Shields up! No one passes {vilao}. No one.', 'Escudos ao alto! Ninguém passa por {vilao}. Ninguém.'], ['You fought well to get here. It changes nothing.', 'Vocês lutaram bem para chegar até aqui. Isso não muda nada.']],
@@ -2760,15 +2794,16 @@ function cenaDoChefe(pm, plano, rng, si) {
   const frases = frasesDe(plano.historiaInicial || (pm.meta.intro || '').split('\n\n')[0] || '');   /* (with no story in the first room, the intro of the map) */ const eco = (frases.find(f => vil && f.includes(vil)) || frases.find(f => v.alvo && f.includes(v.alvo)) || frases[0] || '').trim();
   const fac = VOZ_DO_VILAO[plano.premissa.faccao] || VOZ_DO_VILAO.culto; const um = l => { const x = rng.pick(l); return preencher(L2(x[0], x[1]), v); };
   const nome = vil ? vil.charAt(0).toUpperCase() + vil.slice(1) : L2('The enemy', 'O inimigo');
-  // (the climax answers the anchor: who or what told the story at the start, in its words, and the answer standing here)
+  // (the climax answers the anchor: who or what told the story at the start, in its words, and the answer standing here;
+  // v268: the question asked first, the warning alone asks none)
   const an = plano.roteiro?.abertura; const quem = an && an.nome ? comoJaVisto(an.nome) : '';
-  const resposta = vil ? L2(' Now the answer stands before you: ' + vil + '.', ' Agora a resposta está diante de vocês: ' + vil + '.') : L2(' Now you see it with your own eyes.', ' Agora vocês veem com os próprios olhos.');
+  const resposta = vil ? L2(' Who was behind it all?', ' Quem estaria por trás de tudo?') + L2(' Now the answer stands before you: ' + vil + '.', ' Agora a resposta está diante de vocês: ' + vil + '.') : L2(' Now you see it with your own eyes.', ' Agora vocês veem com os próprios olhos.');
   // (v259: templates, so the other languages have the whole sentence: the warning is a cut of a text already in the language)
   const lembra = eco && quem ? contrair(an.npc ? LF('At the start, {0} warned you: "{1}"', 'Lá no começo, {0} avisou: «{1}»', quem, eco) : LF('At the start, by {0}, the warning was clear: "{1}"', 'Lá no começo, diante de {0}, o aviso foi claro: «{1}»', quem, eco)) + resposta
     : eco ? LF('At the start, the warning was clear: "{0}" Now you see it with your own eyes.', 'Lá no começo, o aviso foi claro: «{0}» Agora vocês veem com os próprios olhos.', eco) : L2('At last, the one behind it all.', 'Enfim, quem está por trás de tudo.');
   // (the villain answers it too: it knows who talked, or what it left behind)
   const R = quem && plano.premissa.faccao !== 'feras' ? REACAO_DO_VILAO[an.familia === 'escolta' ? 'guia' : an.npc ? 'npc' : 'pista'] : null; const reacao = R ? preencher(L2(...rng.pick(R)), { quem, marca: quem }) + ' ' : '';
-  const cx = (id, speaker, title, text, next) => ({ id, type: 'normal', speaker, title, text, cast: speaker === '@hero1' ? [] : ['@hero1'], background: FUNDO_PADRAO, next, options: [] });
+  const cx = (id, speaker, title, text, next) => ({ id, type: 'normal', speaker, title, text, cast: speaker === '@hero1' || title ? [] : ['@hero1'], background: FUNDO_PADRAO, next, options: [] });   // (v268: the villain's line (its name as the title) without a hero's portrait, which read as the hero speaking)
   const cena = { uid: uid(), tipo: 'scene', primeiraVez: 'chefe', inicio: 'c1', requisitos: clone(ab.g.requisitos || []), caixas: [cx('c1', '', '', lembra, 'c2'), cx('c2', '', nome, reacao + um(fac.fala), 'c3'), cx('c3', '@hero1', '', um(RESPOSTAS_DOS_HEROIS), '')] };
   ab.o.gatilhos = (ab.o.gatilhos || []).concat([cena]);
   // its last words, when it falls

@@ -180,7 +180,7 @@ const DICAS = [
   { id: 'pecaUnica', texto: 'A room is one set of tiles: the same physical tile appears only once in it (sides A and B are the same piece). Reusing a tile in a later room takes the earlier room off the table.', feita: () => projeto.salas.length >= 3 },
   { id: 'niveis', texto: 'Tiles can stand at levels 1, 2 and 3 (the level buttons) on <b>pillars (P)</b>; the app counts the pillars your boxes have.', feita: () => projeto.salas.some(s => s.pecas.some(p => (p.level || 0) > 0)) },
   { id: 'contagem', texto: '<b>Counts</b> keep a number during the map (keys found, seals broken): triggers add to it, and a map objective can wait for the total.', feita: () => (projeto.contadores || []).length > 0 },
-  { id: 'exportar', texto: '<b>Export map</b> writes the .dmap: into the folder chosen in ⚙, or into Downloads, from where the game (with the mod) brings it by itself; in the game, “Community maps” lists it.', feita: () => jaVisto('dica:exportar') },
+  { id: 'exportar', texto: '<b>Export map</b> writes the .bmap: into the folder chosen in ⚙, or into Downloads, from where the game (with the mod) brings it by itself; in the game, “Community maps” lists it.', feita: () => jaVisto('dica:exportar') },
   { id: 'campanha', texto: '<b>Start a campaign</b> to chain maps on the world map, with scenes, choices and rewards between them.', feita: () => !!campanha },
   // (the tour of the whole editor: one hint per part, gone once the part is opened)
   { id: 'gerarSala', texto: '<b>✦ Generate room</b> builds a room for you from an archetype: click the object that will open it, pick among the candidates, place it and use it.', feita: () => jaVisto('dica:gerarSala') },
@@ -738,7 +738,7 @@ const urlDoBlob = b => { let u = _urlsBlob.get(b); if (!u) { u = URL.createObjec
 /* the map's own music: an audio file played in a loop instead of the game's music */
 function campoMusica(el, m) {
   const mu = m.musica; const blob = mu && AUDIOS[mu.arquivo];
-  el.innerHTML = `<p class="ajuda">Your own music for this map, played in a loop in place of the game’s. <b>OGG</b> (Ogg Vorbis) is the format that suits the game best; WAV and MP3 also work. The file is saved next to the map file in the CustomMaps folder (the same folder as the .dmap).</p>
+  el.innerHTML = `<p class="ajuda">Your own music for this map, played in a loop in place of the game’s. <b>OGG</b> (Ogg Vorbis) is the format that suits the game best; WAV and MP3 also work. The file is saved next to the map file in the Bigorna\\Mapas folder (the same folder as the .bmap).</p>
     <div class="linha"><label class="sm botaoArquivo">${mu ? 'Replace the music…' : 'Add music (OGG, WAV, MP3)…'}<input type="file" accept=".ogg,.oga,.wav,.mp3,audio/ogg,audio/wav,audio/mpeg" id="mp_musArq" hidden></label>
     ${mu ? `<b>${esc(mu.nome || mu.arquivo)}</b> <small class="ajuda">(${esc(mu.arquivo)}${blob ? ', ' + Math.round(blob.size / 1024) + ' KB' : ', file not in this browser: add it again'})</small><button class="sm perigo" id="mp_musTira">Remove</button>` : '<span class="ajuda">No music: the game plays its own.</span>'}</div>
     ${mu ? `<label class="chk"><input type="checkbox" id="mp_musLoop" ${mu.loop !== false ? 'checked' : ''}> Loop (starts again when it ends)</label>${blob ? `<audio controls loading="lazy" decoding="async" ${imgTardia(urlDoBlob(blob))} style="width:100%;margin-top:6px"></audio>` : ''}` : ''}`;

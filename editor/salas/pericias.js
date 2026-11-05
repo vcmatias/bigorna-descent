@@ -226,7 +226,7 @@ function jpegDaCarta(url) {
     ok({ bytes, w: i.width, h: i.height }); }; i.src = url; });
 }
 
-/* the skills for the mod: the game's changed (name, cost) and the new ones tied to a hero; never the pictures */
+/* the skills for the mod: the new ones tied to a hero (copies included); the game's stay as the game has them (v255: read-only); never the pictures */
 function periciasExportadas() {
   return (oficina().pericias || []).filter(p => p.heroi && !p.base).map(p => ({ id: idPericiaExportada(p), ...(p.base ? { game: p.base } : {}), hero: p.heroi, name: nomePericia(p), cost: p.custo || 1 }));
 }

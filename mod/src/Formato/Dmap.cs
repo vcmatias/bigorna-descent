@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -25,6 +25,10 @@ namespace Bigorna.Formato
             [JsonProperty("heroCount")] public int[] Herois;
             [JsonProperty("estimatedMinutes")] public int Minutos;
             [JsonProperty("intro")] public string Intro;
+            /// <summary>O editor que fez o mapa ("bigorna-rooms" no Bigorna).</summary>
+            [JsonProperty("editor")] public string Editor;
+            /// <summary>v268: o desfecho do mapa (o gerador o escreve), dito na vitória junto do "Vitória!".</summary>
+            [JsonProperty("outro")] public string Desfecho;
             /// <summary>Extensao Bigorna: as regras proprias do mapa (limite de rodadas, o escuro que cansa…), numa caixa so delas,
             /// "Regra especial", logo depois da introducao (que fica so com a narracao).</summary>
             [JsonProperty("rules")] public string Regras;
@@ -112,6 +116,10 @@ namespace Bigorna.Formato
             /// <summary>Vaga "balanced from enemy pool" (enemy = "@pool"): os monstros que podem sair nela e a intensidade da sala.</summary>
             [JsonProperty("pool")] public List<string> Pool;
             [JsonProperty("intensity")] public int Intensidade;
+            /// <summary>v268: quantas figuras a leva traz pelo menos (as ondas do gerador: 2), com as figuras livres e as casas que tem.</summary>
+            [JsonProperty("minFigures")] public int Minimo;
+            /// <summary>v268: um nome proprio para esta figura (o vilao de um mapa gerado): o monstro do jogo com outro nome.</summary>
+            [JsonProperty("name")] public string Nome;
             /// <summary>Tier pelo numero de herois (posicao 0 = 1 heroi ... 3 = 4 herois), como os chefes do jogo; vazio = Tier.</summary>
             [JsonProperty("tierByHeroes")] public int[] TierPorHerois;
             /// <summary>Um campeao (gerador de mapas): +ataque ou +defesa sobre o nivel, aplicados quando ele entra.</summary>
@@ -279,6 +287,10 @@ namespace Bigorna.Formato
         }
 
         [JsonProperty("format")] public string Formato;
+        /// <summary>v270: a assinatura do Bigorna ("bigorna"), no começo dos arquivos novos.</summary>
+        [JsonProperty("app")] public string App;
+        /// <summary>v270: o arquivo é do Bigorna (o nome novo, a assinatura ou a marca do editor); um de outro editor fica fora das listas.</summary>
+        [JsonIgnore] public bool DoBigorna;
         [JsonProperty("version")] public int Versao;
         [JsonProperty("meta")] public Meta Metadados = new Meta();
         [JsonProperty("board")] public Tabuleiro Board = new Tabuleiro();
@@ -352,7 +364,7 @@ namespace Bigorna.Formato
                 while (r.Read() && r.TokenType == JsonToken.PropertyName)
                 {
                     var nome = (string)r.Value;
-                    if (nome != "format" && nome != "version" && nome != "meta" && nome != "ficha" && !(campanha && ficha && nome == "nodes")) return null;
+                    if (nome != "format" && nome != "version" && nome != "app" && nome != "meta" && nome != "ficha" && !(campanha && ficha && nome == "nodes")) return null;
                     if (!r.Read()) return null;
                     j[nome] = JToken.ReadFrom(r);
                     if (nome == "ficha") ficha = true;
@@ -366,7 +378,8 @@ namespace Bigorna.Formato
         internal static JObject DaCabeca(JObject h)
         {
             var f = h["ficha"] as JObject; var j = new JObject();
-            foreach (var k in new[] { "format", "version", "meta", "nodes" }) if (h[k] != null) j[k] = h[k];
+            foreach (var k in new[] { "format", "version", "app", "meta", "nodes" }) if (h[k] != null) j[k] = h[k];
+            if (j["app"] == null) j["app"] = Arquivos.Assinatura;   // (v270: só o Bigorna grava a ficha)
             if (f?["requires"] is JArray rq && rq.Count > 0) j["requires"] = rq;
             if (f?["languages"] is JArray ls && ls.Count > 0) j["languages"] = ls;
             if (f?["translations"] is JObject ts && ts.Count > 0) j["translations"] = ts;
@@ -388,10 +401,22 @@ namespace Bigorna.Formato
             d.Linguas = linguas ?? (string.IsNullOrEmpty(d.Metadados?.Lingua) ? new List<string>() : new List<string> { Traducao.Codigo(d.Metadados.Lingua) });
             d.LinguaEmUso = lingua ?? (d.Linguas.Count > 0 ? d.Linguas[0] : null);
             if (d.Formato != "dmap") throw new Exception("não é um .dmap (format=" + d.Formato + ")");
+            d.DoBigorna = EhDoBigorna(d.App, d.Metadados?.Editor, texto, caminho);
             if (d.Versao > VersaoAtual) Log.Info("«" + Path.GetFileName(caminho) + "» foi feito num editor mais novo (formato v" + d.Versao + "; este mod lê até v" + VersaoAtual + "): o que ele não conhece fica de fora. Atualize o Bigorna.");
             d.Caminho = caminho;
             d.Normalizar();
             return d;
+        }
+
+        /// <summary>v270: é do Bigorna: o nome novo (.bmap/.bcamp), a assinatura, a marca do editor, ou (lido o texto) a cópia do
+        /// editor ou a ficha. Um arquivo sem caminho (um teste, um texto em memória) passa.</summary>
+        internal static bool EhDoBigorna(string app, string editor, string texto, string caminho)
+        {
+            if (string.IsNullOrEmpty(caminho) || Arquivos.EhDoBigornaPeloNome(caminho)) return true;
+            if (string.Equals(app, Arquivos.Assinatura, StringComparison.OrdinalIgnoreCase)) return true;
+            if (!string.IsNullOrEmpty(editor) && editor.StartsWith("bigorna", StringComparison.OrdinalIgnoreCase)) return true;
+            if (texto != null) return texto.Contains("\"bigornaSalas\"") || texto.Contains("\"ficha\"");
+            try { return Arquivos.DoBigorna(caminho); } catch { return false; }
         }
 
         /// <summary>As linguas do arquivo e a escolhida; com outra que nao a original, os textos ja trocados no JSON.</summary>
@@ -478,9 +503,14 @@ namespace Bigorna.Formato
         {
             var lista = new List<Dmap>();
             if (!Directory.Exists(pasta)) return lista;
-            foreach (var arq in Directory.GetFiles(pasta, "*.dmap").OrderBy(x => x))
+            foreach (var arq in Arquivos.Mapas(pasta))   // (v270: .bmap e .dmap)
             {
-                try { lista.Add(soFicha ? Lembrado(arq, extra, CarregarFicha, "ficha") : Lembrado(arq, extra, Carregar)); }
+                try
+                {
+                    var d = soFicha ? Lembrado(arq, extra, CarregarFicha, "ficha") : Lembrado(arq, extra, Carregar);
+                    // (v270: um .dmap de outro editor (o DescentForge, com o mesmo formato) fica fora da lista; renomeado para .bmap, entra)
+                    if (d.DoBigorna) lista.Add(d); else Log.Info("«" + Path.GetFileName(arq) + "» é de outro editor (sem a marca do Bigorna): fica fora da lista; renomeie para " + Arquivos.Mapa + " se for do Bigorna");
+                }
                 catch (Exception ex) { Log.Info("mapa ilegível " + Path.GetFileName(arq) + ": " + ex.Message); }
             }
             return lista;

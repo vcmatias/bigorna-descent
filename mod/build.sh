@@ -27,6 +27,6 @@ for f in ../app/out/*; do APP+=("-resource:$f,Bigorna.App.$(basename "$f" | tr '
 if [ -f ../tools/gerador_trad/montar.py ]; then python3 ../tools/gerador_trad/montar.py >/dev/null; fi   # (as tabelas do gerador, quando as fontes delas estão aqui)
 for f in ../editor/dist/gerador/bigorna-gerador-*.js; do [ -e "$f" ] || continue; l=$(basename "$f" .js); APP+=("-resource:$f,Bigorna.Gerador.${l#bigorna-gerador-}.js"); done
 dotnet "$CSC" -nologo -target:library -out:out/Bigorna.dll -langversion:8.0 -nullable:disable -optimize+ -debug:portable \
-  -nowarn:CS1701,CS1702,CS0618 -define:BIGORNA -resource:"$EDITOR",Bigorna.Salas.html "${APP[@]}" \
+  -nowarn:CS1701,CS1702,CS0618 -define:BIGORNA -resource:"$EDITOR",Bigorna.Salas.html -resource:../editor/dist/publico/Bigorna-Gerador.html,Bigorna.PaginaDoGerador.html "${APP[@]}" \
   $R out/VersaoDoPacote.cs $(find src -name '*.cs' | sort)
 echo "Bigorna $VERSAO -> out/Bigorna.dll ($(stat -c %s out/Bigorna.dll) bytes)"

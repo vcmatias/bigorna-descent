@@ -102,7 +102,7 @@ namespace Bigorna.Encontro
                     + (_maxUnidades > 0 ? ", até " + _maxUnidades + " por visita" : "") + (_vende ? "" : ", sem venda"));
             }
 
-            static ItemModel Modelo(string id) { if (string.IsNullOrEmpty(id)) return null; try { return UserCollectionManager.GetItem(id, false); } catch { return null; } }
+            static ItemModel Modelo(string id) { if (string.IsNullOrEmpty(id)) return null; try { return UserCollectionManager.GetItem(id, true); } catch { return null; } }   // (v288: só os da coleção do jogo)
             int Vendidos(string id) => Roteiro.Var("loja:" + _chave + ":" + id);
 
             void Por(ItemModel m, int q, string fonte)

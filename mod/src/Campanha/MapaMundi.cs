@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -29,7 +29,7 @@ namespace Bigorna.Campanha
             try
             {
                 if (Encontro.Lancador.CenaBase(null) == null) return 0;
-                foreach (var c in Dcamp.CarregarTodas(Bootstrap.PastaMapas))
+                foreach (var c in Bootstrap.Campanhas())
                     foreach (var no in c.Nos)
                         if (!string.IsNullOrEmpty(no?.Id) && !no.NaCidade && Registrar(c, no) != null) n++;
                 _todasPostas = true;
@@ -154,7 +154,7 @@ namespace Bigorna.Campanha
                 if (lista == null || lista.Count == 0) return;
                 var soltos = lista.Where(id => !Resolve(id)).ToList();
                 if (soltos.Count == 0) return;
-                var campanhas = Dcamp.CarregarTodas(Bootstrap.PastaMapas);
+                var campanhas = Bootstrap.Campanhas();
                 foreach (var id in soltos)
                 {
                     var c = campanhas.FirstOrDefault(x => x.Nos.Any(n => string.Equals(n.Id, id, StringComparison.OrdinalIgnoreCase)));

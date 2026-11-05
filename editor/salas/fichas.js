@@ -234,8 +234,8 @@ function explicacaoDaAba(aba) {
       <p>Each one may have its own default script, like the objects of the game: the next ones placed come already programmed.</p>`, `<p>Objetos seus: as casas que ocupam no tabuleiro, uma cor e um ícone. No jogo eles aparecem como ficha de interação, cartão em pé, bloco ou modelo 3D.</p>
       <p>Cada um pode ter o seu script padrão, como os objetos do jogo: os próximos colocados já chegam programados.</p>`)];
     case 'herois': return [L2('The hero workshop', 'A oficina de heróis'), dois(`<p>The six heroes of the game, changed for this ${onde}: name, portrait, art on the board and voice.</p>
-      <p>Their weapons change in the Weapons tab, and their skill cards in the Skills tab.</p>`, `<p>Os seis heróis do jogo, alterados para ${campanha ? 'esta' : 'este'} ${ondePt}: nome, retrato, arte no tabuleiro e voz.</p>
-      <p>As armas deles mudam na aba Armas, e as cartas de perícia na aba Perícias.</p>`)];
+      <p>Their weapons change in the Weapons tab, and their skill cards in each hero's sheet, in the Heroes tab.</p>`, `<p>Os seis heróis do jogo, alterados para ${campanha ? 'esta' : 'este'} ${ondePt}: nome, retrato, arte no tabuleiro e voz.</p>
+      <p>As armas deles mudam na aba Armas, e as cartas de perícia na ficha de cada herói, na aba Heróis.</p>`)];
     case 'facanhas': return [L2('The feat workshop', 'A oficina de façanhas'), dois(`<p>Feats are goals a hero reaches during the ${onde} (defeat monsters, open chests, survive a fight…) that pay a reward. Import the feats of the game or create your own: the hero, the goal, when it counts and the reward.</p>
       <p>The feat pool decides which feats are offered: for a hero with any feat in it, only those.</p>`, `<p>Façanhas são metas que um herói alcança durante a ${ondePt} (derrotar monstros, abrir baús, sobreviver a uma luta…) e que pagam uma recompensa. Importe as façanhas do jogo ou crie as suas: o herói, a meta, quando ela conta e a recompensa.</p>
       <p>O pool de façanhas decide quais são oferecidas: para um herói com alguma façanha nele, só essas.</p>`)];
@@ -346,9 +346,9 @@ function modalImportacao(titulo, entradas, aoImportar, filtros = [], opcoes = {}
 const TIPO_DO_ITEM = cls => cls === 'TableItem' ? 'TrinketModel' : cls;
 function importar() {
   const ehItem = abaF === 'itens';
-  const lista = abaF === 'monstros' ? CAT.monstros.filter(m => monstroDeEscolha(m) && m.name_en && !/^ENEMY_/.test(m.name_en)).sort((a, b) => a.name_en.localeCompare(b.name_en))
-    : abaF === 'personagens' ? CAT.personagens.filter(p => p.name_en && !/^(Variable|NPC_|Text)/.test(p.name_en)).sort((a, b) => (ehHeroiDaCaixa(b._id) - ehHeroiDaCaixa(a._id)) || a.name_en.localeCompare(b.name_en))
-    : CAT.itens.filter(i => doTipoItem({ cls: i._cls }, tipoItem || TIPOS_ITEM[0][0]) && i.name_en && i.name_en !== 'Text').sort((a, b) => a.name_en.localeCompare(b.name_en));
+  const lista = abaF === 'monstros' ? CAT.monstros.filter(m => monstroDeEscolha(m) && monstroDasCaixas(m._id) && m.name_en && !/^ENEMY_/.test(m.name_en))   /* v293: only the monsters some box brings */.sort((a, b) => a.name_en.localeCompare(b.name_en))
+    : abaF === 'personagens' ? CAT.personagens.filter(p => p.name_en && !/^(Variable|NPC_|Text)/.test(p.name_en) && !/^(Variable|NPC_|Text)/.test(p._name || '')).sort((a, b) => (ehHeroiDaCaixa(b._id) - ehHeroiDaCaixa(a._id)) || a.name_en.localeCompare(b.name_en))
+    : CAT.itens.filter(i => doTipoItem({ cls: i._cls }, tipoItem || TIPOS_ITEM[0][0]) && i.name_en && i.name_en !== 'Text' && i._name !== 'Text').sort((a, b) => a.name_en.localeCompare(b.name_en));
   const ja = new Set(bestiario()[abaF].map(x => x.base));
   const imagem = x => abaF === 'monstros' ? RETRATOS.monstros[chaveArte(x.TextureTabAssetPath)] : abaF === 'personagens' ? RETRATOS.personagens[chaveArte(x.TextureAssetPathDefault || x.TextureAssetPathActI)] || RETRATOS.personagens[x._name] : RETRATOS.itens[chaveArte(x.ArmoryAssetPath || x.TextureAssetPath)] || RETRATOS.itens[x._name];
   const tipoMonstro = x => x.IsVillain ? 'villain' : x.IsNamed ? 'unique' : 'common';
@@ -755,7 +755,8 @@ function fichaMonstro(c, m) {
   const dcp = $('#fm_defcopia'); if (dcp) dcp.onchange = e => { const d = DEFESAS_DO_JOGO()[+e.target.value]; if (!d) return; m.defesa = d.texto; m.defesaApos = d.apos; m.defesaImportada = true;
     // the automatic part goes with the copied defense when the mod can do it; the Anger of the berserker becomes "damage +1"
     let nota = '';
-    if (d.regra === 'Anger') { m.defesaModo = 'proprio'; m.defesaEfeitos = [{ tipo: 'damage', n: 1 }]; }
+    // (v294: the Anger is known by the key of the game's defense, the same in every language: the name is «Fúria» in Portuguese)
+    if (d.chave === 'ENEMY_DEFEND_BERSERKER' || d.regra === 'Anger') { m.defesaModo = 'proprio'; m.defesaEfeitos = [{ tipo: 'damage', n: 1 }]; }
     else if (d.tipos.includes(m.tipo)) m.defesaModo = 'jogo';
     else { m.defesaModo = 'nenhum'; m.defesaEfeitos = []; if (d.tipos.some(t => DEFESA_AUTOMATICA[t])) nota = ' In the game part of it is automatic; add it under “My own effect” if you want the app to apply it.'; }
     marcar(m, c); renderFichas(); aviso('Defense “' + d.regra + '” copied.' + nota); };
@@ -854,7 +855,7 @@ function fichaPersonagem(c, p) {
 // ------------------------------------------------------------ item sheet
 function fichaItem(c, i) {
   const mat = i.cls === 'CraftingMaterialModel';
-  const bases = CAT.itens.filter(z => z._cls === (i.cls === 'TableItem' ? 'TrinketModel' : i.cls) && z.name_en && z.name_en !== 'Text');
+  const bases = CAT.itens.filter(z => z._cls === (i.cls === 'TableItem' ? 'TrinketModel' : i.cls) && z.name_en && z.name_en !== 'Text' && z._name !== 'Text');
   const receitas = (oficina().receitas || []).filter(r => r.item === i.id);
   const orig = !!i.base, mudado = orig && itemMudou(i);
   c.innerHTML = `<div class="cabF"><h2>${esc(i.nome)} <span class="etq ${orig ? '' : 'custom'}">${orig ? (mudado ? 'original of the game, changed' : 'original of the game') : 'custom'}</span></h2><div class="botoes">${orig ? '<button class="sm primario" id="fi_dup">⧉ Duplicate</button>' : ''}${mudado ? '<button class="sm" id="fi_volta">↺ Back to the game’s</button>' : ''}<button class="sm perigo" id="fi_apaga">Delete</button></div></div>
@@ -1200,7 +1201,7 @@ function travarOriginal(el) {
 const semTagsDefesa = t => (t || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 function DEFESAS_DO_JOGO() {
   if (_defesas) return _defesas; const porTexto = new Map();
-  CAT.monstros.forEach(z => { const t = (z.defense_en || '').trim(); if (!monstroDeEscolha(z) || !t || !z.name_en || /^ENEMY_/.test(z.name_en)) return; const d = porTexto.get(t) || { texto: t, apos: !!z.ShowDefenseAfterAttack, nomes: [], tipos: [], regra: (t.match(/<b>([^<]+?):?<\/b>/) || [, t.replace(/<[^>]+>/g, '').slice(0, 40)])[1].replace(/:$/, '') }; if (!d.nomes.includes(z.name_en)) d.nomes.push(z.name_en); const tp = TIPOS_MONSTRO[z.Type]; if (tp && !d.tipos.includes(tp)) d.tipos.push(tp); porTexto.set(t, d); });
+  CAT.monstros.forEach(z => { const t = (z.defense_en || '').trim(); if (!monstroDeEscolha(z) || !t || !z.name_en || /^ENEMY_/.test(z.name_en)) return; const d = porTexto.get(t) || { texto: t, apos: !!z.ShowDefenseAfterAttack, nomes: [], tipos: [], chave: z.DefensiveKey || '', regra: (t.match(/<b>([^<]+?):?<\/b>/) || [, t.replace(/<[^>]+>/g, '').slice(0, 40)])[1].replace(/:$/, '') }; if (!d.nomes.includes(z.name_en)) d.nomes.push(z.name_en); const tp = TIPOS_MONSTRO[z.Type]; if (tp && !d.tipos.includes(tp)) d.tipos.push(tp); porTexto.set(t, d); });
   _defesas = [...porTexto.values()].map(d => ({ ...d, nomes: d.nomes.slice(0, 3).join(', ') + (d.nomes.length > 3 ? '…' : '') })).sort((a, b) => a.regra.localeCompare(b.regra)); return _defesas;
 }
 /* picture in place of the animated figure: new pictures start at 60% of the frame, 15% higher and 30% to the side
@@ -1308,8 +1309,13 @@ function vagasDe(texto, padrao) {
   ns.forEach(n => {
     const re = s => new RegExp(s.replace(/N/g, '\\{' + n + '\\}'), 'i');
     let tipo = 'hero';
-    if (re("\\bthe N").test(t)) tipo = 'monster';
-    else if (re("N\\s+(spaces?|damage|health|cards?|times)\\b").test(t) || re("(tests? \\w+|suffers?|recovers?|terrif\\w+|scars?|places?)\\s+N\\b").test(t) || re("^\\s*N\\s*$").test(t)) tipo = 'number';
+    // (v294: the texts of the game come in its language. In English the monster is "the N"; in the other languages its name
+    //  already brings the article («O Berserker»), so {0}, the one who acts in the text of its own activation, is the monster;
+    //  the numbers are known by the words around them, in English and in Portuguese)
+    const ingles = !/^(pt|es|fr|de|it|pl|hu|cs|ru|ko|zh)/i.test((typeof JOGO !== 'undefined' && JOGO.lang) || 'en');
+    if (ingles ? re("\\bthe N").test(t) : (n === 0 || re("\\b(o|a|os|as|el|la|le|les|il|lo|der|die|das|den|dem)\\s+N").test(t))) tipo = 'monster';
+    if (re("N\\s+(spaces?|damage|health|cards?|times)\\b").test(t) || re("(tests? \\w+|suffers?|recovers?|terrif\\w+|scars?|places?)\\s+N\\b").test(t) || re("^\\s*N\\s*$").test(t)
+      || re("N\\s*(espaços?|espaço\\(s\\)|dano|danos|vida|cartas?|vezes|casas?)\\b").test(t) || re("(testa \\w+|sofre|recupera|aterroriza|marca|vira)\\s*N").test(t)) tipo = 'number';
     r[n] = tipo;
   });
   for (let i = 0; i < r.length; i++) if (!r[i]) r[i] = 'name';

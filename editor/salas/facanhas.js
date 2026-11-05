@@ -171,7 +171,7 @@ function painelDeProezas(c, hid) {
   // (a feat of the game in the pool, not brought in: its text; a copy to change it)
   const cj = facanhaDoJogo(fichaSel); if (!cj) return;
   el.innerHTML = `<div class="cabF"><h2 data-sem-traducao>${esc(nomeDaFacanhaId(fichaSel))} <span class="etq">${esc(tr('the game’s'))}</span></h2><div class="botoes"><button class="sm primario" id="ff_trazer">⧉ ${esc(tr('Duplicate'))}</button></div></div><p>${esc(semTagsFacanha(partesDoTexto(cj.desc_en).corpo))}</p>`;
-  $('#ff_trazer').onclick = () => { const id = fichaSel; oficina().poolFacanhas = poolDasFacanhas().filter(x => x !== id); const d = facanhaDoCatalogo(cj); d.id = 'B_' + uid(); d.base = null; d.custom = true; d.heroi = hid; d.textoAuto = false; delete d.premiosJogo; oficina().facanhas.push(d); poolDasFacanhas().push(d.id); abrirProezas(hid, d.id); };
+  $('#ff_trazer').onclick = () => { const id = fichaSel; oficina().poolFacanhas = poolDasFacanhas().filter(x => x !== id); const d = facanhaDoCatalogo(cj); d.id = 'B_' + uid(); d.base = null; d.custom = true; d.heroi = hid; d.textoAuto = false; if (!d.premios) d.premios = [...(d.premiosJogo || [])]; delete d.premiosJogo; oficina().facanhas.push(d);   /* (v294: the copy keeps the game's reward, as the other copies do) */ poolDasFacanhas().push(d.id); abrirProezas(hid, d.id); };
 }
 
 function renderFacanhas() {

@@ -107,9 +107,32 @@ def conferir_sintaxe():
     """node --check em cada parte (quando o node existe): um erro de sintaxe deixaria a pagina inteira sem editor."""
     import shutil, subprocess
     if not shutil.which("node"): return
-    for _, arq in PARTES + (("CARREGADOR", "carregador.js"),):
+    for _, arq in PARTES + (("CARREGADOR", "carregador.js"), ("CARREGADOR_DO_GERADOR", "carregador_gerador.js"), ("PONTE", "ponte.js")):
         r = subprocess.run(["node", "--check", os.path.join(AQUI, arq)], capture_output=True, text=True)
         if r.returncode: sys.exit("erro de sintaxe em " + arq + ":\n" + r.stderr[:800])
+
+
+# v274: a página só do gerador do mapa oneshot (Bigorna-Gerador.html), sem a tela do editor: as partes que o gerador usa
+FORA_DO_GERADOR = {"DESENHO", "TEXTURAS", "PAPELAO", "TRES", "INTERFACE", "FORJA_FUNDO", "ACERVO", "TUTORIAL", "OFICINA_HISTORIAS"}
+PARTES_DO_GERADOR = tuple(p for p in PARTES if p[0] not in FORA_DO_GERADOR)
+
+
+def montar_gerador(saida, fontes):
+    html = open(os.path.join(AQUI, "gerador.html"), encoding="utf-8").read()
+    html = html.replace("<!--@@FONTES@@-->", fontes, 1)
+    codigo = [open(os.path.join(AQUI, "gerador_stubs.js"), encoding="utf-8").read().rstrip("\n")]
+    for marca, arq in PARTES_DO_GERADOR:
+        c = open(os.path.join(AQUI, arq), encoding="utf-8").read().rstrip("\n")
+        if "</script" in c.lower(): sys.exit("«</script» em " + arq)
+        codigo.append(c)
+    try: versao = open(os.path.join(AQUI, "..", "..", "mod", "VERSAO"), encoding="utf-8").read().strip()
+    except OSError: versao = ""
+    codigo.append(open(os.path.join(AQUI, "ponte.js"), encoding="utf-8").read().rstrip("\n"))   # (v278: a ponte do navegador, no Linux)
+    html = html.replace("/*@@PARTES_DO_GERADOR@@*/", "\n".join(codigo).replace("@@VERSAO_BIGORNA@@", versao), 1)
+    html = html.replace("/*@@CARREGADOR_DO_GERADOR@@*/", open(os.path.join(AQUI, "carregador_gerador.js"), encoding="utf-8").read().rstrip("\n"), 1)
+    os.makedirs(os.path.dirname(os.path.abspath(saida)), exist_ok=True)
+    with open(saida, "w", encoding="utf-8", newline="\n") as f: f.write(html)
+    print("montado:", saida, "(" + str(os.path.getsize(saida)) + " bytes)")
 
 
 def montar(saida, fontes):
@@ -134,6 +157,7 @@ def montar(saida, fontes):
     print("montado:", saida, "(" + str(os.path.getsize(saida)) + " bytes)")
 
 
+FONTES_GERADOR = '<script src="bigorna-idioma.js"></script>'
 FONTES_PUBLICAS = '<script src="bigorna-idioma.js"></script>\n<script src="bigorna-game-data.js"></script>\n<script src="bigorna-worldmap.js"></script>'
 
 
@@ -141,10 +165,12 @@ def main():
     args = sys.argv[1:]
     if "--publico" in args:
         montar(os.path.join(DIST, "publico", "Bigorna-Salas.html"), FONTES_PUBLICAS)
+        montar_gerador(os.path.join(DIST, "publico", "Bigorna-Gerador.html"), FONTES_GERADOR)
         return
     if "--teste" in args:
         pasta = args[args.index("--teste") + 1]
         montar(os.path.join(pasta, "Bigorna-Salas.html"), FONTES_PUBLICAS)
+        montar_gerador(os.path.join(pasta, "Bigorna-Gerador.html"), FONTES_GERADOR)
         jogo, mapa, origem = dados_de_trabalho()
         with open(os.path.join(pasta, "bigorna-game-data.js"), "w", encoding="utf-8") as f: f.write("// teste\n// teste\n" + js("BIGORNA_JOGO", jogo) + "\n")
         if mapa:
@@ -155,6 +181,9 @@ def main():
     retratos_em_webp(jogo)
     fontes = "<script>\nwindow.BIGORNA_EMBUTIDO = true;\n" + js("BIGORNA_JOGO", jogo) + "\n" + js("BIGORNA_MAPA", mapa) + "\n</script>"
     montar(sys.argv[1] if len(args) == 1 and not args[0].startswith("--") else os.path.join(DIST, "Bigorna-Salas.html"), fontes)
+    if not (len(args) == 1 and not args[0].startswith("--")):
+        sem_retratos = dict(jogo, retratos={})
+        montar_gerador(os.path.join(DIST, "Bigorna-Gerador.html"), "<script>\n" + js("BIGORNA_JOGO", sem_retratos) + "\n</script>")
     print("dados embutidos de", origem)
 
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -116,7 +116,7 @@ namespace Bigorna.Dados
                 if (_indice == null || (DateTime.UtcNow - _indiceQuando).TotalSeconds > 10)
                 {
                     _indice = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase); _indiceQuando = DateTime.UtcNow;
-                    foreach (var raiz in new[] { "CustomMaps", "Pacotes" })
+                    foreach (var raiz in new[] { Path.Combine("Bigorna", "Mapas"), "CustomMaps", "Pacotes" })   // (v270: a pasta nova dos mapas primeiro)
                     {
                         var d = Path.Combine(Dados, raiz); if (!Directory.Exists(d)) continue;
                         try { foreach (var p in Directory.GetDirectories(d, "imagens", SearchOption.AllDirectories)) foreach (var a in Directory.GetFiles(p)) { var n = Path.GetFileName(a); if (Nome.IsMatch(n) && !_indice.ContainsKey(n)) _indice[n] = a; } }

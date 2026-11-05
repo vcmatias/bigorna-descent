@@ -54,13 +54,13 @@ namespace Bigorna.Menu
             if (Input.GetKeyDown(KeyCode.W)) { Roteiro.Completar(true); Avisar("mapa vencido", "map won"); }
         }
 
-        static bool Ocupado() => Jogo.Salvando || Inimigos.Gerando > 0 || Dialogos.Ocupado || Dialogos.NaFila > 0;
+        public static bool Ocupado() => Jogo.Salvando || Inimigos.Gerando > 0 || Dialogos.Ocupado || Dialogos.NaFila > 0;
 
         /// <summary>Mostra o aviso no painel, na lingua do mod; o registro fica em portugues.</summary>
-        static void Avisar(string pt, string en) { _ultimo = T(pt, en); Log.Info("[teste] " + pt); }
+        static void Avisar(string pt, string en) { _ultimo = T(pt, en); Log.Info("[teste] " + pt); try { CanalDeTeste.Anotar("teste", pt); } catch { } }
 
         /// <summary>As salas ainda fechadas, em ordem (sala 2, 3…), com o gatilho que as abre.</summary>
-        static List<(string grupo, Dmap.Gatilho g)> Fechadas()
+        public static List<(string grupo, Dmap.Gatilho g)> Fechadas()
         {
             var r = new List<(string, Dmap.Gatilho)>();
             var gatilhos = Roteiro.Mapa?.Gatilhos ?? new List<Dmap.Gatilho>();
@@ -73,7 +73,7 @@ namespace Bigorna.Menu
         }
         static int Numero(string g) { var d = new string((g ?? "").Where(char.IsDigit).ToArray()); return int.TryParse(d, out var n) ? n : 9999; }
 
-        static void Abrir(string grupo, Dmap.Gatilho g)
+        public static void Abrir(string grupo, Dmap.Gatilho g)
         {
             try
             {
@@ -84,12 +84,31 @@ namespace Bigorna.Menu
         }
         public static void AbrirProxima() { var f = Fechadas(); if (f.Count == 0) { Avisar("todas as salas estão abertas", "all rooms are open"); return; } Abrir(f[0].grupo, f[0].g); }
 
-        public static void DerrotarTodos()
+        /// <summary>v277: os monstros caem um por vez, cada um pelas mãos de um herói (em rodízio, a partir do primeiro), e o
+        /// próximo espera a árvore de derrota do anterior terminar (várias de uma vez deixavam monstros de pé).</summary>
+        static int _proximoHeroi;
+        public static bool Derrotando { get; private set; }
+        public static void DerrotarTodos(int heroi = -1)
         {
-            int n = 0;
-            if (Ocupado()) { Avisar("espere: o jogo está ocupado (gravando ou pondo peças e monstros)", "wait: the game is busy (saving or placing tiles and monsters)"); return; }
-            try { foreach (var e in Jogo.Inimigos.ToList()) { if (e == null || e.Health <= 0) continue; Acoes.Derrotar(e); n++; } } catch (Exception ex) { Log.Erro("derrotando no modo de teste", ex); }
-            Avisar(n + " monstro(s) derrotado(s)", "enemies defeated: " + n);
+            if (Ocupado() || Derrotando) { Avisar("espere: o jogo está ocupado (gravando ou pondo peças e monstros)", "wait: the game is busy (saving or placing tiles and monsters)"); return; }
+            Nucleo.Instancia.StartCoroutine(DerrotarUmPorVez(heroi));
+        }
+        static System.Collections.IEnumerator DerrotarUmPorVez(int heroi)
+        {
+            Derrotando = true; int n = 0; var nomes = new List<string>();
+            var fila = Jogo.Inimigos.Where(e => e != null && e.Health > 0).ToList();
+            foreach (var e in fila)
+            {
+                float ate = Time.unscaledTime + 60f;
+                while (Time.unscaledTime < ate && (Ocupado() || Jogo.Persistente?.ProcessStack?.CurrentProcess != null)) yield return null;
+                if (e.Health <= 0 || !Jogo.Inimigos.Contains(e)) continue;
+                string quem = null;
+                try { quem = Acoes.DerrotarPorHeroi(e, heroi >= 0 ? heroi : _proximoHeroi++); } catch (Exception ex) { Log.Erro("derrotando no modo de teste", ex); }
+                if (quem != null) { n++; nomes.Add(Inimigos.NomeDoInimigo(e) + " (" + quem + ")"); }
+                yield return null;
+            }
+            Derrotando = false;
+            Avisar(n + " monstro(s) derrotado(s): " + string.Join(", ", nomes), "enemies defeated: " + n + ": " + string.Join(", ", nomes));
         }
 
         static IEnumerable<Objetos.NaMesa> Usaveis() => Objetos.Postos.Where(p => p != null && p.Visivel && !p.Usado && p.Dados != null && !Objetos.EhEscadaDeMao(p.Dados.Tipo)).Reverse();

@@ -42,11 +42,18 @@ namespace Bigorna.Menu
         /// <summary>v266: um mapa oneshot terminado com a ultima copia dele: com o menu do jogo de pe (e sem a escolha do destino do
         /// grupo na tela), a pergunta se ele vira mapa novo.</summary>
         static float _menuDesde = -1f;
+        static bool _grupoTentado; static float _grupoPedidoEm = -100f;
         static void PerguntarFim()
         {
             bool menu = _sair != null && _sair.gameObject.activeInHierarchy && _sair.interactable;
             if (!menu) { _menuDesde = -1f; return; }
             if (_menuDesde < 0f) _menuDesde = Time.unscaledTime;
+            // (v287: o destino do grupo de uma partida gravada, no quadro do jogo; se não der, o mod desenha a pergunta como antes.
+            //  Fechado sem resposta (a seta de voltar), a pergunta volta)
+            if (Encontro.GrupoDoSave.Pendente && Encontro.GrupoDoSave.NoQuadroDoJogo && !TelaDeMapas.Aberta && Time.unscaledTime - _grupoPedidoEm > 3f) { Encontro.GrupoDoSave.NoQuadroDoJogo = false; _grupoTentado = false; _menuDesde = Time.unscaledTime; }
+            if (Encontro.GrupoDoSave.Pendente && !Encontro.GrupoDoSave.NoQuadroDoJogo && !TelaDeMapas.Aberta && !PainelMapas.Aberto && Time.unscaledTime - _menuDesde >= 1.5f && !_grupoTentado)
+            { _grupoTentado = true; if (TelaDeMapas.PerguntarGrupo()) { Encontro.GrupoDoSave.NoQuadroDoJogo = true; _grupoPedidoEm = Time.unscaledTime; } return; }
+            if (!Encontro.GrupoDoSave.Pendente) _grupoTentado = false;
             if (Oneshot.FimPendente == null || Encontro.GrupoDoSave.Pendente || TelaDeMapas.Aberta || PainelMapas.Aberto || Time.unscaledTime - _menuDesde < 1.5f) return;
             if (!TelaDeMapas.PerguntarFim()) Oneshot.FimPendente = null;
         }

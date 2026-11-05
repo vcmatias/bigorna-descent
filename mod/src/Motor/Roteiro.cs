@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Bigorna.Encontro;
@@ -586,14 +586,16 @@ namespace Bigorna.Motor
                 if (!Anunciado(_opcionais[i])) continue;
                 if (sb.Length > 0) sb.Append('\n');
                 var t = TextoDe(_opcionais[i]);
-                sb.Append(_opcionaisFeitos.Contains(i) ? "✓ <s>" + t + "</s>" : "· " + t);
+                sb.Append(_opcionaisFeitos.Contains(i) ? "· <s>" + t + "</s> " + T("(cumprido)", "(done)") : "· " + t);   // (v268: sem o ✓, que a fonte do jogo não tem)
             }
             return sb.ToString();
         }
 
+        static string _objetivoAnotado;
         public static void DefinirTextoObjetivo(string texto, bool final)
         {
             if (string.IsNullOrEmpty(texto)) return;
+            if (texto != _objetivoAnotado) { _objetivoAnotado = texto; try { Menu.CanalDeTeste.Anotar("objetivo", texto); } catch { } }
             try
             {
                 var partida = Jogo.Partida;
@@ -652,7 +654,8 @@ namespace Bigorna.Motor
             var t = TextoDe(_opcionais[i]);
             Log.Info("objetivo opcional cumprido: " + t);
             MostrarObjetivo();
-            Dialogos.Mensagem(T("Objetivo opcional cumprido: ", "Optional objective completed: ") + t, null, T("Objetivo", "Objective"));
+            // (v268: a missão de um contador, como a da porta que só abre depois das ondas, é um passo do mapa: sem o "opcional")
+            Dialogos.Mensagem((string.IsNullOrEmpty(_opcionais[i].Missao) ? T("Objetivo opcional cumprido: ", "Optional objective completed: ") : T("Objetivo cumprido: ", "Objective completed: ")) + t, null, T("Objetivo", "Objective"));
             Mesa.Atualizar();
         }
 
@@ -789,12 +792,19 @@ namespace Bigorna.Motor
                 if (fim != null && fim.isRunning) { Log.Info("  o jogo já está fechando; não chamo por cima"); return; }
                 // (na cena emprestada as chaves do quadro de fim faltam e apareciam cruas, "END_ENCOUNTER": antes de fechar, elas
                 // ganham o texto do resultado, e o proprio jogo o mostra)
-                var palavra = vitoria ? Idioma.T("Vitória! O mapa está concluído.", "Victory! The map is complete.") : Idioma.T("Derrota. Os heróis recuam, feridos, e o mapa se perde.", "Defeat. The heroes fall back, wounded, and the map is lost.");
+                var palavra = vitoria ? PalavraDaVitoria() : Idioma.T("Derrota. Os heróis recuam, feridos, e o mapa se perde.", "Defeat. The heroes fall back, wounded, and the map is lost.");
                 foreach (var chave in new[] { "END_ENCOUNTER", "END_OF_QUEST" }) if (_termosDoFim.Contains(chave) || Jogo.Texto(chave, chave) == chave) { Jogo.Termo(chave, palavra); _termosDoFim.Add(chave); }
                 Jogo.Controle.EndQuest(vitoria);
                 Log.Info("  EndQuest(" + vitoria + ") chamado");
             }
             catch (Exception ex) { Log.Erro("não consegui fechar o encontro", ex); }
+        }
+
+        /// <summary>v268: o texto do fim na vitória: o desfecho do mapa, quando ele tem um ("Vitória! O lacre se rompe..."), senão o de sempre.</summary>
+        public static string PalavraDaVitoria()
+        {
+            var d = Mapa?.Metadados?.Desfecho;
+            return string.IsNullOrWhiteSpace(d) ? Idioma.T("Vitória! O mapa está concluído.", "Victory! The map is complete.") : Idioma.T("Vitória!", "Victory!") + " " + d.Trim();
         }
 
         public static void Retirado(string guid) { if (!string.IsNullOrEmpty(guid)) _retirados.Add(guid); }

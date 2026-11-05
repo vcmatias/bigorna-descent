@@ -17,13 +17,21 @@ function limparArmas() {
   b.armas.forEach(a => { Object.keys(a.pecas || {}).forEach(p => { if (!Object.keys(a.pecas[p]).length) delete a.pecas[p]; }); if (a.pecas && !Object.keys(a.pecas).length) delete a.pecas; });
   b.armas = b.armas.filter(armaMudou);
 }
-const nomeDaArma = w => { const a = armaEditada(w._id); return a?.nova ? (a.nova.nome || (a.runa ? 'New rune' : 'New weapon')) : (a?.nome || w.name_en); };
+const nomeDaArma = w => { const a = armaEditada(w._id); return a?.nova ? (a.nova.nome || (a.runa ? 'New rune' : 'New weapon')) : (a?.nome || nomeDoJogo(w)); };
 /* runes: weapons of no hero (class Rune); the party gets one with its rune (part A) and any hero may take it */
-/* the game calls five of them just "Rune": the editor shows the name of their rune (part A) instead */
-let runasNomeadas = false;
-const RUNAS_JOGO = () => { const r = CAT.itens.filter(i => i._cls === 'WeaponModel' && i.Class === 12);
-  if (!runasNomeadas) { runasNomeadas = true; r.forEach(i => { if (i.name_en === 'Rune') i.name_en = 'Rune: ' + (semGlifo(itemDoJogo((i.StartingWeaponParts || [])[0]?.id)?.name_en) || i._id); }); }
-  return r.sort((a, b) => (a.name_en || '').localeCompare(b.name_en || '')); };
+/* the game calls five of them just "Rune" ("Runa" in Portuguese, and so on in each language of the game): the editor shows
+   the name of their rune (part A) after it. v290: the generic name is the one more than one rune shares, in any language.
+   v291: only on the screen (nomeDoJogo): the catalogue of the game stays as the game wrote it (official content is read-only) */
+let _nomesDasRunas = null;
+const nomeDoJogo = w => {
+  if (!w) return '';
+  if (w._cls !== 'WeaponModel' || w.Class !== 12) return w.name_en;
+  if (!_nomesDasRunas) { _nomesDasRunas = {}; const r = CAT.itens.filter(i => i._cls === 'WeaponModel' && i.Class === 12); const vezes = {};
+    r.forEach(i => { vezes[i.name_en] = (vezes[i.name_en] || 0) + 1; });
+    r.forEach(i => { _nomesDasRunas[i._id] = i.name_en && (vezes[i.name_en] > 1 || i.name_en === 'Rune') ? i.name_en + ': ' + (semGlifo(itemDoJogo((i.StartingWeaponParts || [])[0]?.id)?.name_en) || i._id) : i.name_en; }); }
+  return _nomesDasRunas[w._id] ?? w.name_en;
+};
+const RUNAS_JOGO = () => CAT.itens.filter(i => i._cls === 'WeaponModel' && i.Class === 12).sort((a, b) => (nomeDoJogo(a) || '').localeCompare(nomeDoJogo(b) || ''));
 const RUNAS_PROPRIAS = () => oficina().armas.filter(a => a.runa);
 /* a weapon by id: the game's, or a rune of the workshop (drawn over the game rune it is made from) */
 function armaPorId(wid) { const a = armaEditada(wid); if (a && a.runa) { const b = itemDoJogo(a.base) || RUNAS_JOGO()[0]; return { ...b, _id: a.id, name_en: (a.nova && a.nova.nome) || 'New rune', _runaPropria: true }; } return itemDoJogo(wid); }
@@ -183,7 +191,7 @@ function fichaArma(c, x) {
   const quem = x.runa ? 'A rune: any hero may take it, in the hero choice before a quest or in the armory, once the party has its rune (part A).' : `Weapon ${x.i + 1} of ${esc(nomeDoHeroi(x.heroi))} (${NOME_CLASSE[k]}).`;
   const nomeCampo = `<div class="duas">${propria || nova ? `<label class="campo">Name <input data-wnome="${w._id}" value="${esc(nova ? nova.nome || '' : a.nome || '')}" placeholder="${esc(nova ? (propria ? 'Name of the new rune' : 'Name of the new weapon') : w.name_en)}"></label>` : `<p class="ajuda">${esc(tr('A weapon of the game: its parts stay as in the game. Duplicate a part (✎ beside its name) to make one of your own from it, and put it together here.'))}</p>`}
     <label class="campo">${esc(tr('Category'))} <span class="linha"><select data-wcat>${opcoesCategoria(categoriaDaArma(w._id))}</select><button class="sm" data-novacat title="${esc(tr('New category'))}">+</button></span></label></div><p class="ajuda">${quem}</p>` +
-    (propria ? `<label class="campo">Made from <select data-rbase>${RUNAS_JOGO().map(r => `<option value="${r._id}" ${a.base === r._id ? 'selected' : ''}>${esc(r.name_en)}${r._id === 'WEAPON_DRAGONSBANE' ? ' (Dragonsbane)' : ''}</option>`).join('')}</select></label><p class="ajuda">The game rune it copies: frame, figure and sounds in the app, and the pictures of the parts you leave as they are.</p>
+    (propria ? `<label class="campo">Made from <select data-rbase>${RUNAS_JOGO().map(r => `<option value="${r._id}" ${a.base === r._id ? 'selected' : ''}>${esc(nomeDoJogo(r))}${r._id === 'WEAPON_DRAGONSBANE' ? ' (Dragonsbane)' : ''}</option>`).join('')}</select></label><p class="ajuda">The game rune it copies: frame, figure and sounds in the app, and the pictures of the parts you leave as they are.</p>
       <label class="chk"><input type="checkbox" data-rinicio ${a.inicio ? 'checked' : ''}> The party has it from the start of the ${campanha ? 'campaign’s maps' : 'map'} (the heroes pick it in the hero choice)</label>` : '')
     + (nova ? `<label class="campo">Range <select data-nk="alcance">${ALCANCES.map(r => `<option ${(nova.alcance || ALCANCES[w.RangeApproximation] || 'Melee') === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label>` : '');
   // (a new weapon in the place of a game one: only in projects made before; the parts of the workshop do it now)
@@ -196,7 +204,7 @@ function fichaArma(c, x) {
   const apaga = $('#fa_apaga'); if (apaga) apaga.onclick = () => { if (!confirm('Delete the rune “' + nomeDaArma(w) + '”?')) return; oficina().armas = oficina().armas.filter(z => z.id !== w._id); esquecerFicha('itens', 'RUNA:' + w._id); armaSel = null; forja = null; renderArmas(); };
   const rb = c.querySelector('[data-rbase]'); if (rb) rb.onchange = () => { a.base = rb.value; forja = null; renderArmas(); };
   const ri = c.querySelector('[data-rinicio]'); if (ri) ri.onchange = () => { a.inicio = ri.checked; renderArmas(); };
-  const volta = $('#fa_volta'); if (volta) volta.onclick = () => { if (!confirm('Undo every change to the ' + w.name_en + '?')) return; oficina().armas = oficina().armas.filter(z => z.id !== w._id); forja = null; renderArmas(); };
+  const volta = $('#fa_volta'); if (volta) volta.onclick = () => { if (!confirm('Undo every change to the ' + nomeDoJogo(w) + '?')) return; oficina().armas = oficina().armas.filter(z => z.id !== w._id); forja = null; renderArmas(); };
   const wc = c.querySelector('[data-wcat]'); if (wc) wc.onchange = () => { if (wc.value) oficina().armasCat[w._id] = wc.value; else delete oficina().armasCat[w._id]; renderArmas(); };
   const nc = c.querySelector('[data-novacat]'); if (nc) nc.onclick = () => { const cat = novaCategoria(null); if (cat) { oficina().armasCat[w._id] = cat.id; renderArmas(); } };
   ligarArmas(c, w);
@@ -304,7 +312,7 @@ function habilidadesParaCopiar(s) {
 function formArmaNova(w, n, soSlot, semAlcance) {
   n.pecas = n.pecas || {};
   return (semAlcance ? '' : `<label class="campo">Range <select data-nk="alcance">${ALCANCES.map(r => `<option ${(n.alcance || ALCANCES[w.RangeApproximation] || 'Melee') === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
-    <p class="ajuda">${w._runaPropria ? 'A rune of its own, made from the ' + esc(itemDoJogo(armaEditada(w._id)?.base)?.name_en || 'game rune') + ' (same frame, figure and sounds). The rune (part A) is what the party receives; with it any hero may take the weapon.' : 'It takes the place of the ' + esc(w.name_en) + ' while the ' + (campanha ? 'campaign' : 'map') + ' is played (same figure and sounds), in the hands of whoever has it. Upgrades bought in the campaign do not apply to it.'}</p>`) +
+    <p class="ajuda">${w._runaPropria ? 'A rune of its own, made from the ' + esc(nomeDoJogo(itemDoJogo(armaEditada(w._id)?.base)) || 'game rune') + ' (same frame, figure and sounds). The rune (part A) is what the party receives; with it any hero may take the weapon.' : 'It takes the place of the ' + esc(w.name_en) + ' while the ' + (campanha ? 'campaign' : 'map') + ' is played (same figure and sounds), in the hands of whoever has it. Upgrades bought in the campaign do not apply to it.'}</p>`) +
     SLOTS_ARMA.map(([sl, expl], s) => { if (soSlot !== null && soSlot !== undefined && s !== soSlot) return ''; const q = n.pecas[sl] || {}; const hab = q.copia ? itemDoJogo(q.copia) : null;
       return `<div class="ativ novaPeca"><div class="sub pequena">${sl} · ${expl}</div>
         <label class="campo">Name <input data-np="${sl}" data-nq="nome" value="${esc(q.nome || '')}" placeholder="${['Head', 'Haft', 'Grip'][s]}"></label>

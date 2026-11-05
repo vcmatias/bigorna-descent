@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -157,7 +157,7 @@ namespace Bigorna.Acervo
 
     public static class Instalador
     {
-        public static readonly string[] Tipos = { ".dmap", ".dcamp", ".bigorna", ".json", ".ogg", ".mp3", ".wav", ".mp4", ".webm", ".png", ".jpg", ".jpeg", ".webp", ".glb", ".gltf", ".obj", ".bin", ".mtl" };
+        public static readonly string[] Tipos = { ".dmap", ".dcamp", ".bmap", ".bcamp", ".bigorna", ".json", ".ogg", ".mp3", ".wav", ".mp4", ".webm", ".png", ".jpg", ".jpeg", ".webp", ".glb", ".gltf", ".obj", ".bin", ".mtl" };
         static readonly Regex NomeSeguro = new Regex(@"^[^/\\:*?""<>|\x00-\x1f]{1,120}$");
         static readonly Regex ImagemDaObra = new Regex(@"^imagens/[0-9a-f]{32}\.(png|jpg|webp|gif)$");
 
@@ -183,8 +183,8 @@ namespace Bigorna.Acervo
                 if (!Tipos.Contains(Path.GetExtension(e.Nome).ToLowerInvariant())) throw new Exception(LinguaDosErros.T("tipo de arquivo não aceito: ", "file type not accepted: ") + e.Nome);
                 if (!vistos.Add(e.Nome)) throw new Exception(LinguaDosErros.T("arquivo repetido: ", "repeated file: ") + e.Nome);
             }
-            if (f.Tipo == "mapa" && !es.Any(e => e.Nome.EndsWith(".dmap", StringComparison.OrdinalIgnoreCase))) throw new Exception(LinguaDosErros.T("o mapa não traz o .dmap", "the map has no .dmap"));
-            if (f.Tipo == "campanha" && !es.Any(e => e.Nome.EndsWith(".dcamp", StringComparison.OrdinalIgnoreCase))) throw new Exception(LinguaDosErros.T("a campanha não traz o .dcamp", "the campaign has no .dcamp"));
+            if (f.Tipo == "mapa" && !es.Any(e => e.Nome.EndsWith(".dmap", StringComparison.OrdinalIgnoreCase) || e.Nome.EndsWith(".bmap", StringComparison.OrdinalIgnoreCase))) throw new Exception(LinguaDosErros.T("o mapa não traz o .dmap", "the map has no .dmap"));
+            if (f.Tipo == "campanha" && !es.Any(e => e.Nome.EndsWith(".dcamp", StringComparison.OrdinalIgnoreCase) || e.Nome.EndsWith(".bcamp", StringComparison.OrdinalIgnoreCase))) throw new Exception(LinguaDosErros.T("a campanha não traz o .dcamp", "the campaign has no .dcamp"));
             if (f.Tipo == "pacote" && !es.Any(e => e.Nome == "pacote.json")) throw new Exception(LinguaDosErros.T("o pacote não traz o pacote.json", "the package has no pacote.json"));
             return es;
         }

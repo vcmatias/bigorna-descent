@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using FFG.Core;
@@ -205,14 +205,33 @@ namespace Bigorna.Encontro
             // o proximo sai no batimento seguinte, quando o jogo ja soltou o quadro
         }
 
+        /// <summary>v268 (canal de teste): o quadro do mod aberto agora, ou null.</summary>
+        public static Newtonsoft.Json.Linq.JObject Descrever()
+        {
+            var p = _atual; if (p == null) return null;
+            return new Newtonsoft.Json.Linq.JObject { ["tipo"] = Tipo(p), ["titulo"] = p.Titulo, ["texto"] = p.Texto, ["opcoes"] = p.Opcoes == null ? null : new Newtonsoft.Json.Linq.JArray(p.Opcoes), ["personagem"] = p.Personagem };
+        }
+        static string Tipo(Pedido p) => p.Abrir != null ? "janela" : p.Narrativo ? "cena" : p.Desafio ? "teste" : p.Opcoes != null && p.Opcoes.Count > 0 ? "escolha" : "aviso";
+
+        /// <summary>v269: o texto de um quadro como o diário do jogo o guarda. O jogo grava cada quadro no diário da partida numa
+        /// linha "rodada|texto|tipo", trocando só o "\r\n" por {BR}: uma quebra "\n" sozinha (a do mod) partia a linha, e ao carregar
+        /// a partida cada pedaço virava uma entrada ilegível («Incorrect log entry Round ID format», relato de 04/11/2026). As quebras
+        /// viram a quebra do TextMeshPro (&lt;br&gt;, o mesmo na tela) e a barra vertical, que separa os campos, vira barra.</summary>
+        public static string ParaODiario(string t)
+        {
+            if (string.IsNullOrEmpty(t)) return t;
+            return t.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", "<br>").Replace("|", "/");
+        }
+
         static bool Mostrar(Pedido p)
         {
+            try { if (p.Abrir == null) Menu.CanalDeTeste.Anotar(Tipo(p), p.Texto, p.Titulo, p.Opcoes); } catch { }
             if (p.Abrir != null) return p.Abrir(() => Fechou(p, -1));
             var persistente = Jogo.Persistente;
             var ui = Jogo.UI;
             if (persistente == null) return false;
             var titulo = string.IsNullOrEmpty(p.Titulo) ? null : "<b>" + p.Titulo + "</b>\n\n";
-            var texto = (titulo ?? "") + (p.Texto ?? "");
+            var texto = ParaODiario((titulo ?? "") + (p.Texto ?? ""));
 
             if (p.Narrativo)
             {
@@ -221,7 +240,7 @@ namespace Bigorna.Encontro
                 if (p.Opcoes != null && p.Opcoes.Count > 0)
                 {
                     var m = new MultipleChoiceMessageRequest { Key = texto };
-                    foreach (var o in p.Opcoes) m.Choices.Add(new MessageChoice(o));
+                    foreach (var o in p.Opcoes) m.Choices.Add(new MessageChoice(ParaODiario(o)));
                     m.CallbackChoice = i => Fechou(p, i);
                     pedido = m;
                 }
@@ -262,7 +281,7 @@ namespace Bigorna.Encontro
             else if (p.Opcoes != null && p.Opcoes.Count > 0)
             {
                 var m = new MultipleChoiceMessageRequest { Key = texto };
-                for (int i = 0; i < p.Opcoes.Count; i++) m.Choices.Add(Resposta(p.Opcoes[i], p.Ativas == null || i >= p.Ativas.Count || p.Ativas[i]));
+                for (int i = 0; i < p.Opcoes.Count; i++) m.Choices.Add(Resposta(ParaODiario(p.Opcoes[i]), p.Ativas == null || i >= p.Ativas.Count || p.Ativas[i]));
                 m.CallbackChoice = i => Fechou(p, i);
                 m.Settings.BackDisabled = true;
                 persistente.Messages.DisplayMessage(m, ui.MessageDialog); MarcarNosso(false);

@@ -18,7 +18,6 @@ const ID_ACERVO = /^[a-z0-9][a-z0-9-]{1,58}[a-z0-9]$/;
 const TIPOS_ACERVO = ['mapa', 'campanha', 'pacote'];
 /* the language a work was made in: one of the game's (linguas.js), told by the author (map setup, campaign screen), shown
    with its flag. The emoji go in the GitHub request title; the pages show the flag pictures (Windows shows no flag emoji) */
-const codigoDeLingua = l => { const k = String(l || '').trim().toLowerCase().replace('_', '-'); return k === 'cz' ? 'cs' : k === 'pt-br' ? 'pt' : k; };
 const bandeiras = l => String(l || '').split(',').map(x => (LINGUA_DE[codigoDeLingua(x)] || {}).emoji || x.trim().toUpperCase()).filter(Boolean).join(' ');
 const imgBandeira = (cod, alto = 14) => { const l = LINGUA_DE[codigoDeLingua(cod)]; return l ? `<img class="bandeira" loading="lazy" decoding="async" ${imgTardia(l.png)} alt="${esc(l.emoji)}" title="${esc(l.nome)}" style="height:${alto}px;vertical-align:-2px;border:1px solid #0004">` : esc(String(cod || '').toUpperCase()); };
 const imgsBandeira = (l, alto) => String(l || '').split(',').filter(x => x.trim()).map(x => imgBandeira(x, alto)).join(' ');
@@ -151,11 +150,11 @@ async function obraParaOAcervo(indice, vinculos = []) {
   if (campanha) {
     const { cid, dcamp, mapas } = montarDcamp();
     tipo = 'campanha'; nome = campanha.meta.name || 'Campaign'; ato = dcamp.meta.requiresAct === 'II' ? 2 : 1; conteudo = { mapas: mapas.length };
-    docs = [{ nome: cid + '.dcamp', doc: dcamp }, ...mapas.map(m => ({ nome: m.nome, doc: m.doc }))];
+    docs = [{ nome: cid + EXT_CAMPANHA, doc: dcamp }, ...mapas.map(m => ({ nome: m.nome, doc: m.doc }))];
     midias = () => [...musicasDosMapas(mapas.map(m => m.doc), cid), ...videosDasCenas(dcamp, cid)];
   } else {
     const d = montarDmap(); tipo = 'mapa'; nome = projeto.meta.name || 'Map'; ato = atoNecessario(projeto) > 1 ? 2 : 1;
-    docs = [{ nome: d.meta.id + '.dmap', doc: d }]; midias = () => musicasDosMapas([d], null);
+    docs = [{ nome: d.meta.id + EXT_MAPA, doc: d }]; midias = () => musicasDosMapas([d], null);
   }
   } finally { _semSepararPacotes = false; }
   // the entries of the required packages leave the files; a package is required when it took something out or has an entry

@@ -26,13 +26,18 @@ namespace Bigorna.Dados
     public static class DadosDoEditor
     {
         /// <summary>Sobe quando o que se grava muda; um arquivo com outro carimbo e refeito.</summary>
-        public const int Formato = 5;   // 5: a arte dos 6 heróis da caixa (diálogo) em 1024 px; 3: figuras (miniaturas por tipo de monstro das caixas do jogador); 4: textos na lingua do jogo, missoes originais
+        public const int Formato = 6;   // 6: as caixas do jogo e os monstros de cada uma (catalogo.caixas); 5: a arte dos 6 heróis da caixa (diálogo) em 1024 px; 3: figuras (miniaturas por tipo de monstro das caixas do jogador); 4: textos na lingua do jogo, missoes originais
 
         public static string Pasta => Path.Combine(Application.persistentDataPath, "Editor");
         public static string ArquivoDados => Path.Combine(Pasta, "bigorna-game-data.js");
         public static string ArquivoMapa => Path.Combine(Pasta, "bigorna-worldmap.js");
         public static string ArquivoEditor => Path.Combine(Pasta, "Bigorna-Salas.html");
         const string RecursoEditor = "Bigorna.Salas.html";
+        /// <summary>v274: a página só do gerador do mapa oneshot (sem a tela do editor) e os dados dela (os do jogo sem as
+        /// imagens, que o gerador não usa: 30 dos 32 MB).</summary>
+        public static string ArquivoPaginaDoGerador => Path.Combine(Pasta, "Bigorna-Gerador.html");
+        const string RecursoPaginaDoGerador = "Bigorna.PaginaDoGerador.html";
+        public static string ArquivoDadosDoGerador => Path.Combine(Pasta, "bigorna-gerador-dados.js");
 
         public static bool Gerando { get; private set; }
         public static string Situacao { get; private set; }
@@ -55,12 +60,14 @@ namespace Bigorna.Dados
         public static void NoTitulo()
         {
             try { InstalarEditor(); } catch (Exception ex) { Log.Erro("instalando o editor", ex); }
+            try { InstalarPaginaDoGerador(); } catch (Exception ex) { Log.Erro("instalando a página do gerador", ex); }
             try { Directory.CreateDirectory(Pasta); InstalarApp(); } catch (Exception ex) { Log.Erro("instalando o aplicativo do editor", ex); }
             if (_verificado || Gerando) return;
             _verificado = true;
             if (EmDia())
             {
                 Log.Info("dados do editor em dia (" + ArquivoDados + ")");
+                DadosDoGeradorAoFundo();
                 if (!TemAlgumMapa()) Avisar(FaltaMapa, 12f);
                 return;
             }
@@ -112,6 +119,17 @@ namespace Bigorna.Dados
             return igual();
         }
 
+        /// <summary>v286: roda o .exe novo uma vez, só para abrir e fechar («--ola»), logo depois de instalado: o Windows examina
+        /// o arquivo novo na tela de título, e não quando o jogador pede um mapa oneshot.</summary>
+        static void Saudar(string exe)
+        {
+            try
+            {
+                var t = DateTime.Now; var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe, "--ola") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = PastaApp });
+                new System.Threading.Thread(() => { try { bool saiu = p.WaitForExit(600000); Log.Info("aplicativo do editor: primeira execução " + (saiu ? "em " + (DateTime.Now - t).TotalSeconds.ToString("0.0") + " s" : "sem fim em 10 min")); } catch { } }) { IsBackground = true }.Start();
+            }
+            catch (Exception ex) { Log.Info("aplicativo do editor: primeira execução (" + ex.Message + ")"); }
+        }
         static void InstalarApp()
         {
             var asm = typeof(DadosDoEditor).Assembly;
@@ -131,6 +149,7 @@ namespace Bigorna.Dados
                     if (File.Exists(destino)) { var velho = File.ReadAllBytes(destino); if (velho.Length == novo.Length && velho.SequenceEqual(novo)) { Desbloquear(destino); continue; } }
                     File.WriteAllBytes(destino, novo); Desbloquear(destino);
                     Log.Info("aplicativo do editor: " + nome + " instalado");
+                    if (nome == "Bigorna Editor.exe") Saudar(destino);
                 }
                 catch (Exception ex) { Log.Info("aplicativo do editor: " + r + " ficou para depois (" + ex.Message + ")"); }
             }
@@ -186,6 +205,73 @@ namespace Bigorna.Dados
                 Log.Info("editor instalado: " + ArquivoEditor);
             }
             InstalarTabelasDoGerador();
+        }
+
+        /// <summary>v274: a página só do gerador e as tabelas dos textos dele, se diferentes das da pasta.</summary>
+        static void InstalarPaginaDoGerador()
+        {
+            using (var s = typeof(DadosDoEditor).Assembly.GetManifestResourceStream(RecursoPaginaDoGerador))
+            {
+                if (s == null) return;
+                var ms = new MemoryStream(); s.CopyTo(ms); var novo = ms.ToArray();
+                Directory.CreateDirectory(Pasta);
+                if (!File.Exists(ArquivoPaginaDoGerador) || !File.ReadAllBytes(ArquivoPaginaDoGerador).SequenceEqual(novo)) { File.WriteAllBytes(ArquivoPaginaDoGerador, novo); Log.Info("página do gerador instalada: " + ArquivoPaginaDoGerador); }
+            }
+            InstalarTabelasDoGerador();
+        }
+
+        /// <summary>v274: os dados do gerador (bigorna-gerador-dados.js: os do jogo sem os retratos), tirados dos do editor quando
+        /// faltam ou são de outra geração (a segunda linha, com o carimbo, é a mesma). Numa linha de execução à parte: o
+        /// arquivo grande tem 32 MB.</summary>
+        static bool _leveAoFundo;
+        public static void DadosDoGeradorAoFundo()
+        {
+            if (_leveAoFundo || !File.Exists(ArquivoDados)) return;
+            if (File.Exists(ArquivoDadosDoGerador) && SegundaLinha(ArquivoDadosDoGerador) == SegundaLinha(ArquivoDados)) return;
+            _leveAoFundo = true;
+            string de = ArquivoDados, para = ArquivoDadosDoGerador;
+            new System.Threading.Thread(() =>
+            {
+                try { var t = DateTime.Now; CopiarSemRetratos(de, para); Log.Info("dados do gerador tirados dos do editor em " + (DateTime.Now - t).TotalSeconds.ToString("0.0") + " s (" + new FileInfo(para).Length / 1024 + " KB)"); }
+                catch (Exception ex) { Log.Info("dados do gerador: " + ex.Message); }
+                finally { _leveAoFundo = false; }
+            }) { IsBackground = true, Name = "Bigorna dados do gerador" }.Start();
+        }
+        static string SegundaLinha(string f) { try { using (var r = new StreamReader(f)) { r.ReadLine(); return r.ReadLine(); } } catch { return null; } }
+
+        /// <summary>O arquivo dos dados do editor ("window.BIGORNA_JOGO = {...};"), copiado sem a propriedade retratos (fica vazia).</summary>
+        public static void CopiarSemRetratos(string de, string para)
+        {
+            var tmp = para + ".tmp";
+            using (var sr = new StreamReader(de, new UTF8Encoding(false)))
+            using (var sw = new StreamWriter(tmp, false, new UTF8Encoding(false)))
+            {
+                sw.WriteLine(sr.ReadLine()); sw.WriteLine(sr.ReadLine());
+                var prefixo = new StringBuilder();
+                while (sr.Peek() >= 0 && sr.Peek() != '{') prefixo.Append((char)sr.Read());
+                if (sr.Peek() < 0) throw new InvalidDataException("sem o objeto dos dados");
+                sw.Write(prefixo.ToString()); sw.Write('{');
+                using (var jr = new JsonTextReader(sr) { CloseInput = false, DateParseHandling = DateParseHandling.None, FloatParseHandling = FloatParseHandling.Decimal, SupportMultipleContent = true })
+                using (var jw = new JsonTextWriter(sw) { CloseOutput = false, Formatting = Formatting.None })
+                {
+                    if (!jr.Read() || jr.TokenType != JsonToken.StartObject) throw new InvalidDataException("sem o objeto dos dados");
+                    bool primeira = true;
+                    while (jr.Read())
+                    {
+                        if (jr.TokenType == JsonToken.EndObject) break;
+                        if (jr.TokenType != JsonToken.PropertyName) throw new InvalidDataException("esperava uma propriedade: " + jr.TokenType);
+                        var nome = (string)jr.Value;
+                        if (!jr.Read()) break;
+                        if (!primeira) sw.Write(','); primeira = false;
+                        sw.Write(JsonConvert.ToString(nome)); sw.Write(':');
+                        if (nome == "retratos") { jr.Skip(); sw.Write("{}"); }
+                        else { jw.WriteToken(jr); jw.Flush(); }
+                    }
+                }
+                sw.Write("};"); sw.WriteLine();
+            }
+            if (File.Exists(para)) File.Delete(para);
+            File.Move(tmp, para);
         }
 
         /// <summary>v259: as tabelas dos textos do gerador de mapas nas linguas do jogo (o mapa oneshot), embutidas na DLL
@@ -319,6 +405,7 @@ namespace Bigorna.Dados
             if (erro == null)
             {
                 Log.Info("dados do editor gravados em " + dt.ToString("0.0") + " s: " + g.Resumo() + " → " + ArquivoDados);
+                DadosDoGeradorAoFundo();
                 Avisar(TemAlgumMapa() ? T("Bigorna: dados do editor prontos (", "Bigorna: editor data ready (") + g.Resumo(false) + ")." : FaltaMapa, TemAlgumMapa() ? 10f : 16f);
             }
             else Avisar(T("Bigorna: não consegui gravar os dados do editor: ", "Bigorna: could not write the editor data: ") + erro, 20f);
@@ -526,6 +613,21 @@ namespace Bigorna.Dados
                 }
                 _cat["monstros"] = monstros; _cat["ativacoes"] = ativacoes; _cat["itens"] = itens; _cat["receitas"] = receitas; _cat["loots"] = loots;
                 _cat["personagens"] = personagens; _cat["herois"] = herois; _cat["facanhas"] = facanhas; _cat["habilidades"] = habilidades;
+                // (v293: as caixas do jogo e os monstros de cada uma: o editor sorteia e oferece só os originais, os que alguma
+                //  caixa traz; o jogo guarda outros modelos que nenhuma caixa usa, e o nome deles sai errado no tabuleiro)
+                var caixas = new JArray();
+                try
+                {
+                    var meus = UserCollectionManager.GetProducts(true) ?? new List<ProductModel>();
+                    foreach (var pr in UserCollectionManager.GetProducts(false) ?? new List<ProductModel>())
+                    {
+                        if (pr == null) continue;
+                        var ids = new JArray(); foreach (var e in pr.Enemies ?? new EnemyModel[0]) if (e != null && !string.IsNullOrEmpty(e.Id)) ids.Add(e.Id);
+                        caixas.Add(new JObject { ["_id"] = pr.Id, ["codigo"] = pr.ProductCode, ["ato"] = (int)pr.Act, ["tipo"] = pr.Type.ToString(), ["marcada"] = meus.Contains(pr), ["monstros"] = ids });
+                    }
+                }
+                catch (Exception ex) { Log.Info("dados do editor: caixas do jogo: " + ex.Message); }
+                _cat["caixas"] = caixas;
             }
 
             string BundleDe(string caminho)

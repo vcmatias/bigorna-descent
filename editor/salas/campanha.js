@@ -218,7 +218,7 @@ function apagarCampanha() {
       <li>the world map positions, the rewards, the music and videos chosen</li>
     </ul>
     <p class="ajuda">Files already exported stay in the folder${Config.nomePasta() ? ' (' + esc(Config.nomePasta()) + ')' : ''}; delete them there if you want. Autosave stops following this campaign, so it will not erase them. The game keeps the progress of any party that played it.</p>
-    <button class="op destaque" data-o="exp"><b>Export, then delete</b><small>Writes the .dcamp and its maps${Config.nomePasta() ? ' into ' + esc(Config.nomePasta()) : ' (download)'}, then deletes.</small></button>
+    <button class="op destaque" data-o="exp"><b>Export, then delete</b><small>Writes the .bcamp and its maps${Config.nomePasta() ? ' into ' + esc(Config.nomePasta()) : ' (download)'}, then deletes.</small></button>
     <div class="op perigo" style="cursor:default"><b>Delete without exporting</b><small>Type the name of the campaign to confirm: <b>${esc(nome)}</b></small>
       <div class="linha" style="margin-top:6px"><input id="ca_nome" placeholder="${esc(nome)}"><button class="sm perigo" id="ca_ja" disabled>Delete for good</button></div></div>
     <div class="rodape"><button data-o="nao">Cancel</button></div>`, (el, fechar) => {
