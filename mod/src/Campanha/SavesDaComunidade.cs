@@ -178,11 +178,20 @@ namespace Bigorna.Campanha
         }
 
         /// <summary>"Continuar campanha": o jogo carrega a partida (a campanha reabre ao chegar no mapa-mundi). Devolve um erro.</summary>
-        public static string Continuar(int slot, string nome)
+        public static string Continuar(int slot, Formato.Dcamp c)
         {
+            var nome = c?.NomeVisivel;
             var s = Salvar; if (s == null) return T("O jogo ainda não está pronto para carregar.", "The game is not ready to load yet.");
             if (!SaveLoadController.GetMostRecentSaveFilePath(slot, out var arq) || arq == null) return T("A partida gravada da campanha não está mais lá.", "The campaign's saved game is no longer there.");
             Log.Info("«Continuar campanha» «" + nome + "»: ranhura " + slot + " (" + Path.GetFileName(arq) + ")");
+            // (v301: o conteúdo próprio da campanha (itens, monstros, receitas...) entra ANTES de o jogo ler a gravação: a loja da cidade
+            //  é montada na carga e, com um item próprio no inventário ainda desconhecido, quebrava (NullReference em
+            //  ShopController.GenerateFeaturedItems), a carga parava e a gravação seguinte caía também)
+            if (c != null)
+            {
+                var lida = c; if (!string.IsNullOrEmpty(c.Caminho) && File.Exists(c.Caminho)) try { lida = Formato.Dcamp.Carregar(c.Caminho); } catch (Exception ex) { Log.Info("relendo a campanha para continuar: " + ex.Message); }
+                try { Campanha.Abrir(lida); } catch (Exception ex) { Log.Erro("abrindo a campanha antes de carregar", ex); }
+            }
             try { s.LoadGame(arq, slot); } catch (Exception ex) { Log.Erro("carregando a partida da campanha", ex); return ex.Message; }
             return null;
         }

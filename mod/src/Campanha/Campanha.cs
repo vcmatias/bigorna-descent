@@ -128,11 +128,22 @@ namespace Bigorna.Campanha
         /// <summary>Partida carregada pelo menu do jogo: se os destinos ativos sao de uma campanha nossa, reabre-a.</summary>
         public static bool ReabrirSeForPreciso()
         {
-            if (Aberta != null) return false;
             try
             {
                 var dados = Jogo.DadosJogo; var partida = dados?.Data;
                 var ativos = partida?.ActiveDestinationIds;
+                // (v301: «Continuar campanha» já abriu a campanha antes da carga (o conteúdo próprio dela entra antes da loja); aqui
+                //  só falta o que depende da partida carregada)
+                if (Aberta != null)
+                {
+                    if (ativos == null || ativos.Count == 0 || dados.CurrentSaveIndex == _ranhuraVista || !Aberta.Nos.Any(n => ativos.Contains(n.Id))) return false;
+                    _ranhuraVista = dados.CurrentSaveIndex;
+                    Log.Info("partida carregada é da campanha «" + Aberta.NomeVisivel + "», já aberta");
+                    SavesDaComunidade.Registrar(partida.SaveSlotGUID, Aberta);
+                    Encontro.GrupoDoSave.Lembrar(Estado.Origem());
+                    try { partida.UnavailableHeroes?.Clear(); } catch { }
+                    return true;
+                }
                 if (ativos == null || ativos.Count == 0 || dados.CurrentSaveIndex == _ranhuraVista) return false;
                 _ranhuraVista = dados.CurrentSaveIndex;
                 foreach (var c in Bootstrap.Campanhas())

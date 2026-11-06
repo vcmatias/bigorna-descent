@@ -34,9 +34,13 @@ function tabelaDe(l, criar, ob = obraDaLingua()) {
    (cards, scenes) and the Workshop */
 function camposDeTexto(cb, ob = obraDaLingua()) {
   if (!ob) return;
+  // (v302: um objeto que aparece duas vezes na obra (a mesma cena em dois gatilhos) é visitado uma vez só: passar duas vezes
+  //  trocava o texto já traduzido como se fosse o original, e ele ficava na outra língua)
+  const vistos = new WeakSet();
   const anda = (x, onde, pular) => {
     if (Array.isArray(x)) { x.forEach(v => anda(v, onde)); return; }
     if (!x || typeof x !== 'object') return;
+    if (vistos.has(x)) return; vistos.add(x);
     const sala = Array.isArray(x.pecas) && Array.isArray(x.objetos);   // (the name of a room is the editor's, not the players')
     for (const k of Object.keys(x)) {
       if (FORA_TEXTO.has(k) || (pular && pular.has(k))) continue; const v = x[k];

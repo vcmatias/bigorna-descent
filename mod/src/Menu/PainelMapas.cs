@@ -228,7 +228,7 @@ namespace Bigorna.Menu
                 var andamento = Campanha.SavesDaComunidade.EmAndamento(c);
                 if (andamento != null && GUILayout.Button(T("Continuar campanha", "Continue campaign"), _botao, GUILayout.Width(170f), GUILayout.Height(40f)))
                 {
-                    var erro = Campanha.SavesDaComunidade.Continuar(andamento.Value.Key, c.NomeVisivel);
+                    var erro = Campanha.SavesDaComunidade.Continuar(andamento.Value.Key, c);
                     if (erro != null) _erro = erro; else _aberto = false;
                 }
                 if (andamento == null && GUILayout.Button(prog.Completados.Count > 0 ? T("Continuar", "Continue") : T("Jogar", "Play"), _botao, GUILayout.Width(100f), GUILayout.Height(40f)))

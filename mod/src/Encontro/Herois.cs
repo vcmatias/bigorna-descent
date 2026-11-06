@@ -34,6 +34,19 @@ namespace Bigorna.Encontro
             var ui = Jogo.UI;
             var tela = ui?.IntroSequenceHeroSelectDialog;
             var disponiveis = UserCollectionManager.GetHeroes(true)?.ToList();
+            // (v300: o canal de teste pediu os heróis: entram eles, sem a tela de escolha)
+            if (Menu.CanalDeTeste.HeroisPedidos != null)
+            {
+                var pedidos = Menu.CanalDeTeste.HeroisDoPedido(Jogo.Partida, disponiveis);
+                if (pedidos != null && Jogo.Partida?.ActivePlayers != null)
+                {
+                    Jogo.Partida.ActivePlayers.Clear(); Jogo.Partida.ActivePlayers.AddRange(pedidos);
+                    try { Jogo.UI?.HeroMenu?.SyncTo(Jogo.Partida.ActivePlayers); } catch { }
+                    Log.Info("grupo: os heróis pedidos pelo canal de teste");
+                    Recortar(vagas);
+                    yield break;
+                }
+            }
             if (tela == null || disponiveis == null || disponiveis.Count < 2)
             {
                 Log.Info("grupo: sem tela de escolha; entra o grupo já montado");

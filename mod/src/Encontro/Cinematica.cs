@@ -44,6 +44,7 @@ namespace Bigorna.Encontro
         /// <summary>Toca e chama "aoFim" quando o filme acaba (ou logo, se nao der para tocar).</summary>
         public static bool Tocar(string nome, Action aoFim)
         {
+            if (Menu.CanalDeTeste.PularCenas) { Log.Info("cena «" + nome + "» pulada (canal de teste)"); Menu.CanalDeTeste.Anotar("cena pulada", nome); try { aoFim?.Invoke(); } catch (Exception ex) { Log.Erro("depois da cena", ex); } return true; }
             var modelo = Achar(nome);
             bool ok = false;
             if (modelo == null) Log.Info("cena «" + nome + "» não existe nesta coleção. Cenas disponíveis:\n" + Lista());

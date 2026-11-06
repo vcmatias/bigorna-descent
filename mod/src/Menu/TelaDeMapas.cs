@@ -260,7 +260,7 @@ namespace Bigorna.Menu
                     if (andamento != null)
                     {
                         int ranhura = andamento.Value.Key; var info = andamento.Value.Value;
-                        principal = T("Continuar campanha", "Continue campaign"); aoPrincipal = () => Lancou(Campanha.SavesDaComunidade.Continuar(ranhura, c.NomeVisivel));
+                        principal = T("Continuar campanha", "Continue campaign"); aoPrincipal = () => Lancou(Campanha.SavesDaComunidade.Continuar(ranhura, c));
                         outro = T("Recomeçar…", "Restart…"); aoOutro = recomecar;
                         detalhe = T("Em andamento com o grupo «", "In progress with the party “") + info.PartyName + T("»", "”") + (info.Timestamp > 0 ? " · " + DataHora(new DateTime(info.Timestamp)) : "")
                             + T(". «Recomeçar» começa de novo, com um grupo novo ou com os seus heróis.", ". “Restart” starts over, with a new party or with your heroes.");
@@ -399,7 +399,7 @@ namespace Bigorna.Menu
                 // (a escolha: continuar a partida em andamento, grupo novo ou os seus heróis)
                 var andamento = Campanha.SavesDaComunidade.EmAndamento(c); int ranhura = andamento?.Key ?? -1; _paginaSaves = 0;
                 AbrirSaves(c.NomeVisivel, () => Lancou(Campanha.Campanha.Comecar(c, false)), s => Lancou(Campanha.Campanha.Comecar(c, false, s)),
-                    andamento != null ? (Action)(() => Lancou(Campanha.SavesDaComunidade.Continuar(ranhura, c.NomeVisivel))) : null);
+                    andamento != null ? (Action)(() => Lancou(Campanha.SavesDaComunidade.Continuar(ranhura, c))) : null);
             }
             else
             {

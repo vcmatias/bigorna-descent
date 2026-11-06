@@ -22,6 +22,7 @@ namespace Bigorna.Encontro
             void Fim() { try { aoFim?.Invoke(); } catch (Exception ex) { Log.Erro("depois do filme", ex); } }
             if (string.IsNullOrEmpty(arquivo) || !File.Exists(arquivo)) { Log.Info("filme: não achei «" + arquivo + "» (ele vai na mesma pasta do .dcamp ou do .dmap)"); Fim(); return; }
             if (EmMarcha) { Log.Info("já há um filme tocando; «" + Path.GetFileName(arquivo) + "» é pulado"); Fim(); return; }
+            if (Menu.CanalDeTeste.PularCenas) { Log.Info("filme «" + Path.GetFileName(arquivo) + "» pulado (canal de teste)"); Menu.CanalDeTeste.Anotar("filme pulado", Path.GetFileName(arquivo)); Fim(); return; }
             if (Nucleo.Instancia == null) { Fim(); return; }
             Nucleo.Instancia.StartCoroutine(Correr(arquivo, Fim));
         }

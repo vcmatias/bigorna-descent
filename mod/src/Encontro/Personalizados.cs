@@ -241,6 +241,8 @@ namespace Bigorna.Encontro
                 int r = Array.IndexOf(Oficina.Alcances, (string)j["rangeType"]); a.RangeType = r >= 0 ? (TargetRanges)r : TargetRanges.Melee;
                 a.DisplayTarget = true; if (nova) a.HasDelayedText = false;
                 var texto = (string)j["text"]; var dica = (string)j["hint"];
+                // (v302: o que cada {n} quer dizer, como o editor marcou (vagas do texto e da dica): monster, hero ou number)
+                try { LogicaPropria.DefinirVagas(aid + "_ACTIVATION", j["vagas"] as JArray); LogicaPropria.DefinirVagas(aid + "_HINT", j["vagasDica"] as JArray); } catch { }
                 if (nova) _criadas.Add(aid);
                 if (_criadas.Contains(aid)) { _novas.Add(aid); if (!string.IsNullOrEmpty(texto)) Jogo.Termo(aid + "_ACTIVATION", texto); if (!string.IsNullOrEmpty(dica)) Jogo.Termo(aid + "_HINT", dica); }
                 else { TextoDoJogo(aid, "_ACTIVATION", texto); TextoDoJogo(aid, "_HINT", dica); }

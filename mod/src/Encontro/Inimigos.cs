@@ -59,9 +59,10 @@ namespace Bigorna.Encontro
             if (Reserva.Count > 0) Log.Info("reserva inicial (spawn pool): " + string.Join(", ", Reserva.ToArray()));
             if (lista.Count == 0) yield break;
             var porGatilho = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var g in m.Gatilhos)
-                foreach (var a in g.Acoes)
-                    if (a.Id == "spawnGroup") { var gr = P.Texto(a.Params, "group"); if (!string.IsNullOrEmpty(gr)) porGatilho.Add(gr); }
+            // (v302: também os surgimentos dentro de um «se» (then/else), no «senão» do gatilho e em listas aninhadas: o gerador
+            //  e o editor põem a emboscada e o reforço por rodadas dentro de «se a sala está aberta», e esses grupos entravam com
+            //  a sala, antes da hora)
+            foreach (var g in m.Gatilhos) { GruposQueSurgem(g.Acoes, porGatilho, 0); GruposQueSurgem(g.Senao, porGatilho, 0); }
             var agora = new List<Dmap.Inimigo>();
             foreach (var e in lista)
             {
@@ -77,6 +78,19 @@ namespace Bigorna.Encontro
             if (_emSalaOculta.Count > 0) Log.Info(_emSalaOculta.Count + " inimigo(s) esperam a sala deles aparecer");
             if (agora.Count == 0) yield break;
             yield return Entrar(agora);
+        }
+
+        /// <summary>v302: os grupos que alguma ação faz surgir (spawnGroup), em qualquer nível da lista de ações.</summary>
+        static void GruposQueSurgem(List<Dmap.Clausula> acoes, HashSet<string> grupos, int prof)
+        {
+            if (acoes == null || prof > 12) return;
+            foreach (var a in acoes)
+            {
+                if (a == null) continue;
+                if (a.Id == "spawnGroup") { var gr = P.Texto(a.Params, "group"); if (!string.IsNullOrEmpty(gr)) grupos.Add(gr); }
+                if (a.Params == null) continue;
+                foreach (var k in new[] { "then", "else", "actions" }) GruposQueSurgem(P.Clausulas(a.Params, k), grupos, prof + 1);
+            }
         }
 
         /// <summary>Uma sala apareceu: entram os inimigos que estavam nela (salvo os que chegam por spawnGroup).</summary>

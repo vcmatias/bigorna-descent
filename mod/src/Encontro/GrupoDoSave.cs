@@ -41,6 +41,10 @@ namespace Bigorna.Encontro
         static Save _fimOrigem;
         static string _fimNome;
         static string _aviso;
+        /// <summary>v301: o que o grupo ganhou na aventura (os nomes, feitos no fim do mapa, quando o conteúdo dele ainda está
+        /// registrado) e, disso, o que fica bloqueado na volta (o conteúdo próprio do mapa: itens, armas, receitas, perícias e
+        /// proezas B_/BIGORNA_ que a partida de origem não conhece).</summary>
+        static List<string> _ganhos = new List<string>(), _bloqueados = new List<string>();
         public static bool Pendente => _fim != null;
 
         /// <summary>O texto que explica a diferenca entre os dois botoes (a ficha e a lista de saves mostram).</summary>
@@ -158,6 +162,45 @@ namespace Bigorna.Encontro
         /// <summary>Um id do que o mapa criou (Oficina): itens, receitas, proezas B_..., pericias e runas BIGORNA_...</summary>
         static bool Proprio(string id) => !string.IsNullOrEmpty(id) && (id.StartsWith("B_", StringComparison.Ordinal) || id.StartsWith("BIGORNA_", StringComparison.Ordinal));
 
+        /// <summary>v301: o que o grupo tem no fim e não tinha na partida de origem (ouro, XP, itens, armas, materiais, receitas,
+        /// perícias e proezas), com os nomes; e, disso, o que é conteúdo próprio do mapa (fica bloqueado na volta).</summary>
+        static void Ganhos(SerializedGame antes, SerializedGame depois, out List<string> ganhos, out List<string> bloqueados)
+        {
+            ganhos = new List<string>(); bloqueados = new List<string>();
+            if (depois == null) return;
+            var g = ganhos; var b = bloqueados;
+            int ouro = depois.Gold - (antes?.Gold ?? 0), xp = depois.PartyXP - (antes?.PartyXP ?? 0);
+            if (ouro > 0) g.Add(ouro + T(" de ouro", " gold")); if (xp > 0) g.Add(xp + " XP");
+            // (uma lista de ids: o que sobra de "depois" tirados os de "antes", um a um, com o nome e a conta)
+            void Novos(IEnumerable<string> de, IEnumerable<string> base0, Func<string, string> nome, string tipo)
+            {
+                var resto = (base0 ?? Enumerable.Empty<string>()).Where(x => x != null).GroupBy(x => x).ToDictionary(x => x.Key, x => x.Count());
+                var novos = new List<string>();
+                foreach (var id in (de ?? Enumerable.Empty<string>()).Where(x => !string.IsNullOrEmpty(x))) { if (resto.TryGetValue(id, out var n) && n > 0) resto[id] = n - 1; else novos.Add(id); }
+                foreach (var grupo in novos.GroupBy(x => x))
+                {
+                    var rotulo = nome(grupo.Key) + (tipo != null ? " (" + tipo + ")" : "") + (grupo.Count() > 1 ? " ×" + grupo.Count() : "");
+                    g.Add(rotulo); if (Proprio(grupo.Key)) b.Add(rotulo);
+                }
+            }
+            string NomeItem(string id) { try { var m = UserCollectionManager.GetItem(id, false); if (m != null) { var t = FFGLocalization.Get(m.KeyName, false); if (!string.IsNullOrEmpty(t) && t != m.KeyName) return Limpo(t); } } catch { } return id; }
+            string NomeArma(string id) { try { var m = UserCollectionManager.GetWeapon(id, false); if (m != null) { var t = FFGLocalization.Get(m.KeyName, false); if (!string.IsNullOrEmpty(t) && t != m.KeyName) return Limpo(t); } } catch { } return id; }
+            Novos(depois.ItemInventory?.Where(x => x != null).Select(x => x.Id), antes?.ItemInventory?.Where(x => x != null).Select(x => x.Id), NomeItem, null);
+            Novos(depois.SharedWeaponIds, antes?.SharedWeaponIds, NomeArma, T("arma", "weapon"));
+            Novos(depois.DiscoveredRecipes?.Where(x => x != null).Select(x => x.Id), antes?.DiscoveredRecipes?.Where(x => x != null).Select(x => x.Id), id => id, T("receita", "recipe"));
+            Novos(depois.UnlockedSkills, antes?.UnlockedSkills, id => id, T("perícia", "skill"));
+            Novos(depois.RealCompletedFeats, antes?.RealCompletedFeats, id => id, T("proeza", "feat"));
+            // os materiais: a diferença de quantidade
+            var tinha = (antes?.CraftingMaterials ?? new List<SerializedCraftingMaterial>()).Where(x => x != null && x.Id != null).GroupBy(x => x.Id).ToDictionary(x => x.Key, x => x.Sum(y => y.Qty));
+            foreach (var m in (depois.CraftingMaterials ?? new List<SerializedCraftingMaterial>()).Where(x => x != null && x.Id != null).GroupBy(x => x.Id))
+            {
+                int n = m.Sum(y => y.Qty) - (tinha.TryGetValue(m.Key, out var a) ? a : 0); if (n <= 0) continue;
+                string nome = m.Key; try { var mm = UserCollectionManager.GetCraftingMaterial(m.Key, false); if (mm != null) { var t = FFGLocalization.Get(mm.KeyName, false); if (!string.IsNullOrEmpty(t) && t != mm.KeyName) nome = Limpo(t); } } catch { }
+                var rotulo = nome + " ×" + n; g.Add(rotulo); if (Proprio(m.Key)) b.Add(rotulo);
+            }
+        }
+        static string Limpo(string t) => System.Text.RegularExpressions.Regex.Replace(t ?? "", "<[^>]+>", "").Trim();
+
         static void Lista<T>(List<T> de, ref List<T> para, Func<T, bool> fica)
         {
             if (para == null) para = new List<T>();
@@ -175,6 +218,8 @@ namespace Bigorna.Encontro
                 var d = Jogo.DadosJogo?.Data; if (d == null) return;
                 _fim = JsonUtility.ToJson(d); _fimOrigem = Origem; _fimNome = nome; _aviso = null;
                 _situacao = Verificar(_fimOrigem);
+                try { Ganhos(Ler(_fimOrigem.Slot)?.GameSceneData?.GameState, d, out _ganhos, out _bloqueados); } catch (Exception ex) { _ganhos = new List<string>(); _bloqueados = new List<string>(); Log.Erro("o que o grupo ganhou", ex); }
+                if (_ganhos.Count > 0) Log.Info("  ganhos da aventura: " + string.Join(" · ", _ganhos.ToArray()) + (_bloqueados.Count > 0 ? " (bloqueados: " + string.Join(" · ", _bloqueados.ToArray()) + ")" : ""));
                 GuardarPendente();
                 Log.Info("partida de origem «" + _fimOrigem.Nome + "»: " + (_situacao == Situacao.Igual ? "como estava" : _situacao == Situacao.Mudou ? "mudou durante a aventura" : "não está mais lá"));
                 Log.Info("fim de «" + nome + "» com o grupo do save " + Origem.Slot + ": a mesa escolhe o destino do grupo");
@@ -279,6 +324,12 @@ namespace Bigorna.Encontro
                         ". This adventure's loot stays out of it: the party would go back over what happened there in the meantime, and that would be lost. You can create a copy of that game, as it is now, with this adventure's party; the original stays as it is."));
             else if (_situacao == Situacao.Sumiu)
                 r.Add(T("A partida «", "The game “") + _fimOrigem.Rotulo + T("» foi apagada (ou a ranhura dela guarda outra partida). O grupo desta aventura só pode ser descartado.", "” was deleted (or its slot holds another game). This adventure's party can only be discarded."));
+            if (_ganhos.Count > 0) r.Add(T("Nesta aventura o grupo ganhou: ", "In this adventure the party gained: ") + string.Join(" · ", _ganhos.ToArray()) + ".");
+            if (_bloqueados.Count > 0 && _situacao != Situacao.Sumiu)
+                r.Add("<color=#ffd27a>" + (_fimOrigem.Campanha == null
+                    ? T("Ficam bloqueados, para não levar à campanha oficial conteúdo que o jogo não conhece: ", "Blocked, so that content the game does not know never reaches the official campaign: ")
+                    : T("Ficam bloqueados, porque a campanha «", "Blocked, because the campaign “") + _fimOrigem.Campanha + T("» não conhece o conteúdo deste mapa: ", "” does not know this map's content: "))
+                    + string.Join(" · ", _bloqueados.ToArray()) + T(". O resto vai com o grupo.", ". The rest goes with the party.") + "</color>");
             if (_aviso != null) r.Add("<color=#ff9a7a>" + _aviso + "</color>");
             return r;
         }
@@ -292,20 +343,20 @@ namespace Bigorna.Encontro
             r.Add(new Opcao { Rotulo = T("Descartar (a partida gravada fica como estava)", "Discard (the save stays as it was)"), Fazer = acabou(() => { Log.Info("grupo do fim descartado"); return null; }) });
             return r;
         }
-        static void Terminar() { _fim = null; _fimOrigem = null; _fimNome = null; _aviso = null; NoQuadroDoJogo = false; ApagarPendente(); try { Menu.PainelMapas.Reler(); } catch { } }
+        static void Terminar() { _fim = null; _fimOrigem = null; _fimNome = null; _aviso = null; _ganhos = new List<string>(); _bloqueados = new List<string>(); NoQuadroDoJogo = false; ApagarPendente(); try { Menu.PainelMapas.Reler(); } catch { } }
 
         // ------------------------------------------------ v289: a pergunta guardada em disco
         /// <summary>v289: o grupo no fim do mapa fica também num arquivo até a mesa escolher: se o jogo fechar antes (queda,
         /// Alt+F4, falta de luz), a pergunta volta na próxima tela de título, e o butim da aventura não se perde.</summary>
         static string ArquivoPendente => Path.Combine(Application.persistentDataPath, "Bigorna", "GrupoPendente.json");
-        class Pendencia { public string Fim, Nome; public Save Origem; public long Quando; }
+        class Pendencia { public string Fim, Nome; public Save Origem; public long Quando; public List<string> Ganhos, Bloqueados; }
         static void GuardarPendente()
         {
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(ArquivoPendente));
                 var tmp = ArquivoPendente + ".tmp";
-                File.WriteAllText(tmp, Newtonsoft.Json.JsonConvert.SerializeObject(new Pendencia { Fim = _fim, Nome = _fimNome, Origem = _fimOrigem, Quando = DateTime.Now.Ticks }));
+                File.WriteAllText(tmp, Newtonsoft.Json.JsonConvert.SerializeObject(new Pendencia { Fim = _fim, Nome = _fimNome, Origem = _fimOrigem, Quando = DateTime.Now.Ticks, Ganhos = _ganhos, Bloqueados = _bloqueados }));
                 if (File.Exists(ArquivoPendente)) File.Delete(ArquivoPendente);
                 File.Move(tmp, ArquivoPendente);
             }
@@ -320,7 +371,7 @@ namespace Bigorna.Encontro
             {
                 var p = Newtonsoft.Json.JsonConvert.DeserializeObject<Pendencia>(File.ReadAllText(ArquivoPendente));
                 if (p == null || string.IsNullOrEmpty(p.Fim) || p.Origem == null) { ApagarPendente(); return; }
-                _fim = p.Fim; _fimNome = p.Nome; _fimOrigem = p.Origem; _aviso = null; NoQuadroDoJogo = false;
+                _fim = p.Fim; _fimNome = p.Nome; _fimOrigem = p.Origem; _aviso = null; NoQuadroDoJogo = false; _ganhos = p.Ganhos ?? new List<string>(); _bloqueados = p.Bloqueados ?? new List<string>();
                 _situacao = Verificar(_fimOrigem);
                 Log.Info("o destino do grupo de «" + (_fimNome ?? "") + "» ficou sem resposta da outra vez; a pergunta volta");
             }

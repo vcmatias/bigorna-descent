@@ -494,7 +494,9 @@ namespace Bigorna.Motor
             // um gatilho deste batimento pode ter fechado o roteiro (vitoria/derrota): nada mais e julgado
             if (Inimigos.Gerando == 0 && EmMarcha)
             {
-                ChecarObjetivos();
+                // (v303: com algo pendente (uma pergunta ou um teste sem resposta, um aviso na fila, uma cena ou um filme), os
+                //  objetivos esperam: a resposta pode trazer um monstro de volta, e a vitória saía antes dela)
+                if (!HaPendencias()) ChecarObjetivos();
                 if (EmMarcha) ChecarDerrota(partida, agora.Count, rodada);
             }
         }
@@ -625,6 +627,14 @@ namespace Bigorna.Motor
                 if (t.Length > 0 && Silencio.EhChaveCrua(t)) { Log.Info("o objetivo foi pisado por «" + t + "»; reposto"); MostrarObjetivo(); }
             }
             catch { }
+        }
+
+        /// <summary>v303: algo do mod ainda acontecendo: um quadro aberto ou na fila (pergunta, teste, aviso), uma cena de gatilho
+        /// esperando a vez, uma cena do jogo ou um filme próprio tocando.</summary>
+        public static bool HaPendencias()
+        {
+            try { return Dialogos.Ocupado || Dialogos.NaFila > 0 || Acoes.CenasPorTocar > 0 || Cinematica.EmMarcha || VideoProprio.EmMarcha; }
+            catch { return false; }
         }
 
         static void ChecarObjetivos()

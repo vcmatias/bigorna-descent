@@ -212,6 +212,15 @@ namespace Bigorna.Encontro
         }
 
         /// <summary>Texto de uma ativacao para a tela, com as vagas {n} preenchidas.</summary>
+        static readonly Dictionary<string, List<string>> _vagas = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        /// <summary>v302: as vagas ({0}, {1}...) de um texto de ativação ou de dica, como o editor as marcou.</summary>
+        internal static void DefinirVagas(string chave, Newtonsoft.Json.Linq.JArray vagas)
+        {
+            if (string.IsNullOrEmpty(chave)) return;
+            if (vagas == null || vagas.Count == 0) { _vagas.Remove(chave); return; }
+            _vagas[chave] = vagas.Select(v => (string)v ?? "").ToList();
+        }
+
         internal static string TextoDaAtivacao(SerializedEnemy e, string sufixo = "_ACTIVATION")
         {
             string aid = e.ActivationId ?? "";
@@ -231,11 +240,27 @@ namespace Bigorna.Encontro
             }
             catch { }
             var limpo = Regex.Replace(texto, "<[^>]+>", "");
+            _vagas.TryGetValue(aid + sufixo, out var marcadas);
+            // (v302: o jogo em outra língua que não o inglês: o nome do monstro já traz o artigo («O Berserker»), então o {0} do
+            //  texto do próprio monstro é ele, como o editor entende desde a v294; antes só «the {0}» contava, e a dica em português
+            //  saía com o herói no lugar do monstro)
+            var lj = ""; try { lj = Dados.DadosDoEditor.LinguaDoJogo() ?? ""; } catch { } bool ingles = lj.Length == 0 || lj.StartsWith("en", StringComparison.OrdinalIgnoreCase);
             return Regex.Replace(texto, @"\{(\d)\}", m =>
             {
                 var n = m.Groups[1].Value;
+                int ni = int.Parse(n);
+                if (marcadas != null && ni < marcadas.Count)
+                {
+                    var tipo = marcadas[ni];
+                    if (tipo == "monster") return monstro ?? Idioma.T("inimigo", "enemy");
+                    if (tipo == "hero") return heroi ?? Idioma.T("o herói", "the hero");
+                    if (tipo == "number") return "1";
+                }
                 string N(string s) => s.Replace("N", "\\{" + n + "\\}");
-                if (Regex.IsMatch(limpo, N(@"\bthe N"), RegexOptions.IgnoreCase)) return monstro ?? Idioma.T("inimigo", "enemy");
+                if (ingles ? Regex.IsMatch(limpo, N(@"\bthe N"), RegexOptions.IgnoreCase)
+                           : (ni == 0 || Regex.IsMatch(limpo, N(@"\b(o|a|os|as|el|la|le|les|il|lo|der|die|das|den|dem)\s+N"), RegexOptions.IgnoreCase))) return monstro ?? Idioma.T("inimigo", "enemy");
+                if (Regex.IsMatch(limpo, N(@"N\s*(espaços?|casas?|dano|danos|vida|cartas?|vezes)\b"), RegexOptions.IgnoreCase)
+                    || Regex.IsMatch(limpo, N(@"(testa \w+|sofre|recupera|aterroriza|marca|vira)\s*N\b"), RegexOptions.IgnoreCase)) return "1";
                 if (Regex.IsMatch(limpo, N(@"N\s+(spaces?|damage|health|cards?|times)\b"), RegexOptions.IgnoreCase)
                     || Regex.IsMatch(limpo, N(@"(tests? \w+|suffers?|recovers?|terrif\w+|scars?|places?)\s+N\b"), RegexOptions.IgnoreCase)) return "1";
                 return heroi ?? Idioma.T("o herói", "the hero");
