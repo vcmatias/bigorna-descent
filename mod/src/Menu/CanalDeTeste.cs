@@ -25,7 +25,7 @@ namespace Bigorna.Menu
     /// - transcricao.txt: cada texto que o mod mostra a mesa (avisos, cenas, escolhas, testes, o objetivo), com a hora e a rodada;
     /// - comandos.jsonl: uma linha JSON por comando, {"id": "1", "cmd": "...", ...}; a resposta sai em respostas.jsonl, com o
     ///   mesmo id. Os comandos usam os botoes e os metodos que o jogador e o modo de teste (F7) usam:
-    ///   estado · botoes · clicar {texto | caminho, n} · digitar {texto, campo} · mesa · mesaFazer {indice} · usar {indice, heroi}
+    ///   estado · botoes · clicar {texto | caminho, n} · digitar {texto, campo} · usar {indice, heroi}
     ///   · abrirSala {grupo} · derrotarTodos · derrotar {guid} · vencer · testesPassam {valor} · acao {acao, params}
     ///   · gatilho {gatilho: o id do gatilho do mapa, semCondicoes} · anotar {texto}.</summary>
     public static class CanalDeTeste
@@ -156,8 +156,6 @@ namespace Bigorna.Menu
                     f0.text = (string)c["texto"] ?? ""; f0.onValueChanged?.Invoke(f0.text); f0.onEndEdit?.Invoke(f0.text); f0.onSubmit?.Invoke(f0.text);
                     return Ok(f0.name);
                 }
-                case "mesa": return Ok(new JArray(Mesa.Itens().Select((x, i) => new JObject { ["indice"] = i, ["secao"] = x.secao, ["rotulo"] = Limpo(x.rotulo) })));
-                case "mesaFazer": if (!noMapa) return Erro("fora de um mapa do Bigorna"); return Mesa.Fazer((int?)c["indice"] ?? -1) ? Ok() : Erro("item da mesa inexistente");
                 case "usar":
                 {
                     if (!noMapa) return Erro("fora de um mapa do Bigorna");

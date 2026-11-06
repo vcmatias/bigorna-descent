@@ -4,7 +4,7 @@
    the first rooms by hand (tiles, heroes, a door with "Open a room"), a chest that gives items, the default script (a door
    that opens its room by itself), monsters (none yet: to the Workshop, import about ten; then one placed in a room), the room generator (a door with no
    script, one room to place), and at last the campaign, where everything unlocks and each part explains itself once. Leaving
-   the campaign closes it with the map generator and the bug report of the game (F9).
+   the campaign closes it with the map generator and the bug report (F9, in the editor and in the game).
    A small panel in a corner says the task at hand; windows (popups) mark the turns; what a step has not reached is locked
    (dimmed, not clickable) and what to do now glows. It never starts by itself under automation (the tests drive the editor).
    Kept in this browser: bigorna-tutorial. */
@@ -207,7 +207,7 @@ var Tutorial = (() => {
   function avancar() { if (estado.passo >= PASSOS_TUTORIAL.length - 1) return terminar(true); estado.passo++; entrar(); }
   function terminar(fim) {
     const ja = estado && estado.feito; estado = { passo: PASSOS_TUTORIAL.length - 1, feito: true }; gravar(); aplicar(); desenhar();
-    if (fim && !ja) janela('The map generator', 'Just like rooms, whole maps can be generated too. ✦ Generate map (experimental) builds a map with its story, objectives, and finale. It is still experimental, so feel free to try it and use it. To keep exploring the editor, follow the Hints in the left column: each one disappears after you try what it shows. Found a bug or have a suggestion? During the game, press F9 (“Report a problem”). Nothing is sent without your click. And if you want to revisit this tutorial, you can repeat it from ⚙ Settings.');
+    if (fim && !ja) janela('The map generator', 'Just like rooms, whole maps can be generated too. ✦ Generate map (experimental) builds a map with its story, objectives, and finale. It is still experimental, so feel free to try it and use it. To keep exploring the editor, follow the Hints in the left column: each one disappears after you try what it shows. Found a bug or have a suggestion? Press F9 (“Report a problem”), here in the editor or during the game. Nothing is sent without your click. And if you want to revisit this tutorial, you can repeat it from ⚙ Settings.');
   }
   /* every half second: the task of the step, the windows of the campaign, the Enemy button with no monster */
   function conferir() {

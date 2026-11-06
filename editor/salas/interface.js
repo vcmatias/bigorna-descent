@@ -819,7 +819,8 @@ $('#btnEnquadrar')?.addEventListener('click', enquadrar);
 
 // ------------------------------------------------------------ keyboard
 window.addEventListener('keydown', ev => {
-  if (ev.key === 'F5' || ev.key === 'F9') { ev.preventDefault(); if (ev.key === 'F5') salvarRapido(); else carregarRapido(); return; }
+  // (v296: F9 reports a problem, as in the game; quick load moved to F8)
+  if (ev.key === 'F5' || ev.key === 'F8' || ev.key === 'F9') { ev.preventDefault(); if (ev.key === 'F5') salvarRapido(); else if (ev.key === 'F8') carregarRapido(); else abrirRelato(); return; }
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
   if (!$('#telaCampanha').hidden || $('#telaFichas') && !$('#telaFichas').hidden || $('.modal')) return;
   if (ev.key === 'Escape') { fecharPopupEscolha(); if (vista3d.on) { alternar3d(false); return; } if (escolha) { terminarClique(); return; } if (sairDoModoMover()) { destaqueSala = null; aviso(tr('Moving ended.')); desenhar(); return; } sel = null; ferramenta = null; tudo(); return; }
@@ -924,7 +925,9 @@ const Historico = (() => {
     const f = foto(); if (f === null) return;
     // (the place where one looks and the room open are not changes of the work)
     if (i >= 0 && pilha[i].o === f.o) { pilha[i] = f; return; }
+    const antes = i >= 0 ? pilha[i].o : null;
     pilha.splice(i + 1); pilha.push(f); if (pilha.length > MAX) pilha.shift(); i = pilha.length - 1;
+    if (typeof anotarMudanca === 'function') anotarMudanca(antes, f.o);   // (v299: the log of what was done, for the report)
     if (typeof agendarExtracao === 'function') agendarExtracao();   // (v240: a picture that came in goes into the store)
   }
   const agendar = () => { if (aplicando) return; clearTimeout(timer); timer = setTimeout(conferir, 350); };
@@ -958,8 +961,8 @@ const Historico = (() => {
       redesenhar(e); guardarEstado();
     } finally { setTimeout(() => { aplicando = false; }, 0); }
   }
-  function desfazer() { if (EDITANDO_PADRAO) return false; conferir(); if (i <= 0) { aviso(tr('Nothing to undo.')); return false; } i--; aplicar(pilha[i]); aviso(tr('Undone (Ctrl+Y redoes it).')); return true; }
-  function refazer() { if (EDITANDO_PADRAO) return false; conferir(); if (i >= pilha.length - 1) { aviso(tr('Nothing to redo.')); return false; } i++; aplicar(pilha[i]); aviso(tr('Redone.')); return true; }
+  function desfazer() { if (EDITANDO_PADRAO) return false; conferir(); if (i <= 0) { aviso(tr('Nothing to undo.')); return false; } i--; aplicar(pilha[i]); if (typeof anotarAcao === 'function') anotarAcao('undo (Ctrl+Z)'); aviso(tr('Undone (Ctrl+Y redoes it).')); return true; }
+  function refazer() { if (EDITANDO_PADRAO) return false; conferir(); if (i >= pilha.length - 1) { aviso(tr('Nothing to redo.')); return false; } i++; aplicar(pilha[i]); if (typeof anotarAcao === 'function') anotarAcao('redo (Ctrl+Y)'); aviso(tr('Redone.')); return true; }
   const ehCaixaDeTexto = el => el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && /^(text|search|email|url|)$/i.test(el.type || '')) || el.isContentEditable);
   window.addEventListener('keydown', e => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return;

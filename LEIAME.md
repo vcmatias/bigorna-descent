@@ -27,7 +27,7 @@ vínculo com elas nem aval delas. É preciso ter o jogo na Steam (Windows, ou Li
   coloca monstros, baús, portas e objetos, escreve os textos e gatilhos e testa o andamento. Ele também gera um mapa
   inteiro a partir de algumas escolhas (tamanho, tema, vilão, inimigos) e encadeia mapas numa campanha no mapa-múndi.
 - Um **tutorial** guiado dentro do editor acompanha a montagem do primeiro mapa, passo a passo.
-- **Relatar um problema** com F9 no jogo: o mod junta a sua explicação, o mapa em jogo e os registros.
+- **Relatar um problema** com F9, no jogo ou no editor: a sua explicação vai com o mapa em jogo (ou o trabalho da tela) e os registros, só quando você clica em Enviar.
 
 ## Nada do jogo é compartilhado
 

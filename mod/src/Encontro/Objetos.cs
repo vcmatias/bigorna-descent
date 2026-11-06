@@ -742,9 +742,9 @@ namespace Bigorna.Encontro
             }
         }
 
-        /// <summary>Os objetos a vista agora, com a casa (para a mesa remontar o tabuleiro ao retomar); os pilares vao com as pecas.</summary>
+        /// <summary>Os objetos a vista agora, sem a casa (v297: como no jogo original, a tela mostra onde estão; para a mesa remontar o tabuleiro ao retomar); os pilares vao com as pecas.</summary>
         public static List<string> VisiveisNaMesa() => Postos.Where(p => p != null && p.Visivel && p.Dados != null && p.Dados.DaPeca < 0)
-            .Select(p => p.Rotulo + (string.Equals(p.Rotulo, Nome(p.Dados.Tipo)) ? "" : " (" + Nome(p.Dados.Tipo) + ")") + (p.Dados.TemPosicao ? " " + p.Dados.X + "," + p.Dados.Y : "") + (p.Dados.Nivel > 0 ? Idioma.T(", nível ", ", level ") + p.Dados.Nivel : "")).ToList();
+            .Select(p => p.Rotulo + (string.Equals(p.Rotulo, Nome(p.Dados.Tipo)) ? "" : " (" + Nome(p.Dados.Tipo) + ")") + (p.Dados.Nivel > 0 ? Idioma.T(", nível ", ", level ") + p.Dados.Nivel : "")).ToList();
 
         public static void Reabrir(int indice)
         {

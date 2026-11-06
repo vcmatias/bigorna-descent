@@ -96,17 +96,16 @@ namespace Bigorna.Encontro
             var herois = Jogo.Herois;
             var casas = m.Spawns.InicioHerois;
             if (herois.Count == 0 || casas.Count == 0) return;
-            var linhas = new List<string>();
+            // (v297: como no jogo original, o aviso diz só que as casas estão destacadas, sem a posição no tabuleiro; ela fica no registro)
             for (int i = 0; i < herois.Count && i < casas.Count; i++)
             {
                 var c = casas[i];
                 if (c == null || c.Length < 2) continue;
-                linhas.Add(NomeDe(herois[i]) + Idioma.T(": casa ", ": space ") + c[0] + "," + c[1]);
                 Log.Info("  saída de " + herois[i].HeroId + ": " + c[0] + "," + c[1]);
             }
-            if (linhas.Count == 0) return;
             var inicio = casas.Take(herois.Count).Where(c => c != null && c.Length >= 2).ToList();
-            Dialogos.Mensagem(Idioma.T("Posições iniciais (casas destacadas):\n", "Starting positions (highlighted spaces):\n") + string.Join("\n", linhas.ToArray()), null, Idioma.T("Heróis", "Heroes"), () =>
+            if (inicio.Count == 0) return;
+            Dialogos.Mensagem(Idioma.T("Coloquem os heróis nas casas destacadas.", "Place the heroes on the highlighted spaces."), null, Idioma.T("Heróis", "Heroes"), () =>
             {
                 try
                 {

@@ -27,7 +27,7 @@ affiliation with them and no endorsement from them. You need your own copy of th
   place monsters, chests, doors and objects, write the texts and triggers, and test the flow. It can also generate a
   whole map from a few choices (size, theme, villain, enemies) and chain maps into a campaign on the world map.
 - A guided **tutorial** inside the editor walks through a first map step by step.
-- **Report a problem** with F9 in the game: the mod packs your description, the map in play and the logs.
+- **Report a problem** with F9, in the game or in the editor: your description goes with the map in play (or the work on screen) and the logs, only when you click Send.
 
 ## Nothing from the game is shared
 

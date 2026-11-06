@@ -237,7 +237,7 @@ namespace Bigorna.Encontro
             Log.Info("  entra " + e.Id + " (" + modelo.Type + ") em " + Jogo.Casa(pos) + (string.IsNullOrEmpty(e.Grupo) ? "" : " [grupo " + e.Grupo + "]") + " · base " + corLog);
             bool fechou = false;
             Dialogos.Mensagem((grandes != null ? Idioma.TF("Coloquem <b>{0}</b>, um monstro grande, nas quatro casas marcadas, base {1}.", "Place <b>{0}</b>, a large monster, on the four marked spaces, {1} base.", nome, cor)
-                : Idioma.TF("Coloquem <b>{0}</b> na casa marcada ({1}), base {2}.", "Place <b>{0}</b> on the marked space ({1}), {2} base.", nome, Jogo.Casa(pos), cor)) + (string.IsNullOrEmpty(e.Texto) ? "" : "\n\n" + e.Texto), () => fechou = true, Idioma.T("Inimigo", "Enemy"));
+                : Idioma.TF("Coloquem <b>{0}</b> na casa marcada, base {1}.", "Place <b>{0}</b> on the marked space, {1} base.", nome, cor)) + (string.IsNullOrEmpty(e.Texto) ? "" : "\n\n" + e.Texto), () => fechou = true, Idioma.T("Inimigo", "Enemy"));
             limite = Time.unscaledTime + 180f;
             while (!fechou && Time.unscaledTime < limite) yield return null;
             while (Jogo.Salvando) yield return null;
@@ -524,9 +524,8 @@ namespace Bigorna.Encontro
             foreach (var e in Jogo.Inimigos)
             {
                 if (e == null) continue;
-                var c = CasaDe(e);
-                r.Add(c.HasValue ? Idioma.TF("{0}, base {1}, casa {2}", "{0}, {1} base, space {2}", NomeDoInimigo(e), NomeCor(e.PlasticId), c.Value.Item1 + "," + c.Value.Item2)
-                    : Idioma.TF("{0}, base {1}", "{0}, {1} base", NomeDoInimigo(e), NomeCor(e.PlasticId)));
+                // (v297: sem a posição no tabuleiro, como no jogo original: a tela mostra onde cada um está)
+                r.Add(Idioma.TF("{0}, base {1}", "{0}, {1} base", NomeDoInimigo(e), NomeCor(e.PlasticId)));
             }
             return r;
         }

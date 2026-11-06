@@ -41,8 +41,7 @@ namespace Bigorna.Motor
         {
             if (string.IsNullOrEmpty(chave) || !_anunciadas.Add(chave)) return;
             Log.Info("missão anunciada: " + chave);
-            MostrarObjetivo(); Mesa.Atualizar();
-        }
+            MostrarObjetivo();        }
         static void CumpriuMissao(Dmap.Objetivo o) { if (o != null && !string.IsNullOrEmpty(o.Missao)) { Vars["mission-" + o.Missao] = 1; Disparar("missionComplete", ("mission", o.Missao)); } }
         public static int ObjetivoAtual => _principais.Count == 0 ? 0 : _atual + 1;
         public static int QuantosObjetivos => _principais.Count;
@@ -138,7 +137,6 @@ namespace Bigorna.Motor
             Butim.Importar(e?.Butim);
             Log.Info("roteiro retomado: rodada " + Rodada + ", objetivo " + ObjetivoAtual + " de " + _principais.Count + ", " + _disparados.Count + " gatilho(s) já disparados, " + Vars.Count + " variável(is), " + Derrotados + " derrotado(s)");
             AgendarTemporizadores();
-            Mesa.Atualizar();
         }
 
         /// <summary>v265: o estado do roteiro agora, para a partida em andamento.</summary>
@@ -188,7 +186,6 @@ namespace Bigorna.Motor
             Escolta.Reiniciar();
             Condicoes.Reiniciar();
             Objetos.AoUsar = null;
-            Mesa.Fechar();
         }
 
         // ------------------------------------------------------------------ gatilhos
@@ -290,7 +287,7 @@ namespace Bigorna.Motor
             // (o modo de teste abre uma sala pelo gatilho dela mesmo quando a condicao e uma resposta ainda nao dada)
             if (!semCondicoes && !Condicoes.Todas(g.Condicoes, g))
             {
-                if (g.Senao != null && g.Senao.Count > 0) { Efeitos++; Log.Info("gatilho «" + g.Rotulo + "»: requisito não cumprido; corre o «senão»"); _executando.Add(g.Id); try { Acoes.Executar(g.Senao, g); } finally { _executando.Remove(g.Id); } Mesa.Atualizar(); }
+                if (g.Senao != null && g.Senao.Count > 0) { Efeitos++; Log.Info("gatilho «" + g.Rotulo + "»: requisito não cumprido; corre o «senão»"); _executando.Add(g.Id); try { Acoes.Executar(g.Senao, g); } finally { _executando.Remove(g.Id); } }
                 return false;
             }
             _disparados.Add(g.Id);
@@ -302,7 +299,6 @@ namespace Bigorna.Motor
             finally { _executando.Remove(g.Id); }
             Disparar("afterTrigger", ("trigger", g.Id));
             if (_executando.Count == 0) SoltarVarsMudadas();
-            Mesa.Atualizar();
             return true;
         }
 
@@ -330,7 +326,6 @@ namespace Bigorna.Motor
             if (ligado) { _desligados.Remove(g.Id); _disparados.Remove(g.Id); _niveis.RemoveWhere(k => k == g.Id || k.StartsWith(g.Id + "|")); }
             else _desligados.Add(g.Id);
             Log.Info("gatilho «" + g.Rotulo + "» " + (ligado ? "ligado" : "desligado"));
-            Mesa.Atualizar();
         }
 
         static void AgendarTemporizadores()
@@ -369,7 +364,6 @@ namespace Bigorna.Motor
                     Dialogos.Mensagem(NadaMais, null, p.Rotulo);
             }
             finally { ObjetoDaPergunta = -1; }
-            Mesa.Atualizar();
         }
 
         public static string NadaMais => T("Não há mais nada a fazer aqui.", "There is nothing more to do here.");
@@ -656,7 +650,6 @@ namespace Bigorna.Motor
             MostrarObjetivo();
             // (v268: a missão de um contador, como a da porta que só abre depois das ondas, é um passo do mapa: sem o "opcional")
             Dialogos.Mensagem((string.IsNullOrEmpty(_opcionais[i].Missao) ? T("Objetivo opcional cumprido: ", "Optional objective completed: ") : T("Objetivo cumprido: ", "Objective completed: ")) + t, null, T("Objetivo", "Objective"));
-            Mesa.Atualizar();
         }
 
         /// <summary>O objetivo atual foi cumprido; passa ao proximo ou fecha com vitoria.</summary>
@@ -674,7 +667,6 @@ namespace Bigorna.Motor
                 Log.Info("  agora: «" + TextoDe(Objetivo) + "»");
                 MostrarObjetivo();
                 Disparar("objectiveStart", ("n", _atual + 1));
-                Mesa.Atualizar();
                 if (!ObjetivosAuto.JaEstava(Objetivo)) return;
                 Log.Info("  «" + TextoDe(Objetivo) + "» já estava feito; passa ao seguinte");
             }
@@ -688,7 +680,6 @@ namespace Bigorna.Motor
             _atual = n - 1;
             MostrarObjetivo();
             Disparar("objectiveStart", ("n", n));
-            Mesa.Atualizar();
         }
 
         // ------------------------------------------------------------------ derrota e fim
@@ -750,7 +741,6 @@ namespace Bigorna.Motor
             Tabuleiro.Desmontado();
             _fecharCom = vitoria; Resultado = vitoria;
             _fecharDesde = Time.unscaledTime;
-            Mesa.Fechar();
         }
 
         static bool JogoFechaSozinho()

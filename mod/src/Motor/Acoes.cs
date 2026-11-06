@@ -95,7 +95,17 @@ namespace Bigorna.Motor
         }
 
         /// <summary>Coisas que acontecem na mesa e o app so avisa (dano em heroi, itens...). Sao juntadas num quadro so.</summary>
-        static void Anotar(string texto) { Roteiro.Pendencias.Add("• " + texto); }
+        static void Anotar(string texto) { Anotar(texto, null); }
+        /// <summary>v298: o que a mesa faz numa casa ou numa área vai com as casas destacadas, sem a posição no texto (como no
+        /// jogo original); o destaque acende com o quadro e apaga quando ele fecha.</summary>
+        static void Anotar(string texto, IEnumerable<Transform> casas)
+        {
+            if (Roteiro.Pendencias.Count == 0) _casasDaMesa.Clear();
+            Roteiro.Pendencias.Add("• " + texto);
+            if (casas != null) foreach (var t in casas) if (t != null && !_casasDaMesa.Contains(t)) _casasDaMesa.Add(t);
+        }
+        static readonly List<Transform> _casasDaMesa = new List<Transform>();
+        static IEnumerable<Transform> CasaDe(int[] c) { var t = c != null && c.Length >= 2 ? Tabuleiro.CasaNaGrade(c[0], c[1], c.Length > 2 ? c[2] : 0) : null; if (t != null) yield return t; }
         /// <summary>Uma cena de gatilho espera a fila de avisos: as pecas, os objetos e o texto da sala que abriu vem antes.</summary>
         /// <summary>v247: cenas proprias que um gatilho mandou tocar e ainda esperam os avisos da fila (o fim do encontro espera por
         /// elas: antes, a cena e o fim saiam juntos, e a caixa da cena sobrava para o mapa-mundi, prendendo a fila).</summary>
@@ -121,7 +131,20 @@ namespace Bigorna.Motor
             if (Roteiro.Pendencias.Count == 0) return;
             var texto = T("Apliquem na mesa:\n", "Apply on the table:\n") + string.Join("\n", Roteiro.Pendencias.ToArray());
             Roteiro.Pendencias.Clear();
-            Dialogos.Mensagem(texto, null, T("Na mesa", "On the table"));
+            var casas = _casasDaMesa.ToList(); _casasDaMesa.Clear();
+            var acesas = new List<Transform>();
+            Dialogos.Mensagem(texto, () =>
+            {
+                foreach (var t in acesas) { try { if (t != null) Jogo.Cena?.RemovePersitentHighlight(t); } catch { } }
+            }, T("Na mesa", "On the table"), () =>
+            {
+                if (casas.Count == 0) return;
+                var cena = Jogo.Cena; if (cena == null) return;
+                // (uma casa já destacada por outra ação fica como está: o quadro só apaga as que ele acendeu)
+                foreach (var t in casas) { if (t == null || _realces.Contains(t) || _ateARodada.Contains(t) || _destinos.Contains(t)) continue; try { cena.AddPersistentHighlight(t); acesas.Add(t); } catch { } }
+                try { var c = casas.Where(t => t != null).ToList(); if (c.Count > 0) cena.CameraEncounter?.FocusOn(new Vector3(c.Average(t => t.position.x), 0f, c.Average(t => t.position.z))); } catch { }
+                Log.Info("  na mesa: " + acesas.Count + " casa(s) destacadas");
+            });
         }
 
         static void Uma(Dmap.Clausula a, Dmap.Gatilho dono)
@@ -201,7 +224,7 @@ namespace Bigorna.Motor
                     var area = P.Area(p);
                     // sai da reserva (spawn pool) quando ha uma; senao, dos inimigos que o mapa ja tem
                     var modelos = Inimigos.Reserva.Count > 0 ? Inimigos.Reserva.Distinct().ToList() : Roteiro.Mapa.Spawns.Inimigos.Where(e => !Balanceado.EhVaga(e)).Select(e => e.Id).Where(x => !string.IsNullOrEmpty(x)).Distinct().ToList();
-                    if (modelos.Count == 0) { Anotar(TF("Entram {0} inimigos aleatórios", "{0} random enemies enter", n) + (area != null ? T(" na área ", " in area ") + area[0] + "," + area[1] + T(" a ", " to ") + area[2] + "," + area[3] : "")); break; }
+                    if (modelos.Count == 0) { Anotar(TF("Entram {0} inimigos aleatórios", "{0} random enemies enter", n) + (area != null ? T(" na área destacada", " in the highlighted area") : ""), area != null ? TransformsDe(p).ToList() : null); break; }
                     var lista = new List<Dmap.Inimigo>();
                     var vaoEntrar = new Dictionary<EnemyTypes, int>();
                     for (int i = 0; i < n; i++)
@@ -368,7 +391,7 @@ namespace Bigorna.Motor
                     });
                     break;
                 }
-                case "moveHero": { var c = P.Celula(p); Anotar(T("Movam ", "Move ") + NomeHeroi(P.Texto(p, "hero")) + T(" para ", " to ") + (c != null ? T("", "space ") + c[0] + "," + c[1] : T("o lugar indicado", "the indicated place"))); break; }
+                case "moveHero": { var c = P.Celula(p); Anotar(T("Movam ", "Move ") + NomeHeroi(P.Texto(p, "hero")) + (c != null ? T(" para a casa destacada", " to the highlighted space") : T(" para o lugar indicado", " to the indicated place")), CasaDe(c).ToList()); if (c != null) Log.Info("  mover herói para " + c[0] + "," + c[1]); break; }
                 case "setHeroOnFire": Anotar(NomeHeroi(P.Texto(p, "hero")) + T(" pega fogo", " catches fire")); break;
 
                 // ------------------------------------------------ butim
@@ -410,7 +433,7 @@ namespace Bigorna.Motor
                 case "hideObject": Objetos.Mostrar(P.Inteiro(p, "interactable", -1), false); break;
                 // o objeto fica na mesa, mas ja nao se usa (um teste cumulativo que enfim passou)
                 case "spendObject": { var po = Objetos.Pegar(P.Inteiro(p, "interactable", -1)); if (po != null) { po.Usado = true; Log.Info("  objeto «" + po.Rotulo + "» gasto"); } break; }
-                case "startFire": { var ar = P.Area(p); Anotar(ar != null ? T("Fogo na área ", "Fire in area ") + ar[0] + "," + ar[1] + T(" a ", " to ") + ar[2] + "," + ar[3] : T("Fogo na área indicada", "Fire in the indicated area")); break; }
+                case "startFire": { var ar = P.Area(p); Anotar(ar != null ? T("Fogo na área destacada", "Fire in the highlighted area") : T("Fogo na área indicada", "Fire in the indicated area"), ar != null ? TransformsDe(p).ToList() : null); if (ar != null) Log.Info("  fogo em " + ar[0] + "," + ar[1] + " a " + ar[2] + "," + ar[3]); break; }
                 case "highlightArea":
                 {
                     var cena = Jogo.Cena; if (cena == null) break;

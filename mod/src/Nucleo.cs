@@ -191,7 +191,6 @@ namespace Bigorna
                 }
                 PainelMapas.Desenhar();
                 Dados.DadosDoEditor.Desenhar();
-                Mesa.Desenhar();
                 PainelSons.Desenhar();
                 Relatos.Desenhar();
                 Menu.Atualizacao.Desenhar();

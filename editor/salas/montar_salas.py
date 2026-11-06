@@ -16,7 +16,7 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 DADOS = os.path.join(AQUI, "..", "dados")
 DIST = os.path.join(AQUI, "..", "dist")
 
-PARTES = (("IDIOMA", "idioma.js"), ("IDIOMA_PT", "idioma_pt.js"), ("LINGUAS", "linguas.js"), ("JOGO", "jogo.js"), ("CONFIG", os.path.join("..", "comum", "config.js")), ("IMAGENS", "imagens.js"), ("BASE", "base.js"), ("DESENHO", "desenho.js"), ("TEXTURAS", "texturas.js"), ("PAPELAO", "papelao.js"), ("TRES", "tres.js"),
+PARTES = (("IDIOMA", "idioma.js"), ("IDIOMA_PT", "idioma_pt.js"), ("RELATOS", "relatos.js"), ("LINGUAS", "linguas.js"), ("JOGO", "jogo.js"), ("CONFIG", os.path.join("..", "comum", "config.js")), ("IMAGENS", "imagens.js"), ("BASE", "base.js"), ("DESENHO", "desenho.js"), ("TEXTURAS", "texturas.js"), ("PAPELAO", "papelao.js"), ("TRES", "tres.js"),
           ("INTERFACE", "interface.js"), ("GATILHOS", "gatilhos.js"), ("FICHAS", "fichas.js"), ("HEROIS", "herois.js"), ("FORJA_FUNDO", "forja_fundo.js"), ("ARMAS", "armas.js"),
           ("RECEITAS", "receitas.js"), ("FACANHAS", "facanhas.js"), ("PERICIAS", "pericias.js"), ("PACOTES", "pacotes.js"), ("CAMPANHA", "campanha.js"), ("HISTORIAS", "historias.js"), ("NARRATIVA", "narrativa.js"), ("OFICINA_HISTORIAS", "oficina_historias.js"), ("GERADOR", "gerador.js"), ("GERADOR_MAPAS", "gerador_mapas.js"), ("SIMULADOR", "simulador.js"), ("EXPORTAR", "exportar.js"), ("ACERVO", "acervo.js"), ("TRADUCOES", "traducoes.js"), ("ONESHOT", "oneshot.js"), ("TUTORIAL", "tutorial.js"))
 
@@ -113,7 +113,7 @@ def conferir_sintaxe():
 
 
 # v274: a página só do gerador do mapa oneshot (Bigorna-Gerador.html), sem a tela do editor: as partes que o gerador usa
-FORA_DO_GERADOR = {"DESENHO", "TEXTURAS", "PAPELAO", "TRES", "INTERFACE", "FORJA_FUNDO", "ACERVO", "TUTORIAL", "OFICINA_HISTORIAS"}
+FORA_DO_GERADOR = {"RELATOS", "DESENHO", "TEXTURAS", "PAPELAO", "TRES", "INTERFACE", "FORJA_FUNDO", "ACERVO", "TUTORIAL", "OFICINA_HISTORIAS"}
 PARTES_DO_GERADOR = tuple(p for p in PARTES if p[0] not in FORA_DO_GERADOR)
 
 
