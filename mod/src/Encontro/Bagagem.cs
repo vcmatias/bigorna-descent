@@ -88,7 +88,7 @@ namespace Bigorna.Encontro
                     var pecas = new[] { w.PartAId, w.PartBId, w.PartCId }.Where(x => !string.IsNullOrEmpty(x)).Select(NomeDoItem).ToArray();
                     return NomeDaArma(w.Id) + (pecas.Length > 0 ? " <size=85%>(" + string.Join(", ", pecas) + ")</size>" : "");
                 }).ToArray();
-                bool armaFora = novoJogoMais && ws.Any(w => Fora((i, o) => UserCollectionManager.GetWeapon(i, o), w.Id) || new[] { w.PartAId, w.PartBId, w.PartCId }.Any(x => Fora((i, o) => UserCollectionManager.GetWeaponPart(i, o), x)));
+                bool armaFora = ws.Any(w => Proprio(w.Id) || new[] { w.PartAId, w.PartBId, w.PartCId }.Any(Proprio)) || novoJogoMais && ws.Any(w => Fora((i, o) => UserCollectionManager.GetWeapon(i, o), w.Id) || new[] { w.PartAId, w.PartBId, w.PartCId }.Any(x => Fora((i, o) => UserCollectionManager.GetWeaponPart(i, o), x)));
                 armas.Linhas.Add("<b>" + Herois.NomeDe(p) + ":</b> " + string.Join(" · ", partes) + (armaFora ? T("  <i>(volta às armas iniciais: peça de fora da coleção)</i>", "  <i>(back to the starting weapons: a part from outside the collection)</i>") : ""));
             }
             var pecasSoltas = (g.ItemInventory ?? new List<SerializedItem>()).Where(x => x != null && Pegar(() => UserCollectionManager.GetItem(x.Id, false)) is WeaponPartsModel).ToList();
@@ -98,7 +98,7 @@ namespace Bigorna.Encontro
 
             // armaduras e os outros itens do inventário
             var inv = (g.ItemInventory ?? new List<SerializedItem>()).Where(x => x != null && !string.IsNullOrEmpty(x.Id)).Select(x => new { x.Id, m = Pegar(() => UserCollectionManager.GetItem(x.Id, false)) }).ToList();
-            var forasI = inv.Where(x => Sai((i, o) => UserCollectionManager.GetItem(i, o), x.Id) || (!novoJogoMais ? false : Proprio(x.Id))).ToList();
+            var forasI = inv.Where(x => Sai((i, o) => UserCollectionManager.GetItem(i, o), x.Id) || Proprio(x.Id)).ToList();   // (v304: o conteúdo próprio de uma obra do Bigorna nunca vai para outra, nem para um mapa oneshot)
             var ficam = inv.Except(forasI).ToList();
             r.Add(new Secao { Titulo = T("Armaduras", "Armor"), Linhas = { Ou(Contados(ficam.Where(x => x.m is ArmorModel).Select(x => NomeDoItem(x.Id)))) } });
             var itens = new Secao { Titulo = T("Itens", "Items"), Linhas = { Ou(Contados(ficam.Where(x => !(x.m is ArmorModel) && !(x.m is WeaponPartsModel)).Select(x => NomeDoItem(x.Id)))) } };

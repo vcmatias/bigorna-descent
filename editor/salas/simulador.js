@@ -17,11 +17,24 @@ const SIM = { herois: 2, vida: 8, acoes: 2, sucessos: 2, dano: 3, defesa: 0.5, g
 /* v261: the health of a hero by act (the average of the hero cards: Act I about 8, Act II 11) */
 const VIDA_POR_ATO = { 1: 8, 2: 11 };
 
+/* v365: the successes of a test roll of the party, by the difficulty and the act: those the generator asks of a test of the base
+   (sucessosDoTeste(2)); Easy, always 2 */
+function sucessosDaMesa(dif, ato) { const aj = dif === 'facil' ? 0 : ({ normal: 1, dificil: 2 }[dif] ?? 1) + (ato === 2 ? 1 : 0); return Math.min(4, 2 + Math.min(2, aj)); }
 /* opcoes.ato: the act of the party (the one-shot map with a saved party); without it, the act the map asks for. A health
    given in opcoes (the custom simulation) stays */
 function simularMapa(pm, opcoes = {}) {
   const ato = +opcoes.ato === 2 || +opcoes.ato === 1 ? +opcoes.ato : comProjeto(pm, () => atoNecessario(pm));
-  const cfg = { ...SIM, ...opcoes, ato }; if (opcoes.vida == null) cfg.vida = VIDA_POR_ATO[ato] || SIM.vida; const H = cfg.herois;
+  // (v365: the difficulty of the map: the party rolls the successes the generator counted on for it (sucessosDoTeste: a test
+  //  of the base, 2, is passed in one roll), so a Normal or Hard map is played by the party it was made for; before, every map
+  //  was played by the Easy party, and every Normal and Hard map was lost)
+  const dif = ['facil', 'normal', 'dificil'].includes(opcoes.dificuldade) ? opcoes.dificuldade : (pm.meta && pm.meta.gerado && pm.meta.gerado.dificuldade) || 'facil';
+  const cfg = { ...SIM, ...opcoes, ato, dificuldade: dif }; if (opcoes.vida == null) cfg.vida = VIDA_POR_ATO[ato] || SIM.vida;
+  // (v365: the party of a Normal or Hard map is the one those maps are made for: weapons that hit harder (5 a success) and armour
+  //  that blocks 1 of each monster's hit; measured on generated maps: 3 heroes win about 8 Normal maps in 10 and 2 Hard maps in 3 (asked as the game asks for them, BigornaGerador.rodar)
+  //  Easy keeps its party. To be measured against the table (the plan of the simulator, item 6))
+  if (dif !== 'facil') { if (opcoes.dano == null) cfg.dano = 5; if (opcoes.golpe == null) cfg.golpe = -1; }
+  if (opcoes.sucessos == null) cfg.sucessos = sucessosDaMesa(dif, +(pm.meta && pm.meta.gerado && pm.meta.gerado.atos) || ato);
+  const H = cfg.herois;   // (the successes by the boxes of the map: the generator counts the tests by them)
   return comProjeto(pm, () => simularPartida(pm, cfg, H));
 }
 function simularPartida(pm, cfg, H) {
@@ -56,12 +69,17 @@ function simularPartida(pm, cfg, H) {
   const entrar = (sala, st, grupo, dono) => { const m = { sala, ...st, grupo, dono, chegando: sala !== local }; log('monster in room ' + (sala + 1) + ' hp' + st.hp + ' atk' + st.atk + ' def' + st.def); vivos.push(m); R.monstros++; R.monstrosPorSala[sala] = (R.monstrosPorSala[sala] || 0) + 1; if (grupo) { grupos[grupo] = grupos[grupo] || { sala, lista: [], dono }; grupos[grupo].lista.push(m); } return m; };
   const poolDaSala = si => poolDe(pm, si).filter(id => monstro(id));
   const porPool = (si, vagas, intensidade, grupo, dono, minimo) => { if (!vagas) return; const x = simularVagas(vagas, intensidade, poolDaSala(si), H, pm, [], minimo || 0); for (let k = 0; k < x.n; k++) entrar(si, media(poolDaSala(si), x.tier), grupo, dono); };
+  // (how deep a room is: the rooms opened one from the other, from the start; a detour is as deep as the room beside it on the way)
+  const _fundura = new Map(); const fundura = si => { if (_fundura.has(si)) return _fundura.get(si); _fundura.set(si, 0); const ab = si > 0 ? abridorDe(pm, si) : null; const f = ab && ab.ri !== si ? fundura(ab.ri) + 1 : 0; _fundura.set(si, f); return f; };
+  const mare = (pm.eventos || []).some(ev => Object.keys(ev).some(k => Array.isArray(ev[k]) && ev[k].some(x => x && x.tipo === 'remove_room')));
   const abrirSala = si => { if (abertas.has(si) || removidas.has(si)) return; abertas.add(si); log('room ' + (si + 1) + ' opens');
     const s = pm.salas[si]; (s.inimigos || []).filter(e => !ehPool(e.enemy)).forEach(e => { const m = entrar(si, statsDe(e.enemy, (e.tierPorHerois ? e.tierPorHerois[Math.min(3, H - 1)] : e.tier) || 1), null, e); if (e.bonusAtaque) m.atk += e.bonusAtaque; if (e.bonusDefesa) m.def += e.bonusDefesa; });
     porPool(si, vagasPoolDaSala(s), intensidadeDaSala(s), 'G' + si, s.grupoPool || null); };
   // ---- the lists of an owner
   const executar = (dono, lista, si, ctx = {}) => { for (const g of (dono && dono[lista]) || []) { if (venceu || perdeu) return; passo(dono, g, si, ctx); } };
+  const primeiras = new Set();   // (v348: a trigger marked "first time" (g.primeiraVez, a key shared by several objects) runs once, as in the export: a clue read again adds nothing)
   const passo = (o, g, si, ctx) => {
+    if (g.primeiraVez) { if (primeiras.has(g.primeiraVez)) return; if (reqOk(g.requisitos)) primeiras.add(g.primeiraVez); }
     if (!reqOk(g.requisitos)) { if (o['senao:' + g.uid]) executar(o, 'senao:' + g.uid, si, ctx); ctx.falhouReq = true; return; }
     switch (g.tipo) {
       case 'text': efeitosDoTexto(g.text, 'room ' + (si + 1)); break;
@@ -81,7 +99,7 @@ function simularPartida(pm, cfg, H) {
       case 'give_item': if (g.acao === 'remove') { if (g.modo === 'gold') ouro -= g.amount || 0; break; }
         if (g.modo === 'gold') { ouro += g.amount || 0; R.ouro += g.amount || 0; } else if (g.modo === 'newitem') { if ((g.requisitos || []).some(r => r.tipo === 'gold')) R.comprados = (R.comprados || 0) + (g.amount || 1); else R.itens += g.amount || 1; } else R.pontosEspolio += g.points || 0; break;
       case 'move_heroes': local = g._sala ?? (salaDasCasas(g.cells) ?? local); break;
-      case 'remove_room': removidas.add(g.sala); if (g.sala > 0) abertas.delete(g.sala); vivos.forEach(m => { if (m.sala === g.sala) m.hp = 0; }); break;
+      case 'remove_room': if (!removidas.has(g.sala)) log('room ' + (g.sala + 1) + ' leaves the table'); removidas.add(g.sala); if (g.sala > 0) abertas.delete(g.sala); vivos.forEach(m => { if (m.sala === g.sala) m.hp = 0; }); break;
       case 'enemy_condition': { if (g.acao === 'mirar' || g.acao === 'desmirar') break; const doGrupo = m => g.alvo !== 'group' || ('room-' + (m.sala + 1)) === g.grupo || m.grupo === g.grupo; const alvo = vivos.filter(m => m.hp > 0);
         if (g.acao === 'heal') { alvo.filter(doGrupo).forEach(m => { m.hp += g.amount || 0; }); break; }
         // (a named group, the villain who hunts: only it, and nothing to say when it is not in play)
@@ -108,8 +126,15 @@ function simularPartida(pm, cfg, H) {
     const livres = [...Array(n).keys()].filter(i => !g.umaVez || !usadas.has(i)); if (!livres.length) return -1;
     // a question that gates the way (a point of no return, a waystone, a merchant): the first answer; searches: the best
     const texto = i => { const l = o['op' + i + ':' + g.uid] || []; return JSON.stringify(l.concat(l.filter(x => x.tipo === 'skill_test').flatMap(x => o['ok:' + x.uid] || []))) + ' ' + (g.options[i].response || ''); };
-    const valor = i => { const t = texto(i); let v = 0; if (/open_room|"counter"|move_heroes/.test(t)) v += 10; if (/newitem/.test(t)) v += 4; if (/"random"/.test(t)) v += 2; if (/"gold"/.test(t) && !/"remove"/.test(t)) v += 1;
-      if (/(cura|heals?)\s+\d/i.test(t)) v += vida < H * cfg.vida - 2 ? 5 : -2; if (/enemy_condition/.test(t) && !/"acao":"heal"/.test(t)) v += vivos.some(m => m.hp > 0) ? 3 : -6;
+    // (v348: what moves the map on is worth it while it still does: a room not open yet, a count not full yet (a puzzle solved
+    //  asks again and again; its answer is worth nothing more), a way to another room)
+    const lista = i => { const l = o['op' + i + ':' + g.uid] || []; return l.concat(l.filter(x => x.tipo === 'skill_test').flatMap(x => o['ok:' + x.uid] || [])); };
+    const avanca = i => lista(i).some(x => (x.tipo === 'open_room' && !abertas.has(x.sala) && !removidas.has(x.sala)) || (x.tipo === 'counter' && (x.acao || 'add') !== 'use' && !contCheio.has(x.contador)) || x.tipo === 'move_heroes' || x.tipo === 'add_object'
+      // (v365: a count of rounds that brings the waves of a last defense, or counts or opens: it moves the map on too; before, the
+      //  table answered "not yet" at the guide's place, and the escort never ended)
+      || (x.tipo === 'rounds' && (o['rodada:' + x.uid] || []).some(y => ['spawn', 'counter', 'open_room', 'end_map'].includes(y.tipo) && !(y.tipo === 'end_map' && y.resultado === 'derrota'))));
+    const valor = i => { const t = texto(i); let v = 0; if (avanca(i)) v += 10; if (/newitem/.test(t)) v += 4; if (/"random"/.test(t)) v += 2; if (/"gold"/.test(t) && !/"remove"/.test(t)) v += 1;
+      if (/(cura|heals?)\s+\d/i.test(t)) v += vida < H * cfg.vida - 2 ? 5 : -2; if (/enemy_condition/.test(t) && !/"acao":"(heal|mirar|desmirar)"/.test(t)) v += vivos.some(m => m.hp > 0) ? 3 : -6;
       // (a status question, "the guide fell": never the bad news by choice)
       if (/"acao":"set","n":0/.test(t)) v -= 20; if (/"remove".*"gold"|"acao":"remove"/.test(t)) v -= 1; if (/(Ainda não|Not yet|Nada, obrigado|Nothing, thanks|Seguir sem|Go on without|Deixar|Leave it)/i.test(g.options[i].text || '')) v -= 5; return v; };
     const melhor = livres.slice().sort((a, b) => valor(b) - valor(a))[0];
@@ -118,17 +143,25 @@ function simularPartida(pm, cfg, H) {
   // ---- what the party can do next: the objects of the open rooms not spent, with what using them brings
   const candidatos = () => { const out = [];
     pm.salas.forEach((s, si) => { if (!abertas.has(si) || removidas.has(si)) return;
-      s.objetos.forEach((o, oi) => { const k = si + ':' + oi; if (gastos.has(k) || tirados.has(k) || escondidos.has(k) || inuteis.has(k) || !(o.gatilhos || []).length) return;
+      s.objetos.forEach((o, oi) => { const k = si + ':' + oi; if (gastos.has(k) || tirados.has(k) || escondidos.has(k) || inuteis.has(k) || (!(o.gatilhos || []).length && !ehObjetoFinal(si, oi))) return;   // (v348: the object that ends the map counts with no trigger of its own: the way out)
         if (o.gemeo != null && !gastos.has(si + ':' + o.gemeo)) { /* the twin stands for the same thing */ }
         const gs = todosGatilhos(o); const t = JSON.stringify(gs);
-        const fecha = gs.filter(g => g.tipo === 'open_room').some(g => !abertas.has(g.sala) && !removidas.has(g.sala));
-        const progride = fecha || gs.some(g => g.tipo === 'counter' && (g.acao || 'add') === 'add' && !contCheio.has(g.contador)) || ehObjetoFinal(si, oi);
+        // (v365: a way still locked by its own count (the passage that waits for the riddle) opens nothing yet: the table read
+        //  the words on it once and goes for what it asks)
+        const fecha = gs.filter(g => g.tipo === 'open_room').some(g => !abertas.has(g.sala) && !removidas.has(g.sala) && (reqOk(g.requisitos) || !(g.requisitos || []).some(q => q.tipo === 'counter')));
+        const progride = fecha || gs.some(g => g.tipo === 'counter' && (g.acao || 'add') === 'add' && !contCheio.has(g.contador)) || ehObjetoFinal(si, oi)
+          || gs.some(g => g.tipo === 'add_object' && escondidos.has(g.objSala + ':' + g.objIndex))
+          // (v365: what lets out a beast that counts when it falls (the cages of the pack): the count is in the beast)
+          || gs.some(g => g.tipo === 'spawn' && (g.inimigos || []).some(e => (e.gatilhos || []).some(x => x.tipo === 'counter' && (x.acao || 'add') === 'add' && !contCheio.has(x.contador))));   // (v348: what brings a hidden object to the board (the lever of the loft: the ladder and the point up there) moves the map on)
         const bloqueado = (o.gatilhos || []).length && (o.gatilhos || []).every(g => !reqOk(g.requisitos)) && !(o.gatilhos || []).some(g => o['senao:' + g.uid] && /open_room|"counter"/.test(JSON.stringify(o['senao:' + g.uid])));
         // (a search whose every answer left is of no use now: later)
+        // (v365: a stone or runes that only carry the party elsewhere is no step by itself: the walk is counted by distance; the
+        //  table went back and forth through them and lost the rounds of a clock)
+        if (!progride && /move_heroes/.test(t) && !/give_item|newitem|cura|heals|"spawn"|"counter"/.test(t)) return;
         const busca = (o.gatilhos || []).find(g => g.tipo === 'choice' && g.umaVez); if (busca && !progride && escolher(o, busca, si) === -2) return;
         // (a heal and nothing else, with the party whole: later, when it is of use)
         if (!progride && !busca && /(cura|heals?)\s+\d/i.test(t) && !/give_item/.test(t) && vida >= H * cfg.vida) return;
-        out.push({ si, oi, o, k, progride, bloqueado, util: /give_item|cura|heals|newitem/.test(t), t }); }); });
+        out.push({ si, oi, o, k, progride, bloqueado, fecha, util: /give_item|cura|heals|newitem/.test(t), t }); }); });
     return out; };
   const fm = pm.meta.finalMission || { tipo: 'defeat_all' };
   const ehObjetoFinal = (si, oi) => fm.tipo === 'use_object' && fm.sala === si && fm.objeto === oi;
@@ -143,7 +176,12 @@ function simularPartida(pm, cfg, H) {
     const d = new Map([[local, 0]]); const fila = [local]; while (fila.length) { const a = fila.shift(); for (const b of viz.get(a) || []) if (!d.has(b) && abertas.has(b) && !removidas.has(b)) { d.set(b, d.get(a) + 1); fila.push(b); } }
     return d.has(si) ? d.get(si) : 3; };
   // ---- one use of an object by a hero
-  const estado = () => abertas.size + '|' + JSON.stringify(cont) + '|' + JSON.stringify(acumulado) + '|' + vivos.filter(m => m.hp > 0).length + '|' + tirados.size + '|' + escondidos.size + '|' + R.itens + '|' + ouro + '|' + timers.length;
+  // (v365: a count the clock moves every round (the noise, a wave's rounds) is not something the party did: in the state it
+  //  kept a locked door "worth trying" every round, and the party never went for what opens it)
+  const doRelogio = new Set((pm.contadores || []).filter(c => c.ruido).map(c => c.nome));
+  // (a count past its goal is the same as at its goal: an answer given again adds to it, and changes nothing)
+  const metaDe = Object.fromEntries((pm.contadores || []).map(c => [c.nome, metaDoContador(c)]));
+  const estado = () => abertas.size + '|' + JSON.stringify(Object.fromEntries(Object.entries(cont).filter(([k]) => !doRelogio.has(k)).map(([k, v]) => [k, Math.min(v, metaDe[k] ?? v)]))) + '|' + JSON.stringify(acumulado) + '|' + vivos.filter(m => m.hp > 0).length + '|' + tirados.size + '|' + escondidos.size + '|' + R.itens + '|' + ouro + '|' + timers.length;
   const inuteis = new Set(); let ultimoEstado = '';
   const usar = c => { const { si, oi, o, k } = c; const ctx = { chave: k }; const e0 = estado(); log('use ' + baseObj(o.type) + ' in room ' + (si + 1) + (o.name ? ' "' + o.name + '"' : '') + (c.progride ? ' [progress]' : ''));
     // (as the export does: an object locked by a requirement that also removes itself leaves the board only when a locked
@@ -166,26 +204,42 @@ function simularPartida(pm, cfg, H) {
   let semProgresso = 0;
   while (!venceu && !perdeu && rodada <= cfg.maxRodadas) {
     // start of the round: timers ("rounds"), map events, pressure
+    const contAntes = { ...cont };   // (v365: what the clock alone changes, below)
     timers.forEach(t => { const n = t.g.n || 1; const passou = rodada - t.desde; if (t.g.modo === 'uma') { if (!t.feitas && passou >= n) { t.feitas = 1; executar(t.o, 'rodada:' + t.g.uid, t.si, {}); } }
       else if (passou > 0 && passou % n === 0 && (!t.g.vezes || t.feitas < t.g.vezes)) { t.feitas++; executar(t.o, 'rodada:' + t.g.uid, t.si, {}); } });
     (pm.eventos || []).forEach(ev => { const r0 = ev.rodada || 1; if (rodada < r0) return; if (rodada === r0 || (ev.cada && (rodada - r0) % ev.cada === 0)) executar(ev, 'gatilhos', ev.sala || 0, {}); });
     const pr = pm.meta.pressao; if (pr && pr.tipo === 'fadiga' && rodada >= pr.desde) fadiga += H * (pr.pior && rodada >= pr.pior ? 2 : 1);
+    Object.keys(cont).forEach(k => { if (cont[k] !== contAntes[k]) doRelogio.add(k); });
     mortes(); contadores(); if (venceuJa()) { venceu = true; break; } if (perdeu) break;
     // the heroes' actions
-    let acoes = H * cfg.acoes; let fez = false;
+    let acoes = H * cfg.acoes; let fez = false; let naFonte = false;
     while (acoes > 0 && !venceu && !perdeu) {
-      const alvo = vivos.filter(m => m.hp > 0).sort((a, b) => a.hp - b.hp)[0];
+      // (v365: the room of the objective first, when it is to clear one (the lieutenant who flees): a table that took the weakest
+      //  first fought the monsters that kept coming from the rooms beside and never reached it)
+      const fmS = fm && fm.tipo === 'defeat_room' ? fm.sala : -1;
+      const alvo = vivos.filter(m => m.hp > 0).sort((a, b) => (b.sala === fmS) - (a.sala === fmS) || a.hp - b.hp)[0];
+      // (v348: with monsters in play, one hero a round still works on what keeps them coming, here in the room (the possessed one
+      //  to free, the nest to seal): a table that only fights never gets to it, and the monsters never end)
+      // (v360: the source may be in the open room next door, from where its monsters come to the party: the table walks there
+      //  (the walk costs the round's moves) and works on it; standing where it was, it fought for ever)
+      if (alvo && !naFonte) { const fs = candidatos().filter(c => !c.bloqueado && c.progride && /"acao":"set","n":0/.test(c.t) && /skill_test/.test(c.t)).sort((a, b) => distancia(a.si) - distancia(b.si)); const f = fs[0];
+        if (f && f.si !== local) { const d = distancia(f.si); acoes -= Math.min(acoes, d * H); local = f.si; fez = true; if (acoes <= 0) continue; }
+        if (f) { naFonte = true; acoes--; usar(f); fez = true; if (venceuJa()) venceu = true; continue; } }
       if (alvo) { alvo.hp -= Math.max(1, (cfg.danoAtaque != null ? cfg.danoAtaque : cfg.sucessos * cfg.dano) - Math.floor((alvo.def || 0) * cfg.defesa));   // (custom: the user's average damage per attack)
          acoes--; if (alvo.hp <= 0) log('a monster falls'); fez = true; mortes(); contadores(); if (venceuJa()) venceu = true; continue; }
       { const e = estado(); if (e !== ultimoEstado) { inuteis.clear(); ultimoEstado = e; } }
       const cs = candidatos().filter(c => !c.bloqueado);
       const pressa = R.limite && rodada > R.limite * 0.6;
       // (what stops monsters from coming, a possessed one, a nest, and what is half done, first; then the nearest)
-      const para = c => /"acao":"set","n":0/.test(c.t) && /skill_test/.test(c.t) ? 0 : (c.o.gatilhos || []).some(g => g.tipo === 'skill_test' && acumulado[g.uid]) ? 0 : 1;
-      const prog = cs.filter(c => c.progride).sort((a, b) => para(a) - para(b) || distancia(a.si) - distancia(b.si));
+      // (v365: the source of the monsters goes first only while monsters are in play: a puzzle whose wrong answer resets its count
+      //  looked like one, and the party kept answering it again instead of going through the way it had opened)
+      const para = c => /"acao":"set","n":0/.test(c.t) && /skill_test/.test(c.t) && vivos.some(m => m.hp > 0) ? 0 : (c.o.gatilhos || []).some(g => g.tipo === 'skill_test' && acumulado[g.uid]) ? 0 : 1;
+      // (v348: with the tide coming from the entrance, a table takes first what it needs from the rooms behind (the water takes a
+      //  room with the seal left in it), oldest room first, and leaves the rest of a room for when nothing presses)
+      const prog = cs.filter(c => c.progride).sort((a, b) => para(a) - para(b) || (mare ? fundura(a.si) - fundura(b.si) || (a.fecha ? 1 : 0) - (b.fecha ? 1 : 0) : 0) || distancia(a.si) - distancia(b.si));
       const opc = pressa ? [] : cs.filter(c => !c.progride && (c.util || /choice/.test(c.t))).sort((a, b) => distancia(a.si) - distancia(b.si));
       // first what is on the way (in this room), then the nearest thing that moves the map on
-      const aqui = opc.filter(c => c.si === local); const c = (prog[0] && para(prog[0]) === 0 ? prog[0] : null) || aqui[0] || prog[0] || opc[0];
+      const aqui = opc.filter(c => c.si === local); const c = (prog[0] && para(prog[0]) === 0 ? prog[0] : null) || (mare && prog[0] && (!prog[0].fecha || fundura(prog[0].si) < fundura(local)) ? prog[0] : null) || aqui[0] || prog[0] || opc[0];
       if (!c) break;
       const d = distancia(c.si) + (c.si === local ? 0 : 0);
       const custo = d * H + 1; if (custo > acoes && d > 0) { if (acoes >= H) { acoes -= H; local = c.si; fez = true; } else acoes = 0; continue; }
@@ -202,7 +256,7 @@ function simularPartida(pm, cfg, H) {
   // fatigue weighs as damage at the end (the table converts it)
   if (fadiga) ferir(Math.floor(fadiga * cfg.fadiga), 'fatigue');
   if (!venceu && !perdeu && rodada > cfg.maxRodadas) R.motivo = 'too many rounds';
-  R.venceu = venceu && !perdeu; R.perdeu = !R.venceu; R.rodadas = rodada; R.vidaFinal = Math.max(0, vida); R.fadiga = fadiga;
+  R.venceu = venceu && !perdeu; R.perdeu = !R.venceu; R.rodadas = rodada; R.vidaFinal = Math.max(0, vida); R.fadiga = fadiga; R.contadores = { ...cont };   // (v348: where each count stood at the end, for whoever reads a simulation that got stuck)
   return R;
 }
 /* the static look at a map: effects against monsters in rooms where no monster ever is, heals in the first room */
@@ -215,7 +269,11 @@ function olharEstatico(pm) {
 }
 /* the verdict for the easy level: can it be won, and is it a fair effort */
 const META_FACIL = { perdaMin: 0.25, perdaMax: 0.8, vidaMinMin: 0.15, itensMax: 3, monstrosPorSalaPorHeroi: 0.75, monstrosSalaMais: 2 };
+/* v365: the verdict of a Normal or Hard map, by its own measure: more of the health goes, the party may end low, more monsters */
+const META_POR_DIF = { facil: META_FACIL, normal: { perdaMin: 0.35, perdaMax: 0.95, vidaMinMin: 0.05, itensMax: 99, monstrosPorSalaPorHeroi: 1, monstrosSalaMais: 3 },
+  dificil: { perdaMin: 0.45, perdaMax: 1.1, vidaMinMin: 0, itensMax: 99, monstrosPorSalaPorHeroi: 1.25, monstrosSalaMais: 4 } };
 function avaliarFacil(pm, R, H = SIM.herois) {
+  const dif = (pm.meta && pm.meta.gerado && pm.meta.gerado.dificuldade) || 'facil'; const META_FACIL = META_POR_DIF[dif] || META_POR_DIF.facil;
   const p = []; const est = olharEstatico(pm);
   if (!R.venceu) p.push('not won: ' + (R.motivo || '?'));
   const perda = R.danoSofrido / R.vidaMax;
@@ -226,7 +284,7 @@ function avaliarFacil(pm, R, H = SIM.herois) {
   const cheia = Object.entries(R.monstrosPorSala).filter(([, n]) => n > H + META_FACIL.monstrosSalaMais); if (cheia.length) p.push('crowded rooms: ' + cheia.map(([s, n]) => (+s + 1) + ' (' + n + ')').join(', '));
   if (R.curasCheio.length) p.push('heals with the party whole: ' + R.curasCheio.length);
   if (R.efeitosVazios.length || est.efeitosSemMonstros.length) p.push('effects against monsters with none in play: ' + (R.efeitosVazios.length + est.efeitosSemMonstros.length));
-  if (R.testesImpossiveis.length) p.push('tests the easy party cannot pass: ' + R.testesImpossiveis.length);
+  if (R.testesImpossiveis.length) p.push((dif === 'facil' ? 'tests the easy party cannot pass: ' : 'tests the party cannot pass: ') + R.testesImpossiveis.length);
   return { problemas: p, perda: Math.round(perda * 100), vidaMin: Math.max(0, Math.round(R.vidaMin / R.vidaMax * 100)), est };
 }
 /* many generated maps of the easy level, simulated: a table (Map generator, with the debug switch on) */

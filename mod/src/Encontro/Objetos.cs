@@ -162,7 +162,9 @@ namespace Bigorna.Encontro
                     posto.Grupo = !string.IsNullOrEmpty(o.Revelar) ? o.Revelar : GrupoDoObjeto(o);
                     posto.EscondidoPorAcao = o.Escondido;
                     Mostrar(posto, false);
-                    if (o.DaPeca >= 0) { /* pilar de sustentacao: aparece junto com a sua peca (Tabuleiro) */ }
+                    // (pilar de sustentacao: aparece junto com a sua peca (Tabuleiro); v354: o de uma peca que ja esta na mesa no comeco (a
+                    //  sala inicial) aparece com os objetos iniciais: antes ele esperava uma peca que nunca entra, e a peca elevada ficava no ar)
+                    if (o.DaPeca >= 0) { if (string.IsNullOrEmpty(o.Revelar) && !o.Escondido) { posto.Grupo = null; iniciais.Add(posto); } }
                     else if (!string.IsNullOrEmpty(posto.Grupo)) Log.Info("  «" + posto.Rotulo + "» espera a sala «" + posto.Grupo + "»");
                     else if (!o.Escondido) iniciais.Add(posto); // aparecem em grupos, quando o aviso do grupo sair
                 }
@@ -171,6 +173,21 @@ namespace Bigorna.Encontro
             if (!restaurando) ApresentarEmGrupos(iniciais);
             if (terreno) { yield return null; Tabuleiro.RefazerGradeAgora(); }
             Log.Info("objetos do mapa: " + Postos.Count + " (" + Postos.Count(p => p.Corpo != null) + " no tabuleiro)");
+        }
+
+        /// <summary>v363: os objetos que aparecem quando a sala abre (o quadro "Proximas salas"): o tipo dos que surgem com ela (bau, alavanca: o que se separa da caixa); os
+        /// escondidos (por acao, "hidden" no mapa, ou revelados por outro gatilho) vao como "Segredo"</summary>
+        public static List<string> DaSalaPorAbrir(string grupo, string segredo)
+        {
+            var r = new List<string>();
+            foreach (var p in Postos)
+            {
+                var o = p?.Dados; if (o == null || p.Usado || o.DaPeca >= 0 || p.Visivel) continue;   // (the pillars go with their tile: Tabuleiro.PorAbrir)
+                if (!string.Equals(GrupoDoObjeto(o), grupo, StringComparison.OrdinalIgnoreCase)) continue;
+                bool comASala = !p.EscondidoPorAcao && string.Equals(p.Grupo, grupo, StringComparison.OrdinalIgnoreCase);
+                r.Add(comASala ? Nome(o.Tipo) : segredo);   // (o tipo, como na caixa do jogo: o nome dado no mapa seria um spoiler)
+            }
+            return r;
         }
 
         /// <summary>Sala oculta que cobre o objeto: qualquer casa do seu quadro (ou das quatro ao redor do cruzamento).</summary>
@@ -512,6 +529,7 @@ namespace Bigorna.Encontro
                     else sai = Oficina.CasasDoObjeto(o, TamanhoDe(o.Tipo)).Any(c => casas.Contains(c));
                 }
                 if (!sai) continue;
+                Bigorna.Motor.Roteiro.PararCronometrosDoObjeto(p.Indice);   // (v313: as ondas de uma emboscada deixada para trás param)
                 bool estava = p.Visivel && p.Corpo != null && p.Corpo.activeInHierarchy;
                 p.EscondidoPorAcao = true; p.Usado = true; p.Grupo = null;
                 if (estava) saem.Add(p); else Mostrar(p, false);
@@ -532,6 +550,7 @@ namespace Bigorna.Encontro
                     else sai = Oficina.CasasDoObjeto(o, TamanhoDe(o.Tipo)).Any(c => casas.Contains(c));
                 }
                 if (!sai) continue;
+                Bigorna.Motor.Roteiro.PararCronometrosDoObjeto(p.Indice);   // (v313: as ondas de uma emboscada deixada para trás param)
                 bool estava = p.Visivel;
                 p.EscondidoPorAcao = true; p.Usado = true; p.Grupo = null; Mostrar(p, false);
                 if (estava && o.DaPeca < 0) nomes.Add(p.Rotulo);

@@ -34,7 +34,7 @@ namespace Bigorna.Encontro
         Action _aoFechar;
         bool _fechada;
 
-        static TMP_FontAsset FonteDoJogo()
+        internal static TMP_FontAsset FonteDoJogo()
         {
             try
             {

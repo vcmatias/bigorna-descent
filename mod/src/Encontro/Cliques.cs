@@ -28,6 +28,7 @@ namespace Bigorna.Encontro
             _nosso = (Vector3 pos, bool apertado) =>
             {
                 if (Dialogos.RecemFechado) return true; // engole o clique
+                if (Proximas.SobOPonteiro(pos)) return true;   // (v363: o clique foi no quadro das proximas salas)
                 if (Menu.Relatos.Aberto && Menu.Relatos.Janela.Contains(new Vector2(pos.x, Screen.height - pos.y))) return true;   // o clique foi na janela de relato
                 if (!apertado) { try { if (NossoObjeto(pos)) return true; } catch (Exception ex) { Log.Info("cliques: " + ex.Message); } }
                 var a = _anterior;

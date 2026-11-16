@@ -86,13 +86,20 @@ namespace Bigorna.Formato
         }
 
         /// <summary>v266: a semente que basta sozinha (7 caracteres: o primeiro, de a a r, diz a duracao, a dificuldade e as caixas;
-        /// os outros seis sao o sorteio), como o gerador do editor a le. null: outra forma (vale o que a tela escolheu).</summary>
-        public static (int duracao, int dificuldade, int atos)? LerSemente(string s)
+        /// os outros seis sao o sorteio), como o gerador do editor a le. null: outra forma (vale o que a tela escolheu).
+        /// v346: a dificuldade (0 a 2) e o ajuste do Perigo (-2 a +2, no fim da semente: "+1", "-2"; ajuste -9: a semente de 8
+        /// caracteres da v318, so com o Perigo).</summary>
+        public static (int duracao, int dificuldade, int ajuste, int perigo, int atos)? LerSemente(string s)
         {
-            s = (s ?? "").Trim().ToLowerInvariant();
-            if (s.Length != 7 || s[0] < 'a' || s[0] > 'r' || !s.Skip(1).All(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z'))) return null;
-            int k = s[0] - 'a';
-            return (k / 6, (k / 2) % 3, k % 2 == 1 ? 2 : 1);
+            s = (s ?? "").Trim().ToLowerInvariant().Replace(" ", "");
+            int aj = 0;
+            if (s.Length == 9 && (s[7] == '+' || s[7] == '-') && s[8] >= '0' && s[8] <= '9') { aj = Math.Max(-2, Math.Min(2, (s[8] - '0') * (s[7] == '-' ? -1 : 1))); s = s.Substring(0, 7); }
+            if (!s.Skip(1).All(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z'))) return null;
+            // (v318: 8 caracteres: o primeiro, de a a f, diz a duracao e as caixas; o segundo, de 0 a 9, o Perigo de 1 a 10)
+            if (s.Length == 8 && s[0] >= 'a' && s[0] <= 'f' && s[1] >= '0' && s[1] <= '9') { int q = s[0] - 'a', p = s[1] - '0' + 1; return (q / 2, p <= 3 ? 0 : p <= 6 ? 1 : 2, -9, p, q % 2 == 1 ? 2 : 1); }
+            if (s.Length != 7 || s[0] < 'a' || s[0] > 'r') return null;
+            int k = s[0] - 'a'; int d = (k / 2) % 3;
+            return (k / 6, d, aj, Math.Max(1, Math.Min(10, (d == 0 ? 2 : d == 2 ? 7 : 5) + aj)), k % 2 == 1 ? 2 : 1);
         }
     }
 }

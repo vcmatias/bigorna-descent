@@ -91,7 +91,7 @@ namespace Bigorna.Encontro
 
             int jogadores = 2;
             try { jogadores = Mathf.Clamp(Jogo.Partida?.ActivePlayerCount ?? 2, 1, 4); } catch { }
-            int intensidade = Mathf.Clamp(vagas[0].Intensidade > 0 ? vagas[0].Intensidade : vagas.Count, 1, 10);
+            int intensidade = Mathf.Clamp(vagas[0].Intensidade > 0 ? vagas[0].Intensidade : vagas.Count, 1, 12);   // (v367: até 12, o ajuste do Perigo e o tamanho do grupo passam de 10, como no gerador)
             int multiplicador = (int)(jogadores * 1.5f) * progresso;           // como o gerador de pontos do jogo (inteiro)
             int pontos = Mathf.RoundToInt(intensidade * 0.1f * multiplicador) + _banco;
             int antes = pontos;

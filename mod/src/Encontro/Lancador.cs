@@ -145,6 +145,7 @@ namespace Bigorna.Encontro
                 if (Avulso) yield return Seguro("grupo", Herois.Escolher(m));
                 else Passo("grupo", () => Herois.Manter(m));
                 if (minha != _geracao) yield break;
+                Passo("itens desconhecidos", () => { int n = GrupoDoSave.TirarDesconhecidos(Jogo.Partida); if (n > 0) Log.Info("grupo: " + n + " item(ns) que o jogo não conhece neste mapa ficaram de fora"); });   // (v304)
                 Passo("soltar as peças", Tabuleiro.Soltar);
                 yield return Seguro("objetos", Objetos.Colocar(m));
                 if (minha != _geracao) yield break;
@@ -262,6 +263,7 @@ namespace Bigorna.Encontro
                 Inimigos.Reiniciar();
                 Passo("destaques da gravação", Acoes.EsquecerDestaquesDoJogo);
                 Passo("o mapa como estava", () => { Tabuleiro.AplicarMovidas(m, e.Tabuleiro); Objetos.AplicarPosicoes(m, e.Objetos); });
+                Passo("itens desconhecidos", () => { int n = GrupoDoSave.TirarDesconhecidos(Jogo.Partida); if (n > 0) Log.Info("partida retomada: " + n + " item(ns) que o jogo não conhece ficaram de fora"); });   // (v304)
                 yield return Seguro("tabuleiro", Tabuleiro.Montar(m));
                 if (minha != _geracao) yield break;
                 if (!Tabuleiro.Montado)

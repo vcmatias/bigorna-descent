@@ -68,6 +68,11 @@ const autoRemocao = () => ({ uid: uid(), tipo: 'remove_object', proprio: true })
 /* a "Show a text" trigger (with its requirements), and the same with the text in the editor's language (the generators) */
 const gatilhoTexto = (text, requisitos = []) => ({ uid: uid(), tipo: 'text', text, requisitos });
 const txtT = (en, pt) => gatilhoTexto(L2(en, pt));
+/* v309: a text made of a template and the names of the map (the template is what the tables of the other languages know):
+   txtTF('{0} falls.', '{0} cai.', X); with the person's gender: ⟨his|her⟩ in the templates, masculine first */
+const LFG = (ela, en, pt, ...v) => { const g = t => String(t).replace(/⟨([^|⟩]*)\|([^⟩]*)⟩/g, (m, a, b) => ela ? b : a); return LF(g(en), g(pt), ...v); };
+const txtTF = (en, pt, ...v) => gatilhoTexto(LF(en, pt, ...v));
+const txtTG = (ela, en, pt, ...v) => gatilhoTexto(LFG(ela, en, pt, ...v));
 /* a result list of a trigger (ok, fail, grupo, rodada…), found on whichever holder keeps it */
 function listaDoGatilho(g, prefixo) { const k = prefixo + ':' + g.uid; for (const ss of projeto.salas) for (const { o } of donosDaSala(ss)) if (o[k]) return o[k]; for (const c of projeto.contadores || []) if (c[k]) return c[k]; return []; }
 const grupoDoGatilho = id => GRUPOS_GATILHO.find(gr => membrosDoGrupo(gr).some(([m]) => m === id));

@@ -557,14 +557,50 @@ namespace Bigorna.Menu
         static TMP_Text _titulo;
         static readonly List<GameObject> _doMapas = new List<GameObject>();
         static Encontro.GrupoDoSave.Save _equipe;
-        static int _duracaoOS = 1, _dificuldadeOS = 1;
+        /// <summary>v320: a história do mapa: 0, o chamado (o quadro de avisos, com missões para escolher); 1, a surpresa.</summary>
+        /// <summary>v371: o quadro de avisos (escolher a missão entre os chamados) fica inativo por enquanto, por decisão do Victor:
+        /// a história é sempre por surpresa, e a escolha some do quadro. Para voltar, QUADRO_DE_AVISOS = true.</summary>
+        const bool QUADRO_DE_AVISOS = false;
+        static int _modoOS = QUADRO_DE_AVISOS ? 0 : 1; static List<Oneshot.Aviso> _quadro;
+        static int _duracaoOS = 1, _difOS = 1, _ajusteOS = 0;   // (v346: Fácil, Normal e Difícil de volta, e o Perigo como ajuste fino, de -2 a +2)
+        static int PerigoOS => Oneshot.PerigoDe(_difOS, _ajusteOS);
+        static string NomeDaDif(int d) => d == 0 ? T("Fácil", "Easy") : d == 2 ? T("Difícil", "Hard") : T("Normal", "Normal");
+        static string NomeDoAjuste(int d, int a) => NomeDaDif(d) + (a > 0 ? " +" + a : a < 0 ? " \u2212" + (-a) : "");
+        /// <summary>v319: a equipe escolhida tem historico nos mapas oneshot: o Perigo ja vem no sugerido por ele.</summary>
+        static void PerigoDaEquipe()
+        {
+            try { Formato.Equipes.Pasta = System.IO.Path.Combine(Application.persistentDataPath, "Bigorna", "Equipes"); int s = Formato.Equipes.Sugerido(_equipe?.Rotulo); if (_equipe != null && s > 0) Oneshot.DifEAjuste(s, out _difOS, out _ajusteOS); }
+            catch (Exception ex) { Log.Erro("perigo da equipe", ex); }
+        }
+        static string HistoricoDaEquipe()
+        {
+            try
+            {
+                if (_equipe == null) return null; var l = Formato.Equipes.Ler(_equipe.Rotulo); if (l.Count == 0) return null;
+                var u = l.Skip(Math.Max(0, l.Count - 3)).Select(r => NomeDoPerigo(r.Perigo) + " " + (r.Venceu ? ((r.Feridos + r.Graves) == 0 ? T("vitória sem feridos", "won, no one injured") : T("vitória com feridos", "won, with injuries")) : T("derrota", "lost")));
+                return T("Últimos mapas desta equipe: ", "Last maps of this party: ") + string.Join(" · ", u.ToArray()) + T(". Sugerido: ", ". Suggested: ") + NomeDoPerigo(Formato.Equipes.Sugerido(_equipe.Rotulo)) + ".";
+            }
+            catch { return null; }
+        }
+        static string NomeDoPerigo(int p) { Oneshot.DifEAjuste(p, out int d, out int a); return NomeDoAjuste(d, a); }
+        static string NomeDoAjusteFino(int a) => a == 0 ? T("0 (o da dificuldade)", "0 (as the difficulty)") : a > 0 ? "+" + a + T(" (um pouco mais perigoso)", " (a little more dangerous)") : "\u2212" + (-a) + T(" (um pouco mais calmo)", " (a little calmer)");
         /// <summary>v272: com equipe nova e o Ato II na coleção, a caixa «Usar o Ato II» (marcada de início): desmarcada, o mapa sai
         /// só com o Ato I. v285: também com uma equipe gravada (a dificuldade cuida do equilíbrio).</summary>
         static bool _usarAto2 = true;
+        /// <summary>v366: quantos heróis vão jogar (2 a 4): o gerador põe tantas casas de saída e mede os monstros por eles. Quais
+        /// heróis, o jogador escolhe na tela do próprio jogo, no encontro. Com a equipe de uma partida gravada, começa no
+        /// tamanho do grupo dela.</summary>
+        static int _nHeroisOS = 3; static string _nHeroisDe;
+        static void HeroisDaEquipe()
+        {
+            string de = _equipe == null ? "" : _equipe.Slot + "|" + _equipe.Rotulo; if (_nHeroisDe == de) return; _nHeroisDe = de;
+            if (_equipe == null) return;
+            try { int n = GrupoDoSave.JogoDoSave(_equipe.Slot)?.ActivePlayers?.Count(x => x != null) ?? 0; if (n >= 2) _nHeroisOS = Mathf.Clamp(n, 2, 4); } catch (Exception ex) { Log.Info("heróis do save: " + ex.Message); }
+        }
         static int AtosEscolhidos() { int a = Oneshot.Atos(); return a == 2 && !_usarAto2 ? 1 : a; }   // (v285: com equipe nova ou gravada)
         static string _sementeDigitada = "", _avisoOS;
         static Oneshot.Resultado _gerado;
-        static bool _gerandoOS, _verSimulacao;
+        static bool _gerandoOS, _verSimulacao, _maisOpcoesOS;   // (v368: «Ver detalhes» do resultado e «Mais opções»)
 
         static void ModoOneshot(bool sim)
         {
@@ -660,7 +696,7 @@ namespace Bigorna.Menu
                     var f = a.Dados; var partes = new List<string>();
                     partes.Add(TF("rodada {0}", "round {0}", Math.Max(1, f.Rodada)));
                     if (f.Duracao >= 0 && f.Duracao < 3) partes.Add(durs[f.Duracao]);
-                    if (f.Dificuldade >= 0 && f.Dificuldade < 3) partes.Add(difs[f.Dificuldade]);
+                    if (f.Dificuldade >= 0 && f.Dificuldade < 3) partes.Add(difs[f.Dificuldade]); else if (f.Dificuldade > 10) partes.Add(NomeDoPerigo(f.Dificuldade - 10));   // (v318: 11 a 20: o Perigo de 1 a 10)
                     partes.Add(string.IsNullOrEmpty(f.Equipe) ? T("equipe nova", "new party") : T("equipe de «", "party of “") + f.Equipe + T("»", "”"));
                     if (a.Quando != DateTime.MinValue) partes.Add(DataHora(a.Quando));
                     var herois = f.Herois != null && f.Herois.Count > 0 ? "\n<size=80%>" + string.Join(", ", f.Herois.ToArray()) + "</size>" : "";
@@ -763,7 +799,7 @@ namespace Bigorna.Menu
         {
             _paginaSaves = 0;
             Oneshot.AbrirGerador();   // (v274: o gerador carrega ao fundo enquanto a equipe, a duração e a dificuldade são escolhidas)
-            AbrirSaves(T("Mapa oneshot · a equipe", "One-shot map · the party"), () => { _equipe = null; DialogoOneshot(true); }, s => { _equipe = s; DialogoOneshot(true); },
+            AbrirSaves(T("Mapa oneshot · a equipe", "One-shot map · the party"), () => { _equipe = null; DialogoOneshot(true); }, s => { _equipe = s; PerigoDaEquipe(); DialogoOneshot(true); },
                 null, VoltarDoOneshot,
                 T("Um mapa novo, feito na hora pelo gerador do Bigorna, com as mesmas regras do editor. Joguem com uma equipe nova ou com a equipe de uma partida gravada; nesse caso, no fim do mapa vocês escolhem se a partida gravada recebe o que a equipe ganhou.",
                   "A new map, made on the spot by Bigorna's generator, with the same rules as the editor. Play with a new party or with the party of a saved game; then, at the end of the map, you choose whether the saved game gets what the party won."),
@@ -782,7 +818,9 @@ namespace Bigorna.Menu
                 _missao = Copia(editar, raiz, "mapa oneshot");
                 var cg = _missao.GetComponent<CanvasGroup>(); if (cg != null) { cg.alpha = fade ? 0f : 1f; cg.interactable = true; cg.blocksRaycasts = true; }
                 var bg = Achar(_missao.transform, "Image_BG") as RectTransform; if (bg == null) throw new Exception("sem Image_BG");
-                bg.sizeDelta = new Vector2(1260f, 860f); bg.anchoredPosition = Vector2.zero;
+                // (v368: o tamanho pelo momento: o essencial, com «Mais opções» aberto, ou o resultado)
+                bool feitoJa = _gerado != null && _gerado.Erro == null && !_gerandoOS;
+                bg.sizeDelta = new Vector2(1260f, feitoJa ? (_verSimulacao ? 900f : 720f) : _maisOpcoesOS ? 1060f : 820f); bg.anchoredPosition = Vector2.zero;
                 var bgBtn = bg.gameObject.AddComponent<Button>(); bgBtn.transition = Selectable.Transition.None;
                 var tituloT = Achar(bg, "Text_PartyName")?.GetComponent<TMP_Text>();
                 if (tituloT != null) { var r = tituloT.transform as RectTransform; r.sizeDelta = new Vector2(1150f, 56f); r.anchoredPosition = new Vector2(0f, -60f); }
@@ -821,48 +859,154 @@ namespace Bigorna.Menu
                     return go;
                 }
                 // (uma escolha nova pede outro mapa: o gerado sai)
-                void Mudou() { if (_gerandoOS) return; _gerado = null; _verSimulacao = false; DialogoOneshot(false); }
+                void Mudou() { if (_gerandoOS) return; _gerado = null; _quadro = null; _verSimulacao = false; DialogoOneshot(false); }
+                // (v320) o quadro de avisos: as missões que o gerador trouxe, cada uma com quem chama, o que houve e o Perigo; a
+                // escolhida é pedida de novo pela semente dela, e o quadro de sempre volta com «Jogar»
+                if (_quadro != null && _quadro.Count > 0 && !_gerandoOS)
+                {
+                    Texto(tituloT, T("Quadro de avisos", "Notice board"));
+                    Linha(T("Escolham o chamado que a equipe vai atender.", "Pick the call the party will answer.") + "  " + TF("Dificuldade: {0}", "Difficulty: {0}", NomeDoAjuste(_difOS, _ajusteOS)), 30f, 22f);
+                    // (v323: um quadro de madeira com um papel pregado por missão; tocar no papel atende o chamado)
+                    var quadro = new GameObject("Bigorna quadro", typeof(RectTransform)); quadro.transform.SetParent(col.transform, false);
+                    var leq = quadro.AddComponent<LayoutElement>(); leq.preferredHeight = 590f; leq.minHeight = 590f;
+                    var imq = quadro.AddComponent<Image>(); imq.color = new Color(0.33f, 0.21f, 0.12f, 0.96f);
+                    var hq = quadro.AddComponent<HorizontalLayoutGroup>(); hq.spacing = 26f; hq.padding = new RectOffset(24, 24, 26, 22); hq.childAlignment = TextAnchor.MiddleCenter; hq.childControlWidth = false; hq.childControlHeight = false; hq.childForceExpandWidth = false; hq.childForceExpandHeight = false;
+                    var escuro = new Color(0.16f, 0.11f, 0.07f, 1f); float[] giros = { -1.6f, 1.1f, -0.8f, 1.5f }; int qn = Math.Min(4, _quadro.Count); float larg = qn > 3 ? 258f : 340f; int qi = 0;
+                    foreach (var a0 in _quadro.Take(4))
+                    {
+                        var a = a0;
+                        var papel = new GameObject("Bigorna aviso", typeof(RectTransform)); papel.transform.SetParent(quadro.transform, false);
+                        var rp = papel.GetComponent<RectTransform>(); rp.sizeDelta = new Vector2(larg, 520f); papel.transform.localRotation = Quaternion.Euler(0f, 0f, giros[qi++ % giros.Length]);
+                        var lep = papel.AddComponent<LayoutElement>(); lep.preferredWidth = larg; lep.preferredHeight = 520f;
+                        var imp = papel.AddComponent<Image>(); imp.color = new Color(0.93f, 0.87f, 0.72f, 1f);
+                        var vp = papel.AddComponent<VerticalLayoutGroup>(); vp.padding = new RectOffset(20, 20, 14, 16); vp.spacing = 8f; vp.childAlignment = TextAnchor.UpperCenter; vp.childControlWidth = true; vp.childControlHeight = true; vp.childForceExpandWidth = true; vp.childForceExpandHeight = false;
+                        // o prego
+                        var prego = new GameObject("prego", typeof(RectTransform)); prego.transform.SetParent(papel.transform, false);
+                        var lpr = prego.AddComponent<LayoutElement>(); lpr.preferredHeight = 16f; lpr.minHeight = 16f;
+                        var ipr = new GameObject("cabeça", typeof(RectTransform)); ipr.transform.SetParent(prego.transform, false); var rpr = ipr.GetComponent<RectTransform>(); rpr.sizeDelta = new Vector2(14f, 14f); ipr.transform.localRotation = Quaternion.Euler(0f, 0f, 45f); ipr.AddComponent<Image>().color = new Color(0.55f, 0.12f, 0.1f, 1f);
+                        TMP_Text NoPapel(string texto, float altura, float tamanho, bool flex, TextAlignmentOptions alinh)
+                        {
+                            var go = Copia(rotuloModelo, papel.transform, "texto"); var tt = go.GetComponent<TMP_Text>(); Texto(tt, texto);
+                            tt.color = escuro; tt.fontSize = tamanho; tt.enableAutoSizing = false; tt.alignment = alinh; tt.enableWordWrapping = true; tt.overflowMode = TextOverflowModes.Truncate; tt.richText = true; tt.raycastTarget = false;
+                            var le2 = go.GetComponent<LayoutElement>() ?? go.AddComponent<LayoutElement>(); le2.preferredHeight = altura; le2.minHeight = altura; le2.flexibleHeight = flex ? 1f : 0f;
+                            return tt;
+                        }
+                        NoPapel("<b>" + a.Nome + "</b>", 66f, qn > 3 ? 21f : 24f, false, TextAlignmentOptions.Center);
+                        NoPapel(a.Texto ?? "", 250f, qn > 3 ? 15f : 17f, true, TextAlignmentOptions.TopLeft);
+                        if (!string.IsNullOrEmpty(a.Objetivo)) NoPapel("<b>" + a.Objetivo + "</b>", 62f, qn > 3 ? 15f : 17f, false, TextAlignmentOptions.Center);
+                        NoPapel("<i>" + T("Toquem para atender", "Tap to answer") + "</i>", 26f, 15f, false, TextAlignmentOptions.Center);
+                        var bp = papel.AddComponent<Button>(); bp.targetGraphic = imp; var cores = bp.colors; cores.highlightedColor = new Color(1f, 0.97f, 0.85f, 1f); cores.pressedColor = new Color(0.85f, 0.78f, 0.62f, 1f); bp.colors = cores;
+                        bp.onClick.AddListener(() => { Som("UI_Click"); var sem = a.Semente; _quadro = null; _difOS = Mathf.Clamp(a.Dificuldade, 0, 2); _ajusteOS = Mathf.Clamp(a.Ajuste, -2, 2); Log.Info("quadro de avisos: escolhido «" + a.Nome + "» (" + sem + ")"); GerarOneshot(sem, true); });
+                    }
+                    var cancelarQ = aviso != null ? Achar(aviso, "Button_Cancel") : null;
+                    var goV = cancelarQ != null ? Copia(cancelarQ, bg, "voltar") : Copia(botaoModelo, bg, "voltar");
+                    var rv = goV.GetComponent<RectTransform>(); rv.anchorMin = rv.anchorMax = new Vector2(0f, 0f); rv.anchoredPosition = new Vector2(220f, 80f); rv.sizeDelta = new Vector2(280f, 90f);
+                    Texto(goV.GetComponentInChildren<TMP_Text>(true), T("Voltar", "Back"));
+                    var bv = goV.GetComponent<Button>(); bv.onClick.AddListener(() => { Som("UI_Click"); _quadro = null; _gerado = null; DialogoOneshot(false); }); bv.interactable = true;
+                    _missao.transform.SetAsLastSibling();
+                    if (cg != null && fade) Nucleo.Instancia.StartCoroutine(Fade(cg, 1f, null));
+                    return;
+                }
 
+                // (v368: o quadro em três momentos. 1) o essencial à vista: os heróis, a duração e a dificuldade, e Gerar; 2) «Mais
+                //  opções», fechado de início: o Ato II, a história (quadro de avisos ou surpresa), o Perigo fino e a semente; 3) com o
+                //  mapa feito, o quadro vira o resultado: o nome, a simulação numa linha e Jogar, Gerar outro e Voltar; a semente e a
+                //  tabela da simulação em «Ver detalhes»)
                 int atosColecao = Oneshot.Atos(), atos = AtosEscolhidos();
                 // (v267: com um mapa gerado, as caixas que ele usa; a semente de 7 caracteres pode pedir só o Ato I)
                 int atosDoMapa = _gerado != null && _gerado.Erro == null && (_gerado.Atos == 1 || _gerado.Atos == 2) ? _gerado.Atos : atos;
-                Linha(T("Equipe: ", "Party: ") + "<b>" + (_equipe == null ? T("nova", "new") : _equipe.Rotulo) + "</b>     " + T("Caixas: ", "Boxes: ") + "<b>" + (atosDoMapa == 2 ? T("Atos I e II", "Acts I and II") : T("Ato I", "Act I")) + "</b> " + (atosDoMapa != atos ? T("(pela semente)", "(from the seed)") : atos != atosColecao ? T("(escolhidas)", "(chosen)") : T("(as da coleção do jogo)", "(those of the game's collection)")), 44f, 22f);
-                // (v272: com o Ato II na coleção, a caixa para usar ou deixar de fora o Ato II; v285: com equipe nova ou gravada)
-                if (atosColecao == 2)
+                bool feito = _gerado != null && _gerado.Erro == null && !_gerandoOS;
+                string nomeDaEquipe = "<size=80%>" + T("Equipe: ", "Party: ") + "<b>" + (_equipe == null ? T("nova", "new") : _equipe.Rotulo) + "</b></size>";
+                void Rotulo(Transform pai, string texto, float larg)
                 {
-                    var fa = Fileira(52f);
-                    var caixa = Botao(fa.transform, _usarAto2 ? "<b>X</b>" : " ", new Vector2(52f, 48f), () => { if (_gerandoOS) return; _usarAto2 = !_usarAto2; Log.Info("mapa oneshot: usar o Ato II " + (_usarAto2 ? "sim" : "não")); Mudou(); });
-                    var tc = caixa.GetComponentInChildren<TMP_Text>(true); if (tc != null) { tc.enableAutoSizing = false; tc.fontSize = 28f; tc.alignment = TextAlignmentOptions.Center; }
-                    Marcar(caixa, true, _gerandoOS);
-                    var rot = Copia(rotuloModelo, fa.transform, "usar o Ato II"); var trot = rot.GetComponent<TMP_Text>();
-                    Texto(trot, T("Usar o Ato II (missões, monstros e peças dele)", "Use Act II (its quests, monsters and tiles)")); trot.fontSize = 22f; trot.enableAutoSizing = false; trot.alignment = TextAlignmentOptions.Left; trot.enableWordWrapping = false;
-                    var ler = rot.GetComponent<RectTransform>(); ler.sizeDelta = new Vector2(560f, 48f);
-                    var lel = rot.GetComponent<LayoutElement>() ?? rot.AddComponent<LayoutElement>(); lel.preferredWidth = 560f; lel.preferredHeight = 48f;
-                    var brot = rot.GetComponent<Button>() ?? rot.AddComponent<Button>(); brot.transition = Selectable.Transition.None; brot.onClick.AddListener(() => { if (_gerandoOS) return; Som("UI_Click"); _usarAto2 = !_usarAto2; Log.Info("mapa oneshot: usar o Ato II " + (_usarAto2 ? "sim" : "não")); Mudou(); });
+                    var r0 = Copia(rotuloModelo, pai, texto); var t0 = r0.GetComponent<TMP_Text>();
+                    Texto(t0, texto); t0.fontSize = 26f; t0.enableAutoSizing = false; t0.alignment = TextAlignmentOptions.Right; t0.enableWordWrapping = false;
+                    var le0 = r0.GetComponent<LayoutElement>() ?? r0.AddComponent<LayoutElement>(); le0.preferredWidth = larg; le0.preferredHeight = 52f; (r0.transform as RectTransform).sizeDelta = new Vector2(larg, 52f);
                 }
-                Divisoria();
-                Linha(T("Duração", "Length"), 34f, 28f);
-                var fd = Fileira(60f); var bd = new List<Button>();
-                var nomesD = new[] { T("Curta (3 salas)", "Short (3 rooms)"), T("Média (6 salas)", "Medium (6 rooms)"), T("Longa (8 salas)", "Long (8 rooms)") };
-                for (int i = 0; i < 3; i++) { int k = i; bd.Add(Botao(fd.transform, nomesD[i], new Vector2(300f, 56f), () => { if (_duracaoOS == k) return; _duracaoOS = k; Mudou(); })); }
-                for (int j = 0; j < 3; j++) Marcar(bd[j], j == _duracaoOS, _gerandoOS);
-                Linha(T("Dificuldade", "Difficulty"), 34f, 28f);
-                var fn = Fileira(60f); var bn = new List<Button>();
-                var nomesN = new[] { T("Fácil", "Easy"), T("Normal", "Normal"), T("Difícil", "Hard") };
-                for (int i = 0; i < 3; i++) { int k = i; bn.Add(Botao(fn.transform, nomesN[i], new Vector2(300f, 56f), () => { if (_dificuldadeOS == k) return; _dificuldadeOS = k; Mudou(); })); }
-                for (int j = 0; j < 3; j++) Marcar(bn[j], j == _dificuldadeOS, _gerandoOS);
-                Divisoria();
-                // a semente (so ela) e, embaixo, a simulacao
-                string estado = _gerandoOS ? T("Gerando o mapa…", "Generating the map…")
-                    : _gerado == null ? T("Escolham a duração e a dificuldade e toquem em Gerar.", "Pick the length and the difficulty and tap Generate.")
-                    : _gerado.Erro != null ? "<color=#ff9a7a>" + _gerado.Erro + "</color>"
-                    : T("Semente: ", "Seed: ") + "<b>" + _gerado.Semente + "</b>" + (string.IsNullOrEmpty(_gerado.Nome) ? "" : "  ·  " + TF("«{0}»", "“{0}”", _gerado.Nome));   // (v288: e o nome do mapa)
-                Linha(estado, 50f, _gerado != null && _gerado.Erro == null && !_gerandoOS ? 34f : 22f);
+                if (!feito)
+                {
+                    Linha(nomeDaEquipe, 30f, 24f);
+                    // (v366: quantos heróis)
+                    {
+                        HeroisDaEquipe();
+                        var fh = Fileira(60f); Rotulo(fh.transform, T("Heróis", "Heroes"), 200f);
+                        var bh = new List<Button>();
+                        for (int i = 2; i <= 4; i++) { int k = i; bh.Add(Botao(fh.transform, k.ToString(), new Vector2(150f, 56f), () => { if (_nHeroisOS == k) return; _nHeroisOS = k; Log.Info("mapa oneshot: " + k + " heróis"); Mudou(); })); }
+                        for (int j = 0; j < 3; j++) Marcar(bh[j], j + 2 == _nHeroisOS, _gerandoOS);
+                    }
+                    Linha(T("Duração", "Length"), 34f, 28f);
+                    var fd = Fileira(60f); var bd = new List<Button>();
+                    var nomesD = new[] { T("Curta (3 salas)", "Short (3 rooms)"), T("Média (6 salas)", "Medium (6 rooms)"), T("Longa (8 salas)", "Long (8 rooms)") };
+                    for (int i = 0; i < 3; i++) { int k = i; bd.Add(Botao(fd.transform, nomesD[i], new Vector2(300f, 56f), () => { if (_duracaoOS == k) return; _duracaoOS = k; Mudou(); })); }
+                    for (int j = 0; j < 3; j++) Marcar(bd[j], j == _duracaoOS, _gerandoOS);
+                    // (v346: Fácil, Normal e Difícil, como na versão publicada (as mesmas sementes dão os mesmos mapas); a dificuldade do
+                    //  próprio jogo continua à parte e vale por cima)
+                    Linha(T("Dificuldade", "Difficulty"), 34f, 28f);
+                    var fn = Fileira(60f); var bn = new List<Button>();
+                    for (int i = 0; i < 3; i++) { int k = i; bn.Add(Botao(fn.transform, NomeDaDif(i), new Vector2(300f, 56f), () => { if (_difOS == k) return; _difOS = k; Mudou(); })); }
+                    for (int j = 0; j < 3; j++) Marcar(bn[j], j == _difOS, _gerandoOS);
+                    Divisoria();
+                    // «Mais opções»
+                    { var fo = Fileira(52f); var bo = Botao(fo.transform, (_maisOpcoesOS ? "« " + T("Menos opções", "Fewer options") : T("Mais opções", "More options") + " »"), new Vector2(360f, 48f), () => { if (_gerandoOS) return; _maisOpcoesOS = !_maisOpcoesOS; DialogoOneshot(false); }); Marcar(bo, true, _gerandoOS); }
+                    if (_maisOpcoesOS)
+                    {
+                        Linha("<size=80%>" + T("Caixas: ", "Boxes: ") + "<b>" + (atosDoMapa == 2 ? T("Atos I e II", "Acts I and II") : T("Ato I", "Act I")) + "</b> " + (atos != atosColecao ? T("(escolhidas)", "(chosen)") : T("(as da coleção do jogo)", "(those of the game's collection)")) + "</size>", 28f, 22f);
+                        // (v272: com o Ato II na coleção, a caixa para usar ou deixar de fora o Ato II; v285: com equipe nova ou gravada)
+                        if (atosColecao == 2)
+                        {
+                            var fa = Fileira(52f);
+                            var caixa = Botao(fa.transform, _usarAto2 ? "<b>X</b>" : " ", new Vector2(52f, 48f), () => { if (_gerandoOS) return; _usarAto2 = !_usarAto2; Log.Info("mapa oneshot: usar o Ato II " + (_usarAto2 ? "sim" : "não")); Mudou(); });
+                            var tc = caixa.GetComponentInChildren<TMP_Text>(true); if (tc != null) { tc.enableAutoSizing = false; tc.fontSize = 28f; tc.alignment = TextAlignmentOptions.Center; }
+                            Marcar(caixa, true, _gerandoOS);
+                            var rot = Copia(rotuloModelo, fa.transform, "usar o Ato II"); var trot = rot.GetComponent<TMP_Text>();
+                            Texto(trot, T("Usar o Ato II (missões, monstros e peças dele)", "Use Act II (its quests, monsters and tiles)")); trot.fontSize = 22f; trot.enableAutoSizing = false; trot.alignment = TextAlignmentOptions.Left; trot.enableWordWrapping = false;
+                            var ler = rot.GetComponent<RectTransform>(); ler.sizeDelta = new Vector2(560f, 48f);
+                            var lel = rot.GetComponent<LayoutElement>() ?? rot.AddComponent<LayoutElement>(); lel.preferredWidth = 560f; lel.preferredHeight = 48f;
+                            var brot = rot.GetComponent<Button>() ?? rot.AddComponent<Button>(); brot.transition = Selectable.Transition.None; brot.onClick.AddListener(() => { if (_gerandoOS) return; Som("UI_Click"); _usarAto2 = !_usarAto2; Log.Info("mapa oneshot: usar o Ato II " + (_usarAto2 ? "sim" : "não")); Mudou(); });
+                        }
+                        // (v320: a história: pelo quadro de avisos, com missões para escolher, ou por surpresa, nascendo dentro do mapa)
+                        if (QUADRO_DE_AVISOS) { var fm = Fileira(56f); var nomesM = new[] { T("Quadro de avisos (escolher a missão)", "Notice board (pick the quest)"), T("Surpresa (a história nasce no mapa)", "Surprise (the story is born in the map)") }; var bm = new List<Button>();
+                          for (int i = 0; i < 2; i++) { int k = i; bm.Add(Botao(fm.transform, nomesM[i], new Vector2(460f, 52f), () => { if (_modoOS == k) return; _modoOS = k; Mudou(); })); }
+                          for (int j = 0; j < 2; j++) Marcar(bm[j], j == _modoOS, _gerandoOS); }
+                        // (v346: o Perigo, o ajuste fino de -2 a +2: muda só a força dos monstros)
+                        { var faj = Fileira(56f); Rotulo(faj.transform, TF("Perigo: {0}", "Danger: {0}", NomeDoAjusteFino(_ajusteOS)), 300f); var ba = new List<Button>();
+                          for (int i = -2; i <= 2; i++) { int k = i; ba.Add(Botao(faj.transform, i > 0 ? "+" + i : i < 0 ? "−" + (-i) : "0", new Vector2(100f, 52f), () => { if (_ajusteOS == k) return; _ajusteOS = k; Mudou(); })); }
+                          for (int j = 0; j < 5; j++) Marcar(ba[j], j - 2 == _ajusteOS, _gerandoOS); }
+                        { var hist = HistoricoDaEquipe(); if (hist != null) Linha("<size=80%>" + hist + "</size>", 30f, 22f); }
+                        // (v266: uma semente digitada: a de 7 caracteres traz a duracao, a dificuldade e as caixas; outra vale com o que esta escolhido)
+                        if (!_gerandoOS)
+                        {
+                            var fsem = Fileira(58f);
+                            CampoDeTexto(fsem.transform, _sementeDigitada, T("semente", "seed"), new Vector2(300f, 52f), t => _sementeDigitada = t);
+                            Botao(fsem.transform, T("Usar esta semente", "Use this seed"), new Vector2(300f, 52f), () => UsarSemente(_sementeDigitada));
+                        }
+                    }
+                    Divisoria();
+                    string estado = _gerandoOS ? T("Gerando o mapa…", "Generating the map…")
+                        : _gerado != null && _gerado.Erro != null ? "<color=#ff9a7a>" + _gerado.Erro + "</color>"
+                        : T("Escolham a duração e a dificuldade e toquem em Gerar.", "Pick the length and the difficulty and tap Generate.");
+                    Linha(estado, 50f, 22f);
+                }
+                else
+                {
+                    // o resultado: o nome, o que foi pedido, a simulação numa linha
+                    Linha("<b>" + (string.IsNullOrEmpty(_gerado.Nome) ? T("Mapa oneshot", "One-shot map") : TF("«{0}»", "“{0}”", _gerado.Nome)) + "</b>", 60f, 40f);
+                    Linha("<size=80%>" + string.Join("  ·  ", new[] { new[] { T("Curta (3 salas)", "Short (3 rooms)"), T("Média (6 salas)", "Medium (6 rooms)"), T("Longa (8 salas)", "Long (8 rooms)") }[Mathf.Clamp(_duracaoOS, 0, 2)], NomeDoAjuste(_difOS, _ajusteOS), TF("{0} heróis", "{0} heroes", _nHeroisOS) }) + "</size>   " + nomeDaEquipe, 32f, 24f);
+                    Divisoria();
+                    { var sc = Oneshot.SimulacaoCompacta(_gerado); if (sc != null) Linha(sc, 40f, 24f); }
+                    { var fo = Fileira(52f); var bo = Botao(fo.transform, (_verSimulacao ? "« " + T("Esconder detalhes", "Hide details") : T("Ver detalhes", "See details") + " »"), new Vector2(360f, 48f), () => { _verSimulacao = !_verSimulacao; DialogoOneshot(false); }); Marcar(bo, true); }
+                    if (_verSimulacao)
+                    {
+                        Linha(T("Semente: ", "Seed: ") + "<b>" + _gerado.Semente + "</b>     <size=80%>" + T("Caixas: ", "Boxes: ") + "<b>" + (atosDoMapa == 2 ? T("Atos I e II", "Acts I and II") : T("Ato I", "Act I")) + "</b> " + (atosDoMapa != atos ? T("(pela semente)", "(from the seed)") : "") + "</size>", 40f, 26f);
+                        { var ts = Linha(Oneshot.TextoDaSimulacao(_gerado), 150f, 16f); ts.alignment = TextAlignmentOptions.TopLeft; ts.overflowMode = TextOverflowModes.Truncate; ts.lineSpacing = -12f; }
+                    }
+                }
                 if (_avisoOS != null) Linha("<color=#a8e6a1>" + _avisoOS + "</color>", 30f, 20f);
                 // (v278: no Linux, o gerador é a página do gerador aberta no Chrome ou no Chromium; o quadro diz onde ela está)
                 if (Plataforma.Wine)
                 {
-                    if (Oneshot.PonteAtiva) Linha("<color=#a8e6a1>" + T("Gerador do navegador conectado.", "Browser generator connected.") + "</color>", 28f, 18f);
+                    if (feito) { }   // (com o mapa feito, a ponte já respondeu)
+                    else if (Oneshot.PonteAtiva) Linha("<color=#a8e6a1>" + T("Gerador do navegador conectado.", "Browser generator connected.") + "</color>", 28f, 18f);
                     else
                     {
                         Linha(TF("No Linux, o gerador roda no Chrome ou no Chromium. Abram <b>{0}</b> e, na página, escolham a pasta <b>{1}</b>.", "On Linux, the generator runs in Chrome or Chromium. Open <b>{0}</b> and, on the page, choose the folder <b>{1}</b>.",
@@ -871,35 +1015,22 @@ namespace Bigorna.Menu
                         Botao(fp.transform, T("Abrir no navegador", "Open in the browser"), new Vector2(300f, 46f), () => { Oneshot.AbrirPonteNoNavegador(); });
                     }
                 }
-                // (v266: uma semente digitada: a de 7 caracteres traz a duracao, a dificuldade e as caixas; outra vale com o que esta escolhido)
-                if (!_gerandoOS)
-                {
-                    var fsem = Fileira(58f);
-                    CampoDeTexto(fsem.transform, _sementeDigitada, T("semente", "seed"), new Vector2(300f, 52f), t => _sementeDigitada = t);
-                    Botao(fsem.transform, T("Usar esta semente", "Use this seed"), new Vector2(300f, 52f), () => UsarSemente(_sementeDigitada));
-                }
-                if (_gerado != null && _gerado.Erro == null && !_gerandoOS)
-                {
-                    var fs = Fileira(60f);
-                    Botao(fs.transform, _verSimulacao ? T("Esconder a simulação", "Hide the simulation") : T("Simulação", "Simulation"), new Vector2(300f, 56f), () => { _verSimulacao = !_verSimulacao; DialogoOneshot(false); });
-                    Botao(fs.transform, T("Gerar outro", "Generate another"), new Vector2(300f, 56f), () => GerarOneshot());
-                    if (_verSimulacao) { var ts = Linha(Oneshot.TextoDaSimulacao(_gerado), 150f, 18f); ts.alignment = TextAlignmentOptions.TopLeft; ts.overflowMode = TextOverflowModes.Truncate; }
-                }
 
-                // embaixo: voltar (a escolha da equipe) e gerar / jogar
+                // embaixo: voltar e gerar / jogar (com o mapa feito: Voltar às escolhas, Gerar outro no meio, Jogar)
                 var cancelar = aviso != null ? Achar(aviso, "Button_Cancel") : null; var seguir = aviso != null ? Achar(aviso, "Button_Proceed") : null;
-                Button Embaixo(Transform modelo, string texto, Vector2 pos, Action acao)
+                Button Embaixo(Transform modelo, string texto, Vector2 pos, Action acao, float ancora = -1f)
                 {
                     var go = modelo != null ? Copia(modelo, bg, texto) : Copia(botaoModelo, bg, texto);
-                    var r = go.GetComponent<RectTransform>(); r.anchorMin = r.anchorMax = new Vector2(pos.x < 0 ? 1f : 0f, 0f); r.anchoredPosition = pos; r.sizeDelta = new Vector2(280f, 90f);
+                    var r = go.GetComponent<RectTransform>(); float ax = ancora >= 0f ? ancora : pos.x < 0 ? 1f : 0f; r.anchorMin = r.anchorMax = new Vector2(ax, 0f); r.anchoredPosition = pos; r.sizeDelta = new Vector2(280f, 90f);
                     Texto(go.GetComponentInChildren<TMP_Text>(true), texto);
                     var b = go.GetComponent<Button>(); b.onClick.AddListener(() => acao()); b.interactable = true;
                     if (go.GetComponent<CanvasGroup>() == null) go.AddComponent<CanvasGroup>();
                     return b;
                 }
-                var voltar = Embaixo(cancelar, T("Voltar", "Back"), new Vector2(220f, 80f), () => { if (_gerandoOS) return; Som("UI_Click"); EscolherEquipe(); });
+                var voltar = Embaixo(cancelar, T("Voltar", "Back"), new Vector2(220f, 80f), () => { if (_gerandoOS) return; Som("UI_Click"); if (feito) { _gerado = null; _verSimulacao = false; DialogoOneshot(false); } else EscolherEquipe(); });
                 Marcar(voltar, !_gerandoOS, _gerandoOS);
-                bool pronto = _gerado != null && _gerado.Erro == null;
+                if (feito) Embaixo(botaoModelo, T("Gerar outro", "Generate another"), new Vector2(0f, 80f), () => { Som("UI_Click"); GerarOneshot(); }, 0.5f);
+                bool pronto = feito;
                 var principal = Embaixo(seguir, _gerandoOS ? T("Gerando…", "Generating…") : pronto ? T("Jogar", "Play") : T("Gerar", "Generate"), new Vector2(-220f, 80f), () =>
                 {
                     if (_gerandoOS) return;
@@ -909,7 +1040,7 @@ namespace Bigorna.Menu
                     try { m = Formato.Dmap.Carregar(_gerado.Caminho); } catch (Exception ex) { Log.Erro("mapa oneshot: lendo o mapa", ex); }
                     if (m == null) { _gerado = new Oneshot.Resultado { Erro = T("O mapa gerado não abriu. Gerem outro.", "The generated map did not open. Generate another.") }; DialogoOneshot(false); return; }
                     Log.Info("«Jogar» mapa oneshot " + _gerado.Semente + (_equipe != null ? " com a equipe do save " + _equipe.Slot : " com equipe nova"));
-                    var erro = Encontro.Lancador.Lancar(m, _equipe, new Encontro.Lancador.InfoOneshot { Semente = _gerado.Semente, Duracao = _duracaoOS, Dificuldade = _dificuldadeOS, Equipe = _equipe?.Rotulo });
+                    var erro = Encontro.Lancador.Lancar(m, _equipe, new Encontro.Lancador.InfoOneshot { Semente = _gerado.Semente, Duracao = _duracaoOS, Dificuldade = 10 + (_gerado.Perigo >= 1 ? _gerado.Perigo : PerigoOS), Equipe = _equipe?.Rotulo });
                     if (erro == null) { var go = _missao; _missao = null; if (go != null) UnityEngine.Object.Destroy(go); _avisoOS = null; _gerado = null; _verSimulacao = false; }   // (v268: o mapa jogado sai do quadro: na volta, Gerar; o mesmo mapa, pela semente)
                     Lancou(erro);
                 });
@@ -939,12 +1070,14 @@ namespace Bigorna.Menu
             }
             if (!perguntado) _avisoOS = null;   // (v288: o aviso do mapa guardado vale só para a geração que vem logo depois dele)
             _gerandoOS = true; _gerado = null; _verSimulacao = false; DialogoOneshot(false);
-            Nucleo.Instancia.StartCoroutine(Oneshot.Gerar(_duracaoOS, _dificuldadeOS, semente, r =>
+            Nucleo.Instancia.StartCoroutine(Oneshot.Gerar(_duracaoOS, _difOS, _ajusteOS, semente, r =>
             {
                 _gerandoOS = false; _gerado = r;
-                if (r != null && r.Erro == null) { if (r.Duracao >= 0) _duracaoOS = r.Duracao; if (r.Dificuldade >= 0) _dificuldadeOS = r.Dificuldade; }   // (v266: a semente digitada manda)
+                // (v320: o gerador trouxe o quadro de avisos: a mesa escolhe antes de haver mapa para jogar)
+                if (r != null && r.Erro == null && r.Avisos.Count >= 2 && string.IsNullOrEmpty(semente)) { _quadro = r.Avisos; _gerado = null; if (_tela != null && _oneshot && _tela.activeSelf) DialogoOneshot(false); return; }
+                if (r != null && r.Erro == null) { if (r.Duracao >= 0) _duracaoOS = r.Duracao; if (r.Dificuldade >= 0) { _difOS = r.Dificuldade; _ajusteOS = Mathf.Clamp(r.Ajuste, -2, 2); } }   // (v266: a semente digitada manda)
                 if (_tela != null && _oneshot && _tela.activeSelf) DialogoOneshot(false);
-            }, _equipe == null ? 0 : _equipe.Ato >= Act.ActII ? 2 : 1, AtosEscolhidos()));   // (v261: a vida da simulacao e a do ato da equipe do save; v272: as caixas escolhidas)
+            }, _equipe == null ? 0 : _equipe.Ato >= Act.ActII ? 2 : 1, AtosEscolhidos(), !QUADRO_DE_AVISOS || _modoOS == 1 ? "surpresa" : "chamado", QUADRO_DE_AVISOS && _modoOS == 0 ? 3 : 0, _nHeroisOS));   // (v366: quantos heróis) (v261: a vida da simulacao e a do ato da equipe do save; v272: as caixas escolhidas)
         }
 
         // ------------------------------------------------ v266: a semente digitada e a pergunta antes de um mapa jogado sair
@@ -958,7 +1091,7 @@ namespace Bigorna.Menu
             var c = go.GetComponent<TMP_InputField>(); if (c == null) { UnityEngine.Object.Destroy(go); return null; }
             c.onValueChanged = new TMP_InputField.OnChangeEvent(); c.onEndEdit = new TMP_InputField.SubmitEvent(); c.onSubmit = new TMP_InputField.SubmitEvent();
             c.onSelect = new TMP_InputField.SelectionEvent(); c.onDeselect = new TMP_InputField.SelectionEvent();
-            c.characterLimit = 24; c.contentType = TMP_InputField.ContentType.Alphanumeric; c.text = texto ?? "";
+            c.characterLimit = 24; c.contentType = TMP_InputField.ContentType.Standard; c.lineType = TMP_InputField.LineType.SingleLine;   // (v346: a semente com o ajuste no fim leva + ou -) c.text = texto ?? "";
             if (c.placeholder is TMP_Text ph) Texto(ph, dica);
             c.onValueChanged.AddListener(t => mudou?.Invoke(t));
             c.interactable = true;
@@ -974,7 +1107,7 @@ namespace Bigorna.Menu
             if (ls != null)
             {
                 if (ls.Value.atos == 2 && Oneshot.Atos() < 2) { _gerado = new Oneshot.Resultado { Erro = T("Esta semente é de um mapa com as caixas dos Atos I e II, e a coleção do jogo tem só o Ato I.", "This seed is of a map with the boxes of Acts I and II, and the game's collection has only Act I.") }; DialogoOneshot(false); return; }
-                _duracaoOS = ls.Value.duracao; _dificuldadeOS = ls.Value.dificuldade; s = s.ToLowerInvariant();
+                _duracaoOS = ls.Value.duracao; _difOS = ls.Value.dificuldade; if (ls.Value.ajuste >= -2) _ajusteOS = ls.Value.ajuste; else Oneshot.DifEAjuste(ls.Value.perigo, out _difOS, out _ajusteOS); s = s.ToLowerInvariant().Replace(" ", "");
             }
             Log.Info("mapa oneshot: semente digitada «" + s + "»" + (ls != null ? " (traz duração, dificuldade e caixas)" : ""));
             GerarOneshot(s);
@@ -1109,7 +1242,7 @@ namespace Bigorna.Menu
                 _missao.transform.SetAsLastSibling();
                 Log.Info("o destino do grupo: a pergunta no quadro do jogo");
             }
-            catch (Exception ex) { Log.Erro("o destino do grupo: quadro", ex); if (_missao != null) UnityEngine.Object.Destroy(_missao); _missao = null; Encontro.GrupoDoSave.NoQuadroDoJogo = false; Fechar(); }
+            catch (Exception ex) { Log.Erro("o destino do grupo: quadro", ex); if (_missao != null) UnityEngine.Object.Destroy(_missao); _missao = null; Encontro.GrupoDoSave.NoQuadroDoJogo = false; Encontro.GrupoDoSave.Reserva = true; Fechar(); }
         }
 
         /// <summary>Na tela de titulo, depois de um mapa jogado que terminou com a ultima copia dele (Oneshot.FimPendente): a tela

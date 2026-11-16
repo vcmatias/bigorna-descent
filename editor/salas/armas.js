@@ -554,7 +554,8 @@ async function ligarForja(el, w) {
       else { const e = arma.nova ? (arma.nova.pecas || {})['ABC'[k]] : (arma.pecas || {})[f.escolhidas[k]]; if (e) { if ('imagemAntesDaForja' in e) { if (e.imagemAntesDaForja) e.imagem = e.imagemAntesDaForja; else delete e.imagem; delete e.imagemAntesDaForja; } else if (!arma.nova) delete e.imagem; delete e.molde; } }
       moldes[k] = jogo(k); camadas[k].src = null; camadas[k].mexida = false; delete camadas[k]._posDesfeita; });
     f.mexida = camadas.some(x => x.mexida); f.sel = k; limparArmas(); renderArmas();
-    aviso(L2('Reset ' + 'ABC'[k] + ': what was forged, painted or moved on this piece is undone.', 'Redefinida ' + 'ABC'[k] + ': o que foi forjado, pintado ou movido nesta peça foi desfeito.')); };
+    aviso(L2('Reset ' + 'ABC'[k] + ': what was forged, painted or moved on this piece is undone.', 'Redefinida ' + 'ABC'[k] + ': o que foi forjado, pintado ou movido nesta peça foi desfeito.'));
+    { const it0 = !arma.nova && pecaPropriaDaArma(f.escolhidas[k]); salvarNaOrigem(it0 || null, it0 ? null : armaEditada(wid)); } };   // (v362: the reset is written over the file too)
   /* a piece baked into a picture of its box: the app fits it back exactly where it is now (stretched, turned, mirrored) */
   const assar = c => { const b = caixa(c.s); const R = Math.max(1, Math.min(3, c.img ? 1 / Math.min(escalas(c)[0], escalas(c)[1]) : 1)); const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(b.w * R)); cv.height = Math.max(1, Math.round(b.h * R));
     const x = cv.getContext('2d'); x.scale(cv.width / b.w, cv.height / b.h); x.translate(b.w / 2, b.h / 2); x.rotate(-phi); x.translate(-b.cx, -b.cy); desenharCamada(x, c); return cv.toDataURL('image/png'); };
@@ -574,7 +575,8 @@ async function ligarForja(el, w) {
     }
     // (this piece is its baked picture now: fitted again in its box; the others keep their changes)
     c.src = null; c.mexida = false; f.mexida = camadas.some(x => x.mexida);
-    limparArmas(); renderArmas(); aviso(L2('Forged ' + 'ABC'[k] + ': this piece stays as you left it, in the game too.', 'Forjada ' + 'ABC'[k] + ': esta peça fica como você deixou, no jogo também.')); };
+    limparArmas(); renderArmas(); aviso(L2('Forged ' + 'ABC'[k] + ': this piece stays as you left it, in the game too.', 'Forjada ' + 'ABC'[k] + ': esta peça fica como você deixou, no jogo também.'));
+    salvarNaOrigem(it || null, it ? null : armaEditada(wid)); };   // (v362: written over its file: one's Workshop, or the package it came from)
   el.querySelectorAll('[data-forjar]').forEach(b => b.onclick = e => { e.stopPropagation(); forjar(+b.dataset.forjar); });
   el.querySelectorAll('[data-redefinir]').forEach(b => b.onclick = e => { e.stopPropagation(); redefinir(+b.dataset.redefinir); });
   // (the template: each piece in its box, the boxes drawn, in the order of the pieces)

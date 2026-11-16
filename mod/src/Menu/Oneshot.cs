@@ -35,7 +35,9 @@ namespace Bigorna.Menu
         {
             public string Erro, Semente, Nome, Caminho;
             /// <summary>v266: o que o mapa saiu (a semente de 7 caracteres traz a duracao, a dificuldade e as caixas); -1: nao veio.</summary>
-            public int Duracao = -1, Dificuldade = -1, Atos;
+            public int Duracao = -1, Dificuldade = -1, Atos; public int Perigo = -1, Ajuste;   // (v346: o ajuste do Perigo, -2 a +2)
+            /// <summary>v320: os avisos do quadro (modo chamado): o mapa de cada um e pedido de novo pela semente.</summary>
+            public List<Aviso> Avisos = new List<Aviso>();   // (v318: o Perigo de 1 a 10 com que o mapa saiu)
             public List<Simulacao> Simulacao = new List<Simulacao>();
         }
 
@@ -63,6 +65,12 @@ namespace Bigorna.Menu
         public static bool AppInstalado => File.Exists(DadosDoEditor.ArquivoApp);
         public static bool Gerando { get; private set; }
         public static readonly string[] Duracoes = { "curta", "media", "longa" };
+        public class Aviso { public string Semente, Nome, Texto, Objetivo; public int Perigo, Dificuldade = 1, Ajuste; }
+        /// <summary>v346: o Perigo (1 a 10) de uma dificuldade (0 a 2) com o ajuste (-2 a +2), e o contrário (o Perigo da v318 nos
+        /// controles de agora).</summary>
+        public static int PerigoDe(int dificuldade, int ajuste) => Mathf.Clamp(new[] { 2, 5, 7 }[Mathf.Clamp(dificuldade, 0, 2)] + Mathf.Clamp(ajuste, -2, 2), 1, 10);
+        public static void DifEAjuste(int perigo, out int dificuldade, out int ajuste)
+        { if (perigo <= 3) { dificuldade = 0; ajuste = Math.Max(-2, perigo - 2); } else if (perigo <= 6) { dificuldade = 1; ajuste = perigo - 5; } else { dificuldade = 2; ajuste = Math.Min(2, perigo - 7); } }
         public static readonly string[] Dificuldades = { "facil", "normal", "dificil" };
 
         /// <summary>As caixas da colecao do jogo: 2 com o Ato II (uma expansao, ou um produto com missoes do Ato II), senao 1.</summary>
@@ -116,7 +124,7 @@ namespace Bigorna.Menu
         /// <summary>Pede o mapa ao aplicativo e espera (ate 3 min). semente vazia: uma nova. atoGrupo: o ato da equipe do save (1 ou
         /// 2; 0: equipe nova, vale o ato que o mapa pede), para a vida da simulacao (v261: as cartas do Ato II tem mais vida).
         /// v272: atosPedidos (1 ou 2) limita as caixas da coleção (a caixa «Usar o Ato II» desmarcada pede 1).</summary>
-        public static IEnumerator Gerar(int duracao, int dificuldade, string semente, Action<Resultado> fim, int atoGrupo = 0, int atosPedidos = 0)
+        public static IEnumerator Gerar(int duracao, int dificuldade, int ajuste, string semente, Action<Resultado> fim, int atoGrupo = 0, int atosPedidos = 0, string modo = null, int chamados = 0, int herois = 0)
         {
             Gerando = true; var r = new Resultado(); Process pr = null;
             // (v274: com o gerador aberto, o pedido vai para a pasta que ele vigia; sem ele, um processo só para este mapa, com
@@ -139,9 +147,11 @@ namespace Bigorna.Menu
             try
             {
                 Directory.CreateDirectory(Pasta); if (File.Exists(resposta)) File.Delete(resposta);
-                j = new JObject { ["duracao"] = Duracoes[Mathf.Clamp(duracao, 0, 2)], ["dificuldade"] = Dificuldades[Mathf.Clamp(dificuldade, 0, 2)], ["atos"] = atos, ["lingua"] = Codigo };   // (v259: a lingua do jogo, qualquer uma: o editor tem as tabelas dos textos do gerador)
+                j = new JObject { ["duracao"] = Duracoes[Mathf.Clamp(duracao, 0, 2)], ["dificuldade"] = Dificuldades[Mathf.Clamp(dificuldade, 0, 2)], ["ajuste"] = Mathf.Clamp(ajuste, -2, 2), ["atos"] = atos, ["lingua"] = Codigo };   // (v259: a lingua do jogo, qualquer uma: o editor tem as tabelas dos textos do gerador)
                 if (!string.IsNullOrEmpty(semente)) j["semente"] = semente;
+                else { if (!string.IsNullOrEmpty(modo)) j["modo"] = modo; if (chamados >= 2) j["chamados"] = chamados; }   // (v320: a história por chamado (com o quadro de avisos) ou por surpresa)
                 if (atoGrupo == 1 || atoGrupo == 2) j["atoGrupo"] = atoGrupo;
+                if (herois >= 2 && herois <= 4) j["herois"] = herois;   // (v366: o número de heróis)
                 var originais = MonstrosOriginais(); if (originais.Count > 0) j["monstros"] = new JArray(originais.ToArray());   // (v292)
                 if (aberto)
                 {
@@ -196,10 +206,14 @@ namespace Bigorna.Menu
                         else
                         {
                             r.Semente = (string)o["semente"]; r.Nome = (string)o["nome"];
-                            r.Duracao = Array.IndexOf(Duracoes, (string)o["duracao"] ?? ""); r.Dificuldade = Array.IndexOf(Dificuldades, (string)o["dificuldade"] ?? ""); r.Atos = (int?)o["atos"] ?? 0;
+                            r.Duracao = Array.IndexOf(Duracoes, (string)o["duracao"] ?? ""); r.Dificuldade = Array.IndexOf(Dificuldades, (string)o["dificuldade"] ?? ""); r.Perigo = (int?)o["perigo"] ?? (r.Dificuldade == 0 ? 2 : r.Dificuldade == 2 ? 7 : 5);
+                            { var aj = o["ajuste"]; if (aj != null && aj.Type == JTokenType.Integer) r.Ajuste = (int)aj; else if (r.Perigo >= 1) { DifEAjuste(r.Perigo, out int d0, out int a0); r.Dificuldade = d0; r.Ajuste = a0; } }   // (v346: a semente da v318 traz só o Perigo)
+                            r.Atos = (int?)o["atos"] ?? 0;
                             r.Caminho = CaminhoDoMapa;
                             File.WriteAllText(r.Caminho, (string)o["dmap"] ?? "", new UTF8Encoding(false));
                             File.WriteAllText(Path.Combine(Pasta, "oneshot.json"), new JObject { ["seed"] = r.Semente, ["name"] = r.Nome }.ToString(Formatting.None), new UTF8Encoding(false));   // (v266: de quem é o oneshot.dmap)
+                            foreach (var a in (o["avisos"] as JArray) ?? new JArray())
+                                r.Avisos.Add(new Aviso { Semente = (string)a["semente"], Nome = (string)a["nome"], Texto = (string)a["texto"], Objetivo = (string)a["objetivo"], Perigo = (int?)a["perigo"] ?? 5, Dificuldade = Math.Max(0, Array.IndexOf(Dificuldades, (string)a["dificuldade"] ?? "normal")), Ajuste = (int?)a["ajuste"] ?? 0 });
                             foreach (var s in (o["simulacao"] as JArray) ?? new JArray())
                                 r.Simulacao.Add(new Simulacao { Herois = (int?)s["herois"] ?? 0, Vida = (int?)s["vida"] ?? 8, Venceu = (bool?)s["venceu"] ?? false, Rodadas = (int?)s["rodadas"] ?? 0, Limite = (int?)s["limite"] ?? 0,
                                     Perda = (int?)s["perda"] ?? 0, VidaMin = (int?)s["vidaMin"] ?? 0, Monstros = (int?)s["monstros"] ?? 0, Itens = (int?)s["itens"] ?? 0,
@@ -322,6 +336,12 @@ namespace Bigorna.Menu
         }
 
         /// <summary>A simulacao em linhas para a tela (TMP, colunas por posicao), como a tabela do editor.</summary>
+        /// <summary>v323: a simulacao numa linha so: por numero de herois, venceu ou perdeu e em quantas rodadas.</summary>
+        public static string SimulacaoCompacta(Resultado r)
+        {
+            if (r == null || r.Simulacao.Count == 0) return null;
+            return T("Simulação: ", "Simulation: ") + string.Join("  ·  ", r.Simulacao.Select(s => TF("{0} heróis", "{0} heroes", s.Herois) + " " + (s.Venceu ? "<color=#a8e6a1>" + T("venceu", "won") + "</color>" : "<color=#ff9a7a>" + T("perdeu", "lost") + "</color>") + " (" + TF("{0} rodadas", "{0} rounds", s.Rodadas) + ")").ToArray());
+        }
         public static string TextoDaSimulacao(Resultado r)
         {
             if (r == null || r.Simulacao.Count == 0) return T("Sem simulação.", "No simulation.");

@@ -117,6 +117,26 @@ FORA_DO_GERADOR = {"RELATOS", "DESENHO", "TEXTURAS", "PAPELAO", "TRES", "INTERFA
 PARTES_DO_GERADOR = tuple(p for p in PARTES if p[0] not in FORA_DO_GERADOR)
 
 
+# v348: os blocos "narrativa" das histórias são na maior parte orientação para o autor (a Oficina de Histórias os mostra); o
+# gerador lê só estes campos (gerador_mapas.js: ligacoesDoVilao, roteiroDe; narrativa.js: pontesDe, forcaEntre). A página do
+# gerador (a do mapa oneshot do mod) leva só eles: ela ficou ~700 KB menor e abre mais rápido. O editor leva tudo.
+NARRATIVA_DO_GERADOR = ("entrada_deve_retomar", "ambientes_compativeis", "pontes_intercategoriais", "pergunta_que_abre", "planta", "retorno_no_climax", "proximas_categorias_preferidas")
+
+
+def historias_do_gerador(c):
+    """historias.js com os blocos "narrativa" dos elementos reduzidos ao que o gerador lê (com o node; sem ele, inteiro)."""
+    import shutil, subprocess
+    ini = "const HISTORIAS = "
+    if not shutil.which("node") or ini not in c: return c
+    a = c.index(ini) + len(ini); b = c.index("\n};", a) + 2
+    js = ("const H = (" + c[a:b] + "); const K = new Set(" + json.dumps(list(NARRATIVA_DO_GERADOR)) + ");"
+          "const w = x => { if (Array.isArray(x)) x.forEach(w); else if (x && typeof x === 'object') { if (x.id && x.narrativa && typeof x.narrativa === 'object') Object.keys(x.narrativa).forEach(k => { if (!K.has(k)) delete x.narrativa[k]; });"
+          " Object.keys(x).forEach(k => { if (!(k === 'narrativa' && x.id)) w(x[k]); }); } }; w(H); process.stdout.write(JSON.stringify(H));")
+    r = subprocess.run(["node", "-"], input=js, capture_output=True, text=True, encoding="utf-8")   # (pela entrada: o texto não cabe numa linha de comando)
+    if r.returncode or not r.stdout.startswith("{"): sys.exit("historias do gerador: " + r.stderr[:500])
+    return c[:a] + r.stdout + c[b:]
+
+
 def montar_gerador(saida, fontes):
     html = open(os.path.join(AQUI, "gerador.html"), encoding="utf-8").read()
     html = html.replace("<!--@@FONTES@@-->", fontes, 1)
@@ -124,6 +144,7 @@ def montar_gerador(saida, fontes):
     for marca, arq in PARTES_DO_GERADOR:
         c = open(os.path.join(AQUI, arq), encoding="utf-8").read().rstrip("\n")
         if "</script" in c.lower(): sys.exit("«</script» em " + arq)
+        if marca == "HISTORIAS": c = historias_do_gerador(c)
         codigo.append(c)
     try: versao = open(os.path.join(AQUI, "..", "..", "mod", "VERSAO"), encoding="utf-8").read().strip()
     except OSError: versao = ""

@@ -111,14 +111,14 @@ namespace Bigorna.Motor
         /// elas: antes, a cena e o fim saiam juntos, e a caixa da cena sobrava para o mapa-mundi, prendendo a fila).</summary>
         public static int CenasPorTocar;
 
-        static IEnumerator CenaDepoisDosAvisos(Dcamp cena, Dcamp.Dialogo primeira)
+        static IEnumerator CenaDepoisDosAvisos(Dcamp cena, Dcamp.Dialogo primeira, Action fim = null)
         {
             try
             {
                 yield return null; yield return null;   // (as acoes seguintes do mesmo gatilho entram na fila primeiro)
                 float t0 = Time.unscaledTime;
                 while ((Dialogos.Ocupado || Dialogos.NaFila > 0) && Time.unscaledTime - t0 < 120f) yield return null;
-                Campanha.Conversa.Tocar(cena, primeira, null);
+                Campanha.Conversa.Tocar(cena, primeira, fim);
             }
             finally { CenasPorTocar = Math.Max(0, CenasPorTocar - 1); }
         }
@@ -372,9 +372,11 @@ namespace Bigorna.Motor
                 {
                     // entra na fila de avisos: depois das pecas e dos objetos da sala que abriu, antes dos inimigos (que esperam a
                     // fila esvaziar). As casas de destino se acendem com o aviso (ate a proxima rodada ou o proximo "mover herois")
-                    var pares = P.Lista(p, "spots");
+                    var pares = P.Lista(p, "spots"); var niveis = P.Lista(p, "levels");
                     var casas = new List<int[]>();
-                    if (pares != null) for (int k = 0; k + 1 < pares.Count; k += 2) casas.Add(new[] { pares[k], pares[k + 1], pares[k], pares[k + 1] });
+                    // (v345: uma casa por destino, no nível dela; antes, a casa acendia em todos os níveis do tabuleiro naquele x,y)
+                    var spots = new List<int[]>();
+                    if (pares != null) for (int k = 0; k + 1 < pares.Count; k += 2) { casas.Add(new[] { pares[k], pares[k + 1], pares[k], pares[k + 1] }); spots.Add(new[] { pares[k], pares[k + 1], niveis != null && k / 2 < niveis.Count ? niveis[k / 2] : -1 }); }
                     if (casas.Count == 0) { var ar = P.Area(p); if (ar != null) casas.Add(ar); }
                     var txt = P.Texto(p, "text");
                     var texto = !string.IsNullOrEmpty(txt) ? txt : casas.Count > 0 ? T("Movam os heróis para as casas destacadas (um herói por casa; se faltar casa, na casa livre mais próxima).", "Move the heroes to the highlighted spaces (one hero per space; if there are not enough, to the nearest empty space).") : T("Movam todos os heróis para o lugar indicado.", "Move all heroes to the indicated place.");
@@ -382,7 +384,15 @@ namespace Bigorna.Motor
                     {
                         LimparDestinos();
                         var cena = Jogo.Cena; int n = 0;
-                        if (cena != null)
+                        if (cena != null && spots.Count > 0)
+                            foreach (var sp in spots)
+                            {
+                                // (sem nível no mapa: a casa mais baixa das peças que estão na mesa)
+                                var tr = Encontro.Tabuleiro.CasaNaGrade(sp[0], sp[1], sp[2] >= 0 ? sp[2] : 0);
+                                if (tr == null || _destinos.Contains(tr)) continue;
+                                try { cena.AddPersistentHighlight(tr); _destinos.Add(tr); n++; } catch { }
+                            }
+                        else if (cena != null)
                             foreach (var ar in casas)
                                 foreach (var tr in TransformsDe(new Dictionary<string, object> { { "area", new List<object> { ar[0], ar[1], ar[2], ar[3] } } }))
                                 { try { cena.AddPersistentHighlight(tr); _destinos.Add(tr); n++; } catch { } }
@@ -564,7 +574,11 @@ namespace Bigorna.Motor
                     var primeira = cena.DialogoPorId(P.Texto(p, "start")) ?? lista[0];
                     Log.Info("  cena própria: " + lista.Count + " caixa(s), começa em «" + primeira.Id + "»");
                     // (depois dos avisos ja na fila ou que entram neste mesmo gatilho: a sala que abriu e montada antes da cena)
-                    if (Nucleo.Instancia != null) { CenasPorTocar++; Nucleo.Instancia.StartCoroutine(CenaDepoisDosAvisos(cena, primeira)); } else Campanha.Conversa.Tocar(cena, primeira, null);
+                    // (v314: "scene": o nome da cena; quando ela acaba, dispara o evento sceneEnd com esse nome, e o que vem depois
+                    //  dela no mapa, como o texto da primeira sala depois da cena de abertura, espera por ele)
+                    var nomeDaCena = P.Texto(p, "scene");
+                    Action fimDaCena = string.IsNullOrEmpty(nomeDaCena) ? (Action)null : () => { try { Roteiro.FimDaCena(nomeDaCena); } catch (Exception ex) { Log.Erro("sceneEnd", ex); } };
+                    if (Nucleo.Instancia != null) { CenasPorTocar++; Nucleo.Instancia.StartCoroutine(CenaDepoisDosAvisos(cena, primeira, fimDaCena)); } else Campanha.Conversa.Tocar(cena, primeira, fimDaCena);
                     break;
                 }
                 case "playVideo":

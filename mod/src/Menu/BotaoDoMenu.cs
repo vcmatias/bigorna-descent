@@ -52,7 +52,7 @@ namespace Bigorna.Menu
             //  Fechado sem resposta (a seta de voltar), a pergunta volta)
             if (Encontro.GrupoDoSave.Pendente && Encontro.GrupoDoSave.NoQuadroDoJogo && !TelaDeMapas.Aberta && Time.unscaledTime - _grupoPedidoEm > 3f) { Encontro.GrupoDoSave.NoQuadroDoJogo = false; _grupoTentado = false; _menuDesde = Time.unscaledTime; }
             if (Encontro.GrupoDoSave.Pendente && !Encontro.GrupoDoSave.NoQuadroDoJogo && !TelaDeMapas.Aberta && !PainelMapas.Aberto && Time.unscaledTime - _menuDesde >= 1.5f && !_grupoTentado)
-            { _grupoTentado = true; if (TelaDeMapas.PerguntarGrupo()) { Encontro.GrupoDoSave.NoQuadroDoJogo = true; _grupoPedidoEm = Time.unscaledTime; } return; }
+            { _grupoTentado = true; if (TelaDeMapas.PerguntarGrupo()) { Encontro.GrupoDoSave.NoQuadroDoJogo = true; _grupoPedidoEm = Time.unscaledTime; } else Encontro.GrupoDoSave.Reserva = true; return; }
             if (!Encontro.GrupoDoSave.Pendente) _grupoTentado = false;
             if (Oneshot.FimPendente == null || Encontro.GrupoDoSave.Pendente || TelaDeMapas.Aberta || PainelMapas.Aberto || Time.unscaledTime - _menuDesde < 1.5f) return;
             if (!TelaDeMapas.PerguntarFim()) Oneshot.FimPendente = null;

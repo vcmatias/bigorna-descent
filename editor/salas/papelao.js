@@ -240,7 +240,10 @@ const MODELOS_PAPELAO = {
         [0.4, 0.6].forEach(f => { g.fillStyle = '#2a1a10'; g.beginPath(); g.ellipse(W * f, H * 0.46, W * 0.05, H * 0.06, (f - 0.5) * 3, 0, 7); g.fill(); circulo(g, W * f, H * 0.46, 2.5, '#ff9a2a'); });
         g.fillStyle = '#2a1a10'; [0.46, 0.54].forEach(f => { g.beginPath(); g.ellipse(W * f, H * 0.86, 2.5, 5, 0, 0, 7); g.fill(); });
         g.strokeStyle = 'rgba(74,64,50,.6)'; g.beginPath(); g.moveTo(W / 2, H * 0.32); g.lineTo(W / 2, H * 0.78); g.stroke(); });
-    return [...caixaCartao(0.35, 0.3, 1.3, 2.4, 0, 0.12, '#6e685e'), ...cruzCartao(1, 1.3, 1.7, 2.8, 0.1, 1.8, frente, perfil)];
+    // (v312: the snout to the south of the piece's own squares, as the 2D art; with the half turn of GIRO_ARTE the head faces
+    // north at rotation 0, as in the game. Before, the profile had the snout to the north, and the 3D view showed it the other way)
+    const perfilSul = (g, W, H) => { g.save(); g.translate(W, 0); g.scale(-1, 1); perfil(g, W, H); g.restore(); };
+    return [...caixaCartao(0.35, 0.3, 1.3, 2.4, 0, 0.12, '#6e685e'), ...cruzCartao(1, 1.7, 1.7, 2.8, 0.1, 1.8, frente, perfilSul)];
   },
   RoundTable() {
     const pe = (g, W, H) => silhueta(g, () => { g.beginPath(); g.moveTo(0, H); g.lineTo(W * 0.42, H * 0.7); g.lineTo(W * 0.44, 0); g.lineTo(W * 0.56, 0); g.lineTo(W * 0.58, H * 0.7); g.lineTo(W, H); g.closePath(); }, () => madeira(g, 0, 0, W, H, '#4a2e18', { tabuas: 1, vertical: true, seed: 17, borda: false }));

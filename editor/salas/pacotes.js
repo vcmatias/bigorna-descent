@@ -422,13 +422,13 @@ function versaoDoPacote(x, comoClone) {
 /* the revision of what the editor writes in a package's pacote.json: a file of an older revision is written again (v251: the
    pictures of the NPCs in the scenes) */
 const REV_PACOTE_MOD = 3;   // (v255: the game's originals go by their ids only)
-async function garantirPacotesDoMod(pacotes) {
+async function garantirPacotesDoMod(pacotes, forcar) {   // (v362: forcar: written again even when it is of this edition (a forged entry))
   if (!Arquivos.ativo || (typeof REDEFININDO !== 'undefined' && REDEFININDO)) return;
   for (const pk of pacotes || []) {
     try {
       const pasta = 'Pacotes/' + (pk._pasta || pastaDoPacote(pk.id));
       const ha = (await Arquivos.lista(pasta)).some(x => x.nome === 'pacote.json' && !x.pasta);
-      if (ha) { let j = null; try { j = await Arquivos.ler(pasta + '/pacote.json', 'json'); } catch { } if (j && j.id === pk.id && (j.edition || 1) === (pk.edicao || 1) && (j.rev || 1) >= REV_PACOTE_MOD) continue; }
+      if (ha && !forcar) { let j = null; try { j = await Arquivos.ler(pasta + '/pacote.json', 'json'); } catch { } if (j && j.id === pk.id && (j.edition || 1) === (pk.edicao || 1) && (j.rev || 1) >= REV_PACOTE_MOD) continue; }
       const custom = customDoPacote(pk); await extrairImagens(custom);
       const txt = JSON.stringify({ format: 'bigorna-pacote', version: 1, rev: REV_PACOTE_MOD, id: pk.id, edition: pk.edicao || 1, name: pk.nome || '', custom });
       try { await Deposito.copiarPara(pasta + '/imagens', [...imagensDoTexto(txt)]); } catch { }

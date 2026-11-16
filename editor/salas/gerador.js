@@ -293,11 +293,42 @@ const novaSemente = () => Math.random().toString(36).slice(2, 8);
    characters, or any text) keeps working with the options chosen on screen. */
 const SEMENTE_DUR = ['curta', 'media', 'longa'], SEMENTE_DIF = ['facil', 'normal', 'dificil'];
 function codigoDaSemente(duracao, dificuldade, atos) { const d = Math.max(0, SEMENTE_DUR.indexOf(duracao)), f = Math.max(0, SEMENTE_DIF.indexOf(dificuldade)); return String.fromCharCode(97 + d * 6 + f * 2 + (+atos === 1 ? 0 : 1)); }
-function sementeCompleta(duracao, dificuldade, atos, sorteio) { let r = String(sorteio || ''); while (r.length < 6) r += Math.random().toString(36).slice(2); return codigoDaSemente(duracao, dificuldade, atos) + r.slice(0, 6).toLowerCase(); }
+/* v318: the Danger (o.perigo, 1 to 10) in place of Easy, Normal and Hard: a seed of 8 characters (the first, a to f, the length
+   and the boxes; the second, 0 to 9, the Danger 1 to 10; six of the draw). The seeds of 7 characters keep working: Easy, Normal
+   and Hard are the Dangers 2, 5 and 7 */
+const PERIGO_DA_DIF = { facil: 2, normal: 5, dificil: 7 };
+const difDoPerigo = p => p <= 3 ? 'facil' : p <= 6 ? 'normal' : 'dificil';
+const perigoDe = o => { const p = Math.round(+(o && o.perigo)); return p >= 1 && p <= 10 ? p : PERIGO_DA_DIF[(o && o.dificuldade) || 'normal'] || 5; };
+/* v346: Easy, Normal and Hard are back as the choice (the seed of 7 characters, as before v318: the same seeds give the same maps),
+   and the Danger is a fine adjustment around it, from -2 to +2 (o.ajuste), that only moves numbers (the base intensity, the
+   progression, the top tier) and stays out of the draws: the seed carries it at its end, "+1", "-2" (none when 0), and the map
+   with another adjustment is the same map. The seeds of 8 characters of v318 (the Danger 1 to 10) keep working. */
+const AJUSTE_MAX = 2;
+const ajusteDe = a => { const n = Math.round(+a); return Number.isFinite(n) ? Math.max(-AJUSTE_MAX, Math.min(AJUSTE_MAX, n)) : 0; };
+const perigoDoAjuste = (dificuldade, ajuste) => Math.max(1, Math.min(10, (PERIGO_DA_DIF[dificuldade] || 5) + ajusteDe(ajuste)));
+const difEAjusteDoPerigo = p => p <= 3 ? { dificuldade: 'facil', ajuste: Math.max(-2, p - 2) } : p <= 6 ? { dificuldade: 'normal', ajuste: p - 5 } : { dificuldade: 'dificil', ajuste: Math.min(2, p - 7) };   // (a Danger of v318 in the new controls)
+const comAjuste = (base, ajuste) => { const a = ajusteDe(ajuste); return String(base).slice(0, 7) + (a > 0 ? '+' + a : a < 0 ? String(a) : ''); };
+function sementeCompleta(duracao, dificuldade, atos, sorteio, perigo, ajuste) { let r = String(sorteio || ''); while (r.length < 6) r += Math.random().toString(36).slice(2); r = r.slice(0, 6).toLowerCase();
+  if (ajuste != null) return comAjuste(codigoDaSemente(duracao, SEMENTE_DIF.includes(dificuldade) ? dificuldade : 'normal', atos) + r, ajuste);
+  const p = Math.round(+perigo); if (!(p >= 1 && p <= 10) || PERIGO_DA_DIF[dificuldade] === p) return codigoDaSemente(duracao, p >= 1 ? difDoPerigo(p) : dificuldade, atos) + r;
+  return String.fromCharCode(97 + Math.max(0, SEMENTE_DUR.indexOf(duracao)) * 2 + (+atos === 1 ? 0 : 1)) + (p - 1) + r; }
 function lerSemente(s) {
-  const m = /^([a-r])([0-9a-z]{6})$/i.exec(String(s || '').trim()); if (!m) return null;
-  const k = m[1].toLowerCase().charCodeAt(0) - 97;
-  return { duracao: SEMENTE_DUR[Math.floor(k / 6)], dificuldade: SEMENTE_DIF[Math.floor(k / 2) % 3], atos: k % 2 ? 2 : 1, semente: String(s).trim().toLowerCase(), sorteio: m[2].toLowerCase() };
+  const t = String(s || '').trim().toLowerCase().replace(/\s+/g, '');
+  const n = /^([a-f])([0-9])([0-9a-z]{6})$/.exec(t);
+  if (n) { const q = n[1].charCodeAt(0) - 97, p = +n[2] + 1; return { duracao: SEMENTE_DUR[Math.floor(q / 2)], dificuldade: difDoPerigo(p), perigo: p, ajuste: null, atos: q % 2 ? 2 : 1, semente: t, base: t, sorteio: n[3] }; }
+  const m = /^([a-r])([0-9a-z]{6})([+-][0-9])?$/.exec(t); if (!m) return null;
+  const k = m[1].charCodeAt(0) - 97; const dif = SEMENTE_DIF[Math.floor(k / 2) % 3]; const aj = ajusteDe(m[3] || 0);
+  return { duracao: SEMENTE_DUR[Math.floor(k / 6)], dificuldade: dif, perigo: perigoDoAjuste(dif, aj), ajuste: aj, atos: k % 2 ? 2 : 1, semente: comAjuste(m[1] + m[2], aj), base: m[1] + m[2], sorteio: m[2] };
+}
+/* v346: the options of a map with the seed's adjustment taken out of the seed (the draws use the 7 characters) and the Danger
+   worked out: with o.ajuste, Easy, Normal or Hard keep their rules and the Danger is theirs plus the adjustment; without it, the
+   Danger of v318 (o.perigo) says which rules apply */
+function opcoesDoPerigo(o) {
+  if (!o) return o; const ls = lerSemente(o.semente);
+  if (ls && ls.ajuste != null && ls.base !== String(o.semente).trim().toLowerCase()) o = { ...o, semente: ls.base, dificuldade: ls.dificuldade, ajuste: o.ajuste != null ? o.ajuste : ls.ajuste };
+  if (o.ajuste != null) { const d = SEMENTE_DIF.includes(o.dificuldade) ? o.dificuldade : 'normal'; const aj = ajusteDe(o.ajuste); return { ...o, dificuldade: d, ajuste: aj, perigo: perigoDoAjuste(d, aj) }; }
+  if (o.perigo != null) return { ...o, perigo: perigoDe(o), dificuldade: difDoPerigo(perigoDe(o)) };
+  return o;
 }
 
 /* an object kind of the chosen boxes */
@@ -386,11 +417,15 @@ const PASSOS_TAMANHO = { P: [0, 0.4], M: [0.3, 0.7], G: [0.6, 1] };
 const naCaixaAte = (tipo, atos) => caixaDoTerreno(tipo, atos) ?? 0;
 /* how many more pieces of a kind the box holds beside the rooms in `salas` (on the table together); Infinity for kinds the
    boxes do not count (the Workshop's objects) */
-function objetoLivre(p, salas, tipo, atos) {
+/* quando (v351, the tokens only): the room the piece goes in; the pieces it shares the box with are those on the table while that room is
+   (usoDesde: what leaves the table before, as a white token used to open the way, gives its piece back). Without it, every
+   piece of the rooms given counts, as before */
+function objetoLivre(p, salas, tipo, atos, quando) {
   const g0 = grupoDoTerreno(tipo); const caixa = g => caixaDoTerreno(g, atos);
   if (caixa(g0) === null) return Infinity;
   const mk = marcasDoMapa(p);   // (the marker of a "Move an object" is the same physical piece: it does not count)
-  const contar = (g, filtro) => { let n = 0; salas.forEach(i => { const s = p.salas[i]; const vistos = new Set(); (s?.objetos || []).forEach((o, oi) => { if (mk.objetos.has(i + ':' + oi)) return; if (grupoDoTerreno(o.type) !== g || (filtro && !filtro(o, s))) return; const k = o.pos.join(',') + ':' + (o.level || 0); if (!vistos.has(k)) { vistos.add(k); n++; } }); }); return n; };
+  // (the tokens: the scarce pieces, white and blue, many of them used and taken away; the other kinds count as before)
+  const contar = quando != null && p.salas[quando] && g0 === 'Fichas' ? (g, filtro) => usoDesde(p, g, quando, filtro) : (g, filtro) => { let n = 0; salas.forEach(i => { const s = p.salas[i]; const vistos = new Set(); (s?.objetos || []).forEach((o, oi) => { if (mk.objetos.has(i + ':' + oi)) return; if (grupoDoTerreno(o.type) !== g || (filtro && !filtro(o, s))) return; const k = o.pos.join(',') + ':' + (o.level || 0); if (!vistos.has(k)) { vistos.add(k); n++; } }); }); return n; };
   if (g0 === 'Bell' || g0 === 'BellFrame') return caixa(g0) - usoDosSinos(g0, g => contar(g), () => contar('Bell', sinoNoArco), caixa);
   return caixa(g0) - usoPartilhado(g0, contar, caixa);
 }
@@ -479,8 +514,8 @@ function gerarSala(opts) {
     const tenta = (tipo) => {
       if (alto && tipo !== 'SightToken') return null;
       // no archway left in the box: the frame of the bell (Act II) stands in for it
-      if (tipo === 'Archway' && objetoLivre(p, mesaDoAbridor, 'Archway', atos) <= 0 && daCaixa('BellFrame', atos)) tipo = 'BellFrame';
-      if (objetoLivre(p, mesaDoAbridor, tipo, atos) <= 0) return null;   // none left in the box
+      if (tipo === 'Archway' && objetoLivre(p, mesaDoAbridor, 'Archway', atos, lig.sala) <= 0 && daCaixa('BellFrame', atos)) tipo = 'BellFrame';
+      if (objetoLivre(p, mesaDoAbridor, tipo, atos, lig.sala) <= 0) return null;   // none left in the box
       if (tipo === 'SightToken') { const o = { type: 'SightToken', pos: [...lig.casa], rot: 0, level: alto }; return naBorda(...lig.casa) && longeDosHerois(...lig.casa) && alcancavel(o) ? o : null; }
       const w = (defObj(tipo)?.w || 2); const rot = lig.dir[1] !== 0 ? 0 : 90; const eixo = rot === 0 ? [1, 0] : [0, 1];
       const arco = ehArcoTipo(tipo);
@@ -511,7 +546,11 @@ function gerarSala(opts) {
             if (!livre.length) { o = null; break; } usadas.add(kc(livre[0].x, livre[0].y)); mover.push({ i, pos: [livre[0].x, livre[0].y] }); } } }
       if (!o) return { erro: L2('No room at that edge for a door or a token.', 'Não cabe porta nem ficha nessa borda.') };
       let moldura = null, gemeo = null;
-      if (querPortal && ehArco(o)) { const porta = portaNoArco(o, tipoA === 'Gate' || tipoA === 'Door' ? tipoA : rng.pick(portas)); if (porta && alcancavel(porta)) { moldura = { ...o, name: '', textClick: L2('A stone portal, its way shut by what stands in it.', 'Um portal de pedra, com a passagem fechada pelo que está nele.'), textUse: '', gatilhos: [], requisitos: [], senao: [] }; o = porta; } }
+      if (querPortal && ehArco(o)) {
+        // (v305: the door in the portal comes from the box too: with none of that kind left, the other kind, or no portal)
+        const livresP = portas.filter(t => objetoLivre(p, mesaDoAbridor, t, atos, lig.sala) > 0);
+        const pedido = tipoA === 'Gate' || tipoA === 'Door' ? (livresP.includes(tipoA) ? tipoA : livresP[0]) : livresP.length ? rng.pick(livresP) : null;
+        const porta = pedido ? portaNoArco(o, pedido) : null; if (porta && alcancavel(porta)) { moldura = { ...o, name: '', textClick: L2('A stone portal, its way shut by what stands in it.', 'Um portal de pedra, com a passagem fechada pelo que está nele.'), textUse: '', gatilhos: [], requisitos: [], senao: [] }; o = porta; } }
       // no portal after all: the kind asked for (a door, for the last room)
       if (!moldura && ehArco(o) && (querPortal && tipoA !== 'Archway' || opts.abridor === 'porta')) o = tenta(tipoA !== 'Archway' ? tipoA : 'Door') || tenta('Door') || o;
       // an archway alone opens nothing (in the game it is not used): a point of interest stands in its passage and opens
@@ -519,7 +558,7 @@ function gerarSala(opts) {
       if (!moldura && ehArco(o)) {
         // two points of interest, one in each square of the passage (the game fires them also on the diagonal: the pair keeps
         // it even); the second stands for the first
-        const meio = meioDoArco(o).meio.filter(([x, y]) => longeDosHerois(x, y)); const livres = objetoLivre(p, mesaDoAbridor, 'SightToken', atos);
+        const meio = meioDoArco(o).meio.filter(([x, y]) => longeDosHerois(x, y)); const livres = objetoLivre(p, mesaDoAbridor, 'SightToken', atos, lig.sala);
         if (livres > 0 && meio.length) { moldura = { ...o, name: '', textClick: '', textUse: '', gatilhos: [], requisitos: [], senao: [] };
           o = { type: 'SightToken', pos: [meio[0][0], meio[0][1]], rot: 0, level: o.level || 0 };
           if (meio.length > 1 && livres > 1) gemeo = { type: 'SightToken', pos: [meio[1][0], meio[1][1]], rot: 0, level: o.level || 0, name: '', textUse: '', gatilhos: [], requisitos: [], senao: [] }; }
@@ -873,7 +912,7 @@ function gerarSala(opts) {
     // (a fight room: the objects that stop a figure or a line of sight, all but the chest, are its cover; they wait for the
     // monsters and go between them and the way in, in 6b. The others are placed now)
     for (const t of escolhidos) { if (!daCaixa(t, atos)) continue; if (lutaPrevista && ehCobertura(t)) { cobertura.push(t); continue; }
-      if (objetoLivre(pTemp(), naMesa, t, atos) <= 0) continue; const o = porObjeto(t, sala, idx, entrada, rng, pTemp); if (o) sala.objetos.push(o); }
+      if (objetoLivre(pTemp(), naMesa, t, atos, idx) <= 0) continue; const o = porObjeto(t, sala, idx, entrada, rng, pTemp); if (o) sala.objetos.push(o); }
     if (arq.id !== 'abertura') noAlto(sala, idx, entrada, rng, pTemp, naMesa, atos);   // (the opening room stays bare)
     textosDosObjetos(sala, arq, rng, p, !ehInicio && !lig && (opts.inimigos || 'balanceado') !== 'nenhum', opts.tagsRoupas || { t: tema !== 'qualquer' ? tema : null, a: atos });
   }
@@ -926,7 +965,7 @@ function gerarSala(opts) {
       const quer = Math.min(3, 1 + Math.floor(ch.size / 30) + (rngC() < 0.4 ? 1 : 0));
       let postos = 0;
       for (const tipo of pendentes.slice()) {
-        if (postos >= quer) break; if (objetoLivre(pTemp(), naMesa, tipo, atos) <= 0) { pendentes.splice(pendentes.indexOf(tipo), 1); continue; }
+        if (postos >= quer) break; if (objetoLivre(pTemp(), naMesa, tipo, atos, idx) <= 0) { pendentes.splice(pendentes.indexOf(tipo), 1); continue; }
         for (let t = 0; t < 14 && meio.length; t++) {
           const c = rngC.pick(meio); const o = { type: tipo, pos: [c.x, c.y], rot: rngC.pick([0, 90]), level: c.nivel, name: '', textClick: textoDeOlhar(tipo, rngC), textUse: '', gatilhos: [], requisitos: [], senao: [] };
           if (!casasDoObjeto(o).every(([x, y]) => { const k = ch.get(kc(x, y)); return livre(k) && k.nivel === c.nivel; })) continue;
@@ -935,7 +974,7 @@ function gerarSala(opts) {
         }
       }
     }
-    for (const tipo of pendentes) { if (objetoLivre(pTemp(), naMesa, tipo, atos) <= 0) continue; const o = porObjeto(tipo, sala, idx, entrada, rng, pTemp); if (o) { sala.objetos.push(o); busca(o, BUSCAS[tipo]); } }
+    for (const tipo of pendentes) { if (objetoLivre(pTemp(), naMesa, tipo, atos, idx) <= 0) continue; const o = porObjeto(tipo, sala, idx, entrada, rng, pTemp); if (o) { sala.objetos.push(o); busca(o, BUSCAS[tipo]); } }
   }
   // the fragile bridge: a point of interest at its end, on the side of the way in, warns it; explored, the hero who explored
   // it calls the others across (a scene), and some rounds later the bridge gives way into the underlay (a text says so)
@@ -953,15 +992,15 @@ function gerarSala(opts) {
       const cx = (id, t, next) => ({ id, type: 'normal', speaker: '@actor', title: '', text: t, cast: ['@hero1'], background: FUNDO_DO_TEMA[opts.tema] ?? FUNDO_PADRAO, next, options: [] });
       const cena = { uid: uid(), tipo: 'scene', inicio: 's1', requisitos: [], caixas: [
         cx('s1', L2('This bridge will not hold for long: the boards are splitting under my feet!', 'Esta ponte não vai aguentar muito: as tábuas estão rachando sob os meus pés!'), 's2'),
-        cx('s2', L2('Everyone across, now! It will not take us much longer before it falls into ' + oQue + '!', 'Todos para o outro lado, agora! Ela não vai nos aguentar por muito tempo antes de cair sobre ' + oQue + '!'), '')] };
+        cx('s2', LF('Everyone across, now! It will not take us much longer before it falls into {0}!', 'Todos para o outro lado, agora! Ela não vai nos aguentar por muito tempo antes de cair sobre {0}!', oQue), '')] };
       const rodadas = { uid: uid(), tipo: 'rounds', modo: 'uma', n, requisitos: [] };
       const poi = { type: 'SightToken', pos: [lugar.x, lugar.y], rot: 0, level: 0, name: L2('Fragile bridge', 'Ponte frágil'),
-        textClick: L2('The bridge creaks and sways over ' + oQue + '. It looks ready to give way.', 'A ponte range e balança sobre ' + oQue + '. Parece prestes a ceder.'),
-        textUse: L2('The bridge is fragile: it will break in ' + n + ' rounds. Whoever has not crossed by then will have to go through ' + oQue + '.', 'A ponte é frágil: vai quebrar em ' + n + ' rodadas. Quem não tiver passado até lá vai ter de atravessar ' + oQue + '.'),
+        textClick: LF('The bridge creaks and sways over {0}. It looks ready to give way.', 'A ponte range e balança sobre {0}. Parece prestes a ceder.', oQue),
+        textUse: LF('The bridge is fragile: it will break in {0} rounds. Whoever has not crossed by then will have to go through {1}.', 'A ponte é frágil: vai quebrar em {0} rodadas. Quem não tiver passado até lá vai ter de atravessar {1}.', n, oQue),
         gatilhos: [cena, rodadas, autoRemocao()], requisitos: [], senao: [] };
       sala.objetos.push(poi);
       poi['rodada:' + rodadas.uid] = [{ uid: uid(), tipo: 'remove_object', objSala: idx, objIndex: sala.objetos.indexOf(ponte), requisitos: [] },
-        txtT('With a long crack, the bridge gives way and falls into ' + oQue + '. From now on, the only way across is through ' + oQue + ', and it hurts.', 'Com um estalo longo, a ponte cede e cai sobre ' + oQue + '. Daqui em diante, o único caminho é por ' + oQue + ', e isso dói.')];
+        txtTF('With a long crack, the bridge gives way and falls into {0}. From now on, the only way across is through {0}, and it hurts.', 'Com um estalo longo, a ponte cede e cai sobre {0}. Daqui em diante, o único caminho é por {0}, e isso dói.', oQue)];
       ponte.name = L2('Fragile bridge', 'Ponte frágil');
     }
   }
@@ -1079,11 +1118,11 @@ function casasDeInimigos(sala, idx, entrada, n, regra, rng, pTemp) {
 const FICHAS_INTERACAO = [
   { olhar: { en: 'A wounded traveller, slumped against the wall.', pt: 'Um viajante ferido, caído contra a parede.' },
     revela: { en: 'Against a wall, a wounded traveller lies slumped, breathing hard.', pt: 'Encostado numa parede, um viajante ferido respira com dificuldade.' },
-    uso: { en: 'The traveller grips your arm. "They went deeper in… and they were not alone."', pt: 'O viajante agarra seu braço. "Eles foram mais para dentro… e não estavam sozinhos."' },
+    uso: { en: 'The traveller grips your arm. "They went deeper in… and they were not alone."', pt: 'O viajante agarra seu braço. «Eles foram mais para dentro… e não estavam sozinhos.»' },
     gasto: { en: 'The wounded traveller, who has told you what he knows.', pt: 'O viajante ferido, que já contou o que sabia.' } },
   { olhar: { en: 'An old man lying on a pallet, too weak to stand.', pt: 'Um velho deitado num catre, fraco demais para ficar de pé.' },
     revela: { en: 'In a corner of the room, an old man lies on a pallet.', pt: 'Num canto da sala, um velho está deitado num catre.' },
-    uso: { en: '"You came… Take this. It is no use to me now."', pt: '"Vocês vieram… Levem isto. Já não me serve de nada."' }, item: true,
+    uso: { en: '"You came… Take this. It is no use to me now."', pt: '«Vocês vieram… Levem isto. Já não me serve de nada.»' }, item: true,
     gasto: { en: 'The old man on his pallet, who gave you what he had.', pt: 'O velho no catre, que já deu o que tinha.' } },
   { olhar: { en: 'Old writing carved into the stone.', pt: 'Escrita antiga entalhada na pedra.' },
     revela: { en: 'Part of a wall is covered in old carvings.', pt: 'Parte de uma parede está coberta de entalhes antigos.' },
@@ -1091,7 +1130,7 @@ const FICHAS_INTERACAO = [
     gasto: { en: 'The old carvings, whose warning you already know.', pt: 'Os entalhes antigos, cujo aviso vocês já conhecem.' } },
   { olhar: { en: 'A body, still clutching a note.', pt: 'Um corpo, ainda segurando um bilhete.' },
     revela: { en: 'A body lies on the floor, a note still in its hand.', pt: 'Um corpo jaz no chão, com um bilhete ainda na mão.' },
-    uso: { en: 'The note reads: "Do not trust the silence." Its purse is still full.', pt: 'O bilhete diz: "Não confiem no silêncio." A bolsa ainda está cheia.' }, item: true, ouro: 10,
+    uso: { en: 'The note reads: "Do not trust the silence." Its purse is still full.', pt: 'O bilhete diz: «Não confiem no silêncio.» A bolsa ainda está cheia.' }, item: true, ouro: 10,
     gasto: { en: 'The body, already searched; the note is gone from its hand.', pt: 'O corpo, já revistado; o bilhete não está mais na mão dele.' } },
   { olhar: { en: 'An abandoned pack, half torn open.', pt: 'Uma mochila abandonada, meio rasgada.' },
     revela: { en: 'Someone left a pack behind, in a hurry.', pt: 'Alguém deixou uma mochila para trás, às pressas.' },
@@ -1099,7 +1138,7 @@ const FICHAS_INTERACAO = [
     gasto: { en: 'The torn pack, already emptied.', pt: 'A mochila rasgada, já esvaziada.' } },
   { olhar: { en: 'A villager hiding in the shadows, shaking.', pt: 'Um aldeão escondido nas sombras, tremendo.' },
     revela: { en: 'In the shadows, a frightened villager hides and watches you.', pt: 'Nas sombras, um aldeão assustado se esconde e observa vocês.' },
-    uso: { en: '"Please… the way ahead is watched. Keep to the walls."', pt: '"Por favor… o caminho adiante é vigiado. Fiquem junto às paredes."' },
+    uso: { en: '"Please… the way ahead is watched. Keep to the walls."', pt: '«Por favor… o caminho adiante é vigiado. Fiquem junto às paredes.»' },
     gasto: { en: 'The frightened villager, who has said what he could.', pt: 'O aldeão assustado, que já disse o que podia.' } }
 ];
 const FICHA_ISCA = { olhar: { en: 'Someone lies huddled on the floor, not moving.', pt: 'Alguém está encolhido no chão, sem se mexer.' },
@@ -1218,6 +1257,8 @@ function efeitosDe(fx) {
     : f.cond ? { uid: uid(), tipo: 'enemy_condition', acao: 'apply', condition: f.cond, alvo: f.todos ? 'all' : 'room', requisitos: [] }
     : f.dano ? { uid: uid(), tipo: 'enemy_condition', acao: 'damage', amount: f.dano, alvo: 'all', requisitos: [] } : null).filter(Boolean);   // the app does not know where the figures stand: every monster in play
 }
+/* v370: a speech between quotes: « » in Portuguese, " " in the other languages (the translation keeps its own) */
+const ASPAS = t => LINGUA_TEXTOS === 'pt' ? '«' + t + '»' : '"' + t + '"';
 const textoDoTeste = t => { const s = STAT[t.stat]; return L2(t.text.en + (s ? ' Test ' + s.en + '.' : '') + (t.cumulativo ? ' The successes add up over tries.' : ''), t.text.pt + (s ? ' Teste de ' + s.pt + '.' : '') + (t.cumulativo ? ' Os sucessos se somam a cada tentativa.' : '')); };
 /* gold for the party */
 const ouroDe = n => ({ uid: uid(), tipo: 'give_item', modo: 'gold', amount: n, requisitos: [] });
@@ -1290,7 +1331,7 @@ function noAlto(sala, idx, entrada, rng, pTemp, naMesa, atos) {
     const ordem = rng.embaralhar(livres).sort((a, b) => longe(b) - longe(a));
     const antes = foraDeAlcance(idx, pt, entrada).length;
     let feito = false;
-    for (const t of ['Chest', 'InteractToken']) { if (feito || !daCaixa(t, atos) || !OBJETO[t] || objetoLivre(pt, naMesa, t, atos) <= 0) continue;
+    for (const t of ['Chest', 'InteractToken']) { if (feito || !daCaixa(t, atos) || !OBJETO[t] || objetoLivre(pt, naMesa, t, atos, idx) <= 0) continue;
       for (const [x, y] of ordem) { const o = { type: t, pos: [x, y], rot: 0, level: q.level || 0, name: '', textClick: '', textUse: '', gatilhos: [], requisitos: [], senao: [] };
         sala.objetos.push(o); if (foraDeAlcance(idx, pTemp(), entrada).length <= antes) { feito = true; if (OBJ_PAREDE.has(t)) costasNaParede(o, ch); break; } sala.objetos.pop(); } }
   }
@@ -1326,7 +1367,7 @@ function textosDosObjetos(sala, arq, rng, p, comIsca = true, tags = null) {
     else if (t === 'Chest') { const item = arq.tesouro === 'bau' && temItens && bausComItem++ === 0; o.gatilhos = [...(item ? [{ uid: uid(), tipo: 'give_item', modo: 'newitem', amount: 1, requisitos: [] }] : []), { uid: uid(), tipo: 'give_item', modo: 'random', points: arq.tesouro === 'bau' ? 25 : 20, requisitos: [] }, ouroDe(arq.tesouro === 'bau' ? 30 : 15)]; }
     else if (BUSCAS[t]) busca(o, BUSCAS[t]);
     else if (ehDaOficina(o.type)) { const v = varObj(o.type); if (!v) return; aplicarPadrao(o); o.textClick = o.textClick || v.textClick || v.nome || ''; o.textUse = o.textUse || v.textUse || '';
-      o._revela = L2('Here: ' + (v.nome || '') + '.', 'Aqui: ' + (v.nome || '') + '.'); }
+      o._revela = LF('Here: {0}.', 'Aqui: {0}.', (v.nome || '')); }
   });
 }
 /* the rules that fail a room (H) */
@@ -1342,7 +1383,7 @@ function validarSalaGerada(sala, idx, p, entrada, lig, contato = true, abertura 
   if (idx === 0 && (sala.herois || []).length < 2) r.push('fewer than 2 hero spaces');
   if (sala.objetos.some(o => !ehTerreno(o) && (ehArco(o) ? meioDoArco(o).meio : casasDoObjeto(o)).some(([x, y]) => !ch.has(kc(x, y))))) r.push('an object off the floor');
   if ((sala.inimigos || []).some(e => !ch.has(kc(e.pos[0], e.pos[1])))) r.push('a monster off the floor');
-  if (sala.intensidade && (sala.intensidade < 1 || sala.intensidade > 10)) r.push('intensity out of range');
+  if (sala.intensidade && (sala.intensidade < 1 || sala.intensidade > INTENSIDADE_MAX)) r.push('intensity out of range');
   if (lig) { const e = lig.fora; if (!ch.has(kc(e[0], e[1]))) r.push('the door leads nowhere'); }
   if (contato && vazamentosDaSala(idx, p, abertura).length) r.push('touches another room outside its door');
   const escadas = sala.objetos.filter(o => ehTipo(o, 'Staircase') || ehTipo(o, 'Ladder') || ehTipo(o, 'LadderMedium'));
@@ -1405,12 +1446,12 @@ function notaDaSala(m, arq) {
 function fraseDaSala(m, arq) {
   if (!m || !m.area) return '';
   const r = []; const pct = v => Math.round(v * 100) + '%';
-  if (m.visao >= 0.75) r.push(L2('clear view from the entry (' + pct(m.visao) + ' of the room)', 'visão ampla da entrada (' + pct(m.visao) + ' da sala)'));
-  else if (m.visao <= 0.45) r.push(L2('blind corners (' + pct(1 - m.visao) + ' hidden from the entry)', 'cantos cegos (' + pct(1 - m.visao) + ' escondidos da entrada)'));
-  if (m.rotas >= 2) r.push(L2(m.rotas + ' separate routes', m.rotas + ' rotas separadas'));
-  if (m.gargalos >= 2) r.push(L2(m.gargalos + ' chokepoints', m.gargalos + ' gargalos'));
-  if (m.cobertura >= 0.25) r.push(L2('cover on ' + pct(m.cobertura) + ' of the floor', 'cobertura em ' + pct(m.cobertura) + ' do piso'));
-  if (m.distInimigo !== null && m.inimigos) r.push(L2('monsters ' + m.distInimigo + ' squares away', 'monstros a ' + m.distInimigo + ' casas'));
+  if (m.visao >= 0.75) r.push(LF('clear view from the entry ({0} of the room)', 'visão ampla da entrada ({0} da sala)', pct(m.visao)));
+  else if (m.visao <= 0.45) r.push(LF('blind corners ({0} hidden from the entry)', 'cantos cegos ({0} escondidos da entrada)', pct(1 - m.visao)));
+  if (m.rotas >= 2) r.push(LF('{0} separate routes', '{0} rotas separadas', m.rotas));
+  if (m.gargalos >= 2) r.push(LF('{0} chokepoints', '{0} gargalos', m.gargalos));
+  if (m.cobertura >= 0.25) r.push(LF('cover on {0} of the floor', 'cobertura em {0} do piso', pct(m.cobertura)));
+  if (m.distInimigo !== null && m.inimigos) r.push(LF('monsters {0} squares away', 'monstros a {0} casas', m.distInimigo));
   if (m.niveis >= 2) r.push(L2('a raised platform', 'uma plataforma elevada'));
   if (m.alfombra > 0) r.push(L2('hazard terrain', 'terreno perigoso'));
   const t = r.slice(0, 3).join(', ');
@@ -1464,17 +1505,21 @@ function desenharCandidato(cv, c, p = projeto) {
 }
 /* Generate room: the starting room right away; any other room is opened by an object or monster of the map, clicked
    first (it gets the trigger "Open a room" when a generated room is used) */
-/* no hero spaces on the map yet (rooms built, heroes not placed): the generator makes the starting room, which goes in as
-   room 1 (the rooms already there move down one number) */
+/* the first room generated is always the starting room (the map empty, or only empty rooms); a map with rooms but no hero
+   spaces yet generates nothing until the starting spaces of the heroes are placed (v311, in place of v254, where the
+   generated room became the starting room and the rooms already there moved down one number) */
 const salasReais = () => projeto.salas.filter(s => !s._previa);
+const salaVazia = s => !s.pecas.length && !s.objetos.length && !(s.inimigos || []).length;
 const semHeroisNoMapa = () => salasReais().length > 0 && !salasReais().some(s => (s.herois || []).length);
-const gerandoInicial = () => !salasReais().length || semHeroisNoMapa();
+const gerandoInicial = () => salasReais().every(salaVazia);
+const faltamHerois = () => !gerandoInicial() && semHeroisNoMapa();
 /* a free place to the right of the map, for a room with no door to the others */
 function origemAoLadoDoMapa() { const cs = salasReais().flatMap(s => s.pecas.flatMap(casasDaPeca).concat(s.objetos.flatMap(casasDoObjeto))); if (!cs.length) return [0, 0];
   return [Math.max(...cs.map(c => c[0])) + 6, Math.min(...cs.map(c => c[1]))]; }
 function iniciarGerador() {
   descartarPrevia(); const j = $('#janelaGerador'); if (j) j.hidden = true;
   if (gerandoInicial()) { GER.dono = null; return abrirGerador(); }
+  if (faltamHerois()) { avisoLongo(L2('Place the starting spaces of the heroes before generating more rooms (Heroes, in the room where the map starts).', 'Coloquem os espaços iniciais dos heróis antes de gerar mais salas (Heróis, na sala onde o mapa começa).'), 8000); return; }
   pedirClique({ modo: 'object', objetoNovo: true, texto: tr('Click the object or monster that will open the new room, or place a new object with Objects (O): it gets the trigger “Open a room”. Esc cancels.'), cb: (x, y, q) => {
     const d = donoDoClique(q); if (!d) { aviso(tr('Click an object or a monster of the map (staircases and bridges are floor).')); return false; }
     GER.dono = d; setTimeout(abrirGerador, 0); return true; } });
@@ -1592,21 +1637,21 @@ function dicasDoGerador(arqs, dono, pontos) {
     gr_tam: x => { const f = PASSOS_TAMANHO[x] || PASSOS_TAMANHO.M, a = arqDe();
       const base = ({ P: L2('The smaller end of the archetype\'s floor area.', 'A ponta menor da área de chão do arquétipo.'), M: L2('The middle of the archetype\'s floor area.', 'O meio da área de chão do arquétipo.'), G: L2('The larger end of the archetype\'s floor area.', 'A ponta maior da área de chão do arquétipo.') })[x] || '';
       if (!a || !a.area) return base + L2(' Each archetype has its own range.', ' Cada arquétipo tem a sua faixa.');
-      const [m, n] = faixa(a.area, f); return base + ' ' + nomeArq(a) + ': ' + L2('about ' + m + ' to ' + n + ' squares.', 'cerca de ' + m + ' a ' + n + ' casas.'); },
+      const [m, n] = faixa(a.area, f); return base + ' ' + nomeArq(a) + ': ' + LF('about {0} to {1} squares.', 'cerca de {0} a {1} casas.', m, n); },
     gr_int: x => { const n = Math.max(1, Math.min(10, +x || 5)), modo = v('gr_ini'), a = arqDe();
       if (modo === 'nenhum') return L2('From 1 to 10. With no monsters, the room ignores it.', 'De 1 a 10. Sem monstros, a sala não usa a intensidade.');
-      if (modo === 'escolhidos') return L2('From 1 to 10. The monsters you pick enter at tier ' + Math.max(1, Math.min(4, Math.round(n / 3))) + ' (intensity ÷ 3).', 'De 1 a 10. Os monstros que você escolhe entram no tier ' + Math.max(1, Math.min(4, Math.round(n / 3))) + ' (intensidade ÷ 3).');
+      if (modo === 'escolhidos') return LF('From 1 to 10. The monsters you pick enter at tier {0} (intensity ÷ 3).', 'De 1 a 10. Os monstros que você escolhe entram no tier {0} (intensidade ÷ 3).', Math.max(1, Math.min(4, Math.round(n / 3))));
       return L2('From 1 to 10: the strength of the balanced group. When the room opens, the game spends intensity ÷ 10 × heroes × 1.5 × progression points on the monsters of the pool: higher brings more monsters or stronger tiers.', 'De 1 a 10: a força do grupo balanceado. Quando a sala abre, o jogo gasta intensidade ÷ 10 × heróis × 1,5 × progressão pontos com os monstros do pool: mais alta traz mais monstros ou tiers mais fortes.')
-        + (a && a.inimigos?.chefe ? L2(' In the boss arena the boss enters at tier ' + Math.max(2, Math.min(4, Math.round(n / 2.5))) + '.', ' Na arena do chefe, o chefe entra no tier ' + Math.max(2, Math.min(4, Math.round(n / 2.5))) + '.') : ''); },
+        + (a && a.inimigos?.chefe ? LF(' In the boss arena the boss enters at tier {0}.', ' Na arena do chefe, o chefe entra no tier {0}.', Math.max(2, Math.min(4, Math.round(n / 2.5)))) : ''); },
     gr_tema: x => x === 'qualquer' ? L2('The generator mixes the floors and objects of every place.', 'O gerador mistura os pisos e objetos de todos os lugares.') : L2('The floors, objects and openers of this kind of place, and its name in the texts of the room: ', 'Os pisos, os objetos e as aberturas deste tipo de lugar, e o nome dele nos textos da sala: ') + tr(TEMAS_SALA[x]?.nome || x) + ' (' + TXT(TEMAS_SALA[x]?.lugar || '') + ').',
     gr_obj: x => { const k = { poucos: 0.6, normal: 1, muitos: 1.5 }[x] || 1, a = arqDe();
       const base = ({ poucos: L2('About 60% of the objects the archetype usually has.', 'Cerca de 60% dos objetos que o arquétipo costuma ter.'), normal: L2('The objects the archetype usually has.', 'Os objetos que o arquétipo costuma ter.'), muitos: L2('About 150% of the objects the archetype usually has.', 'Cerca de 150% dos objetos que o arquétipo costuma ter.') })[x] || '';
-      const t = a?.objetos?.total; return base + L2(' The archetype\'s own objects (the chests of the treasure room, the points of interest of the exploration room) always come.', ' Os objetos próprios do arquétipo (os baús da sala do tesouro, os pontos de interesse da sala de exploração) vêm sempre.') + (t ? ' ' + nomeArq(a) + ': ' + L2('about ' + Math.round(t[0] * k) + ' to ' + Math.round(t[1] * k) + ' objects.', 'cerca de ' + Math.round(t[0] * k) + ' a ' + Math.round(t[1] * k) + ' objetos.') : ''); },
+      const t = a?.objetos?.total; return base + L2(' The archetype\'s own objects (the chests of the treasure room, the points of interest of the exploration room) always come.', ' Os objetos próprios do arquétipo (os baús da sala do tesouro, os pontos de interesse da sala de exploração) vêm sempre.') + (t ? ' ' + nomeArq(a) + ': ' + LF('about {0} to {1} objects.', 'cerca de {0} a {1} objetos.', Math.round(t[0] * k), Math.round(t[1] * k)) : ''); },
     gr_ini: x => { const a = arqDe(), e = a?.inimigos?.espacos;
       if (x === 'nenhum') return L2('The room comes with no monsters.', 'A sala vem sem monstros.');
       if (x === 'escolhidos') return L2('Exactly the monsters ticked below, one space each, at the tier the intensity gives.', 'Exatamente os monstros marcados abaixo, uma casa para cada, no tier que a intensidade dá.');
       return L2('Balanced spaces that the game fills when the room opens, with monsters of the room\'s pool (the map\'s pool, or the Workshop when it is empty) and the strength of the intensity.', 'Casas balanceadas que o jogo preenche quando a sala abre, com monstros do pool da sala (o pool do mapa, ou a Oficina quando ele está vazio) e a força da intensidade.')
-        + (a && e ? ' ' + nomeArq(a) + ': ' + (e[1] ? L2(e[0] + ' to ' + e[1] + ' spaces', e[0] + ' a ' + e[1] + ' casas') + (a.inimigos.como === 'armadilha' ? L2(', brought by a token of the room a round after it opens.', ', trazidas por um marcador da sala uma rodada depois que ela abre.') : '.') : L2('no monsters, whatever is chosen here.', 'sem monstros, seja o que for escolhido aqui.')) : ''); },
+        + (a && e ? ' ' + nomeArq(a) + ': ' + (e[1] ? LF('{0} to {1} spaces', '{0} a {1} casas', e[0], e[1]) + (a.inimigos.como === 'armadilha' ? L2(', brought by a token of the room a round after it opens.', ', trazidas por um marcador da sala uma rodada depois que ela abre.') : '.') : L2('no monsters, whatever is chosen here.', 'sem monstros, seja o que for escolhido aqui.')) : ''); },
     gr_fun: x => { const a = arqDe(), f = x || (a?.funcoes || [])[0];
       const nome = f ? tr((FUNCOES_SALA.find(z => z[0] === f) || [])[1] || f) : '';
       const oque = f && FUNCOES_EXPLICADAS[f] ? L2(...FUNCOES_EXPLICADAS[f]) : '';
@@ -1615,7 +1660,7 @@ function dicasDoGerador(arqs, dono, pontos) {
     gr_atos: x => +x === 1 ? L2('Tiles, objects and monsters of the first box only.', 'Só peças, objetos e monstros da primeira caixa.') : L2('The room may use tiles, objects and monsters of the second box.', 'A sala pode usar peças, objetos e monstros da segunda caixa.'),
     gr_sem: () => L2('The seed of the draw. Each Generate uses a new one; to see a room again, type its seed here before generating.', 'A semente do sorteio. Cada Gerar usa uma nova; para ver uma sala de novo, digite a semente dela aqui antes de gerar.'),
     gr_pto: x => x === 'random' ? (dono ? L2('The generator tries the three nearest edges of that room, in a drawn order, then the others, until one gives rooms.', 'O gerador tenta as três bordas mais próximas daquela sala, numa ordem sorteada, e depois as outras, até uma dar salas.') : L2('The generator tries the free edges of the map in a drawn order until one gives rooms.', 'O gerador tenta as bordas livres do mapa numa ordem sorteada até uma dar salas.'))
-      : (() => { const pt = pontos[+x]; return pt ? L2('The new room starts at this edge: room ' + (pt.sala + 1) + ', ' + nomeDirecao(pt.dir) + ' side, square ' + pt.casa.join(',') + '.', 'A sala nova começa nesta borda: sala ' + (pt.sala + 1) + ', lado ' + nomeDirecao(pt.dir) + ', casa ' + pt.casa.join(',') + '.') : ''; })(),
+      : (() => { const pt = pontos[+x]; return pt ? LF('The new room starts at this edge: room {0}, {1} side, square {2}.', 'A sala nova começa nesta borda: sala {0}, lado {1}, casa {2}.', (pt.sala + 1), nomeDirecao(pt.dir), pt.casa.join(',')) : ''; })(),
     gr_abr: x => ({ random: L2('Drawn by the terrain (dungeons and keeps favour doors, caves and the wilds points of interest).', 'Pelo terreno (masmorras e fortalezas preferem portas; cavernas e ermos, pontos de interesse).'), Door: L2('A door at the edge, between the two rooms: opening it opens the new room.', 'Uma porta na borda, entre as duas salas: abri-la abre a sala nova.'), SightToken: L2('A point of interest at the edge, a passage with no door: the heroes use it to go on.', 'Um ponto de interesse na borda, uma passagem sem porta: os heróis o usam para seguir.'), Archway: L2('An archway at the edge with a point of interest in it: the passage is framed by the arch.', 'Um arco na borda com um ponto de interesse dentro: a passagem fica emoldurada pelo arco.') })[x] + L2(' From a raised edge it is always a point of interest: the heroes jump down.', ' De uma borda elevada é sempre um ponto de interesse: os heróis saltam para baixo.')
   };
   const ROTULOS = { gr_arq: L2('Archetype', 'Arquétipo'), gr_tam: L2('Size', 'Tamanho'), gr_int: L2('Intensity', 'Intensidade'), gr_tema: L2('Terrain and theme', 'Terreno e tema'), gr_obj: L2('Objects', 'Objetos'), gr_ini: L2('Monsters', 'Monstros'), gr_fun: L2('Story function', 'Função na história'), gr_atos: L2('Boxes', 'Caixas'), gr_sem: L2('Seed', 'Semente'), gr_pto: L2('Where it starts', 'Onde começa'), gr_abr: L2('Opened by', 'Aberta por') };

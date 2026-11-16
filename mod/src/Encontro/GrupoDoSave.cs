@@ -125,22 +125,26 @@ namespace Bigorna.Encontro
         /// As listas sao copiadas dentro das listas de destino (o controle de proezas do jogo guarda as dele).</summary>
         static void Copiar(SerializedGame de, SerializedGame para, bool novoMapa)
         {
-            // (de volta a uma partida do jogo, o que so existe no mapa (itens, receitas, pericias, proezas e pecas da Oficina:
-            // B_..., BIGORNA_...) fica de fora: o jogo, sem o mapa, nao o conheceria)
-            bool Fica(string id) => novoMapa || !Proprio(id);
+            // (o conteúdo próprio de um mapa ou campanha do Bigorna (itens, receitas, perícias, proezas e peças da Oficina: B_...,
+            //  BIGORNA_...) nunca passa de uma obra a outra: na volta à partida de origem, ele fica no mapa; v304: na ida para um mapa
+            //  novo também (antes ia, e um item próprio de outra campanha, desconhecido no mapa novo, derrubava o jogo no espólio de
+            //  um monstro: NullReference em SerializedGame.GetDiscoveredItem, visto num mapa oneshot com o grupo da «Teste do Canal»).
+            //  Na volta, o conteúdo próprio que a partida de destino já tinha (de uma campanha da comunidade) fica com ela)
+            bool Fica(string id) => !Proprio(id);
+            bool Dela(string id) => !novoMapa && Proprio(id);
             para.Gold = de.Gold; para.PartyXP = de.PartyXP;
             para.FeatRerollsRemaining = de.FeatRerollsRemaining; para.TotalFeatsRerolled = de.TotalFeatsRerolled;
-            Lista(de.CraftingMaterials, ref para.CraftingMaterials, x => x != null && Fica(x.Id));
-            Lista(de.ItemInventory, ref para.ItemInventory, x => x != null && Fica(x.Id));
-            Lista(de.DiscoveredRecipes, ref para.DiscoveredRecipes, x => x != null && Fica(x.Id));
-            Lista(de.SharedWeaponIds, ref para.SharedWeaponIds, Fica);
+            Lista(de.CraftingMaterials, ref para.CraftingMaterials, x => x != null && Fica(x.Id), x => x != null && Dela(x.Id));
+            Lista(de.ItemInventory, ref para.ItemInventory, x => x != null && Fica(x.Id), x => x != null && Dela(x.Id));
+            Lista(de.DiscoveredRecipes, ref para.DiscoveredRecipes, x => x != null && Fica(x.Id), x => x != null && Dela(x.Id));
+            Lista(de.SharedWeaponIds, ref para.SharedWeaponIds, Fica, Dela);
             Lista(de.DiscoveredEnemyVulnerabilities, ref para.DiscoveredEnemyVulnerabilities, null);
-            Lista(de.UnlockedSkills, ref para.UnlockedSkills, Fica);
-            Lista(de.UnlockedLegends, ref para.UnlockedLegends, Fica);
-            Lista(de.UnlockedCompanions, ref para.UnlockedCompanions, Fica);
-            Lista(de.FeatProgresses, ref para.FeatProgresses, x => Fica(x.RealFeatId));
-            Lista(de.RealCompletedFeats, ref para.RealCompletedFeats, Fica);
-            Lista(de.PendingNewFeatIds, ref para.PendingNewFeatIds, Fica);
+            Lista(de.UnlockedSkills, ref para.UnlockedSkills, Fica, Dela);
+            Lista(de.UnlockedLegends, ref para.UnlockedLegends, Fica, Dela);
+            Lista(de.UnlockedCompanions, ref para.UnlockedCompanions, Fica, Dela);
+            Lista(de.FeatProgresses, ref para.FeatProgresses, x => Fica(x.RealFeatId), x => Dela(x.RealFeatId));
+            Lista(de.RealCompletedFeats, ref para.RealCompletedFeats, Fica, Dela);
+            Lista(de.PendingNewFeatIds, ref para.PendingNewFeatIds, Fica, Dela);
             if (de.AllPlayers == null || para.AllPlayers == null) return;
             foreach (var h in de.AllPlayers)
             {
@@ -150,7 +154,7 @@ namespace Bigorna.Encontro
                 int indice = alvo.Index;
                 // (armas ou apetrecho da Oficina num heroi que volta: ele fica com os que tinha na partida)
                 var armas = alvo.EquippedWeapons; var padrao = alvo.DefaultWeaponsBuild; var apetrecho = alvo.EquippedTrinketId; int mao = alvo.EquippedWeaponIndex;
-                bool proprias = !novoMapa && ((h.EquippedWeapons ?? new List<SerializedWeapon>()).Concat(h.DefaultWeaponsBuild ?? new List<SerializedWeapon>())
+                bool proprias = ((h.EquippedWeapons ?? new List<SerializedWeapon>()).Concat(h.DefaultWeaponsBuild ?? new List<SerializedWeapon>())
                     .Any(w => w != null && (Proprio(w.Id) || Proprio(w.PartAId) || Proprio(w.PartBId) || Proprio(w.PartCId))) || Proprio(h.EquippedTrinketId));
                 try { JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(h), alvo); } catch (Exception ex) { Log.Info("  herói " + h.HeroId + ": " + ex.Message); continue; }
                 alvo.Index = indice;
@@ -187,7 +191,23 @@ namespace Bigorna.Encontro
             string NomeArma(string id) { try { var m = UserCollectionManager.GetWeapon(id, false); if (m != null) { var t = FFGLocalization.Get(m.KeyName, false); if (!string.IsNullOrEmpty(t) && t != m.KeyName) return Limpo(t); } } catch { } return id; }
             Novos(depois.ItemInventory?.Where(x => x != null).Select(x => x.Id), antes?.ItemInventory?.Where(x => x != null).Select(x => x.Id), NomeItem, null);
             Novos(depois.SharedWeaponIds, antes?.SharedWeaponIds, NomeArma, T("arma", "weapon"));
-            Novos(depois.DiscoveredRecipes?.Where(x => x != null).Select(x => x.Id), antes?.DiscoveredRecipes?.Where(x => x != null).Select(x => x.Id), id => id, T("receita", "recipe"));
+            // (v333: a receita leva o nome do que ela cria: item, arma ou peça de arma; antes saía o id, «RECIPE_WEAPON_PART_B_WAND_1»)
+            string NomeReceita(string id)
+            {
+                try
+                {
+                    var r = UserCollectionManager.GetRecipe(id, false); if (r == null) return id;
+                    var c = Bigorna.Dados.Serial.Modelo(r)["CraftedItemId"]; var alvo = c is Newtonsoft.Json.Linq.JObject ? Bigorna.Dados.Serial.IdDe(c) : (string)c;
+                    if (string.IsNullOrEmpty(alvo)) return id;
+                    string De(UnityEngine.Object m, string k) { if (m == null || string.IsNullOrEmpty(k)) return null; var t = FFGLocalization.Get(k, false); return !string.IsNullOrEmpty(t) && t != k ? Limpo(t) : null; }
+                    var it = UserCollectionManager.GetItem(alvo, false); var n = De(it, it?.KeyName);
+                    if (n == null) { var w = UserCollectionManager.GetWeapon(alvo, false); n = De(w, w?.KeyName); }
+                    if (n == null) { var p = UserCollectionManager.GetWeaponPart(alvo, false); n = De(p, p?.KeyName); }
+                    return n ?? id;
+                }
+                catch { return id; }
+            }
+            Novos(depois.DiscoveredRecipes?.Where(x => x != null).Select(x => x.Id), antes?.DiscoveredRecipes?.Where(x => x != null).Select(x => x.Id), NomeReceita, T("receita", "recipe"));
             Novos(depois.UnlockedSkills, antes?.UnlockedSkills, id => id, T("perícia", "skill"));
             Novos(depois.RealCompletedFeats, antes?.RealCompletedFeats, id => id, T("proeza", "feat"));
             // os materiais: a diferença de quantidade
@@ -196,16 +216,40 @@ namespace Bigorna.Encontro
             {
                 int n = m.Sum(y => y.Qty) - (tinha.TryGetValue(m.Key, out var a) ? a : 0); if (n <= 0) continue;
                 string nome = m.Key; try { var mm = UserCollectionManager.GetCraftingMaterial(m.Key, false); if (mm != null) { var t = FFGLocalization.Get(mm.KeyName, false); if (!string.IsNullOrEmpty(t) && t != mm.KeyName) nome = Limpo(t); } } catch { }
+                // (v333: em português o jogo chama os materiais «de Minerais», «de Metal»: o «de» sai)
+                var semDe = System.Text.RegularExpressions.Regex.Replace(nome, "^(de|do|da|dos|das) ", ""); if (semDe.Length > 0 && semDe != nome) nome = char.ToUpper(semDe[0]) + semDe.Substring(1);
                 var rotulo = nome + " ×" + n; g.Add(rotulo); if (Proprio(m.Key)) b.Add(rotulo);
             }
         }
         static string Limpo(string t) => System.Text.RegularExpressions.Regex.Replace(t ?? "", "<[^>]+>", "").Trim();
 
-        static void Lista<T>(List<T> de, ref List<T> para, Func<T, bool> fica)
+        static void Lista<T>(List<T> de, ref List<T> para, Func<T, bool> fica, Func<T, bool> guardar = null)
         {
             if (para == null) para = new List<T>();
+            var dela = guardar == null ? new List<T>() : para.Where(guardar).ToList();   // (v304: o que a partida de destino já tinha e fica)
             para.Clear();
             if (de != null) para.AddRange(fica == null ? de : de.Where(fica));
+            para.AddRange(dela);
+        }
+
+        /// <summary>v304: a rede de segurança no começo de um mapa: um item do inventário (ou o apetrecho de um herói) que o jogo não
+        /// conhece agora sai, com um aviso no registro. O jogo quebrava nele no espólio de um monstro (GetDiscoveredItem) e na loja.</summary>
+        public static int TirarDesconhecidos(SerializedGame g)
+        {
+            if (g == null) return 0;
+            int n = 0;
+            // (o jogo acha o modelo do item só entre os da coleção (ownedOnly), ao ler a partida: um item registrado depois ganha o
+            //  modelo de novo aqui; o que continua sem modelo sai)
+            bool Conhece(string id) { try { return !string.IsNullOrEmpty(id) && UserCollectionManager.GetItem(id, true) != null; } catch { return false; } }
+            if (g.ItemInventory != null)
+                foreach (var x in g.ItemInventory.ToList())
+                {
+                    if (x != null && x.Model == null && x.Id != null) { try { x.OnAfterDeserialize(); } catch { } }
+                    if (x == null || x.Model == null) { g.ItemInventory.Remove(x); n++; Log.Info("  item desconhecido tirado do inventário: " + (x?.Id ?? "(vazio)")); }
+                }
+            foreach (var h in g.AllPlayers ?? new SerializedPlayer[0])
+                if (h != null && !string.IsNullOrEmpty(h.EquippedTrinketId) && !Conhece(h.EquippedTrinketId)) { Log.Info("  apetrecho desconhecido tirado de " + h.HeroId + ": " + h.EquippedTrinketId); h.EquippedTrinketId = null; n++; }
+            return n;
         }
 
         // ------------------------------------------------------------ o fim
@@ -216,7 +260,7 @@ namespace Bigorna.Encontro
             try
             {
                 var d = Jogo.DadosJogo?.Data; if (d == null) return;
-                _fim = JsonUtility.ToJson(d); _fimOrigem = Origem; _fimNome = nome; _aviso = null;
+                _fim = JsonUtility.ToJson(d); _fimOrigem = Origem; _fimNome = nome; _aviso = null; Reserva = false;
                 _situacao = Verificar(_fimOrigem);
                 try { Ganhos(Ler(_fimOrigem.Slot)?.GameSceneData?.GameState, d, out _ganhos, out _bloqueados); } catch (Exception ex) { _ganhos = new List<string>(); _bloqueados = new List<string>(); Log.Erro("o que o grupo ganhou", ex); }
                 if (_ganhos.Count > 0) Log.Info("  ganhos da aventura: " + string.Join(" · ", _ganhos.ToArray()) + (_bloqueados.Count > 0 ? " (bloqueados: " + string.Join(" · ", _bloqueados.ToArray()) + ")" : ""));
@@ -301,7 +345,7 @@ namespace Bigorna.Encontro
         public static void Batimento()
         {
             var cena = Jogo.CenaAtual();
-            bool aberto = _fim != null && !NoQuadroDoJogo && cena != Scene.Game && !(Jogo.Carregador != null && Jogo.Carregador.IsLoading);
+            bool aberto = _fim != null && (Reserva || cena != Scene.Titlescene) && !NoQuadroDoJogo && cena != Scene.Game && !(Jogo.Carregador != null && Jogo.Carregador.IsLoading);
             if (aberto && _eventosDesligados == null)
             {
                 var es = UnityEngine.EventSystems.EventSystem.current;
@@ -312,6 +356,9 @@ namespace Bigorna.Encontro
         // ------------------------------------------------ v287: a pergunta no quadro do próprio jogo (TelaDeMapas.PerguntarGrupo)
         /// <summary>A pergunta está no quadro do jogo: o desenho do mod (o reserva) fica de lado.</summary>
         public static bool NoQuadroDoJogo;
+        /// <summary>v334: o quadro do mod (IMGUI) só aparece quando o quadro do jogo não abriu: antes, ele piscava na tela no
+        /// segundo e meio até o quadro do jogo aparecer.</summary>
+        public static bool Reserva;
         public class Opcao { public string Rotulo; public Func<string> Fazer; }
         public static string TituloDoFim => T("O que fazer com o grupo?", "What to do with the party?");
         public static List<string> TextosDoFim()
@@ -338,12 +385,13 @@ namespace Bigorna.Encontro
         {
             var r = new List<Opcao>(); if (_fim == null) return r;
             Func<string> acabou(Func<string> f) => () => { string erro; try { erro = f(); } catch (Exception ex) { Log.Erro("o destino do grupo", ex); erro = ex.Message; } if (erro != null) _aviso = erro; else Terminar(); return erro; };
-            if (_situacao == Situacao.Igual) r.Add(new Opcao { Rotulo = T("Levar o grupo de volta à partida gravada «", "Take the party back to the save “") + _fimOrigem.Rotulo + T("»", "”"), Fazer = acabou(LevarAoSave) });
-            if (_situacao != Situacao.Sumiu) r.Add(new Opcao { Rotulo = _situacao == Situacao.Mudou ? T("Gravar uma cópia da partida com o grupo desta aventura", "Create a copy of the game with this adventure's party") : T("Gravar o grupo numa partida nova", "Create a new save with the party"), Fazer = acabou(NovoSave) });
-            r.Add(new Opcao { Rotulo = T("Descartar (a partida gravada fica como estava)", "Discard (the save stays as it was)"), Fazer = acabou(() => { Log.Info("grupo do fim descartado"); return null; }) });
+            // (v333, pedido do Victor: as três respostas, nesta ordem)
+            r.Add(new Opcao { Rotulo = T("Manter como está", "Keep it as it is"), Fazer = acabou(() => { Log.Info("grupo do fim descartado"); return null; }) });
+            if (_situacao == Situacao.Igual) r.Add(new Opcao { Rotulo = T("Adicionar itens encontrados", "Add the items found"), Fazer = acabou(LevarAoSave) });
+            if (_situacao != Situacao.Sumiu) r.Add(new Opcao { Rotulo = T("Salvar como novo grupo", "Save as a new party"), Fazer = acabou(NovoSave) });
             return r;
         }
-        static void Terminar() { _fim = null; _fimOrigem = null; _fimNome = null; _aviso = null; _ganhos = new List<string>(); _bloqueados = new List<string>(); NoQuadroDoJogo = false; ApagarPendente(); try { Menu.PainelMapas.Reler(); } catch { } }
+        static void Terminar() { Reserva = false; _fim = null; _fimOrigem = null; _fimNome = null; _aviso = null; _ganhos = new List<string>(); _bloqueados = new List<string>(); NoQuadroDoJogo = false; ApagarPendente(); try { Menu.PainelMapas.Reler(); } catch { } }
 
         // ------------------------------------------------ v289: a pergunta guardada em disco
         /// <summary>v289: o grupo no fim do mapa fica também num arquivo até a mesa escolher: se o jogo fechar antes (queda,
@@ -371,7 +419,7 @@ namespace Bigorna.Encontro
             {
                 var p = Newtonsoft.Json.JsonConvert.DeserializeObject<Pendencia>(File.ReadAllText(ArquivoPendente));
                 if (p == null || string.IsNullOrEmpty(p.Fim) || p.Origem == null) { ApagarPendente(); return; }
-                _fim = p.Fim; _fimNome = p.Nome; _fimOrigem = p.Origem; _aviso = null; NoQuadroDoJogo = false; _ganhos = p.Ganhos ?? new List<string>(); _bloqueados = p.Bloqueados ?? new List<string>();
+                _fim = p.Fim; _fimNome = p.Nome; _fimOrigem = p.Origem; _aviso = null; NoQuadroDoJogo = false; Reserva = false; _ganhos = p.Ganhos ?? new List<string>(); _bloqueados = p.Bloqueados ?? new List<string>();
                 _situacao = Verificar(_fimOrigem);
                 Log.Info("o destino do grupo de «" + (_fimNome ?? "") + "» ficou sem resposta da outra vez; a pergunta volta");
             }
@@ -381,7 +429,8 @@ namespace Bigorna.Encontro
         public static void Desenhar()
         {
             if (_fim == null || NoQuadroDoJogo) return;
-            var cena = Jogo.CenaAtual(); if (cena == Scene.Game || (Jogo.Carregador != null && Jogo.Carregador.IsLoading)) return;
+            var cena = Jogo.CenaAtual(); if (!Reserva && cena == Scene.Titlescene) return;   // (v334: na tela de título, o quadro do jogo vem primeiro)
+            if (cena == Scene.Game || (Jogo.Carregador != null && Jogo.Carregador.IsLoading)) return;
             if (_botao == null)
             {
                 _botao = new GUIStyle(GUI.skin.button) { fontSize = 16, padding = new RectOffset(12, 12, 8, 8), wordWrap = true };
@@ -405,15 +454,16 @@ namespace Bigorna.Encontro
             if (_aviso != null) GUILayout.Label(_aviso, _texto);
             GUILayout.Space(8f);
             string erro = null; bool feito = false;
-            if (_situacao == Situacao.Igual && GUILayout.Button(T("Levar o grupo de volta à partida gravada «", "Take the party back to the save “") + _fimOrigem.Rotulo + T("»", "”"), _botao, GUILayout.Height(44f)))
-            { try { erro = LevarAoSave(); } catch (Exception ex) { Log.Erro("levando o grupo ao save", ex); erro = ex.Message; } feito = erro == null; }
-            if (_situacao != Situacao.Sumiu && GUILayout.Button(_situacao == Situacao.Mudou ? T("Gravar uma cópia da partida «", "Create a copy of the game “") + _fimOrigem.Rotulo + T("» com o grupo desta aventura (a original fica como está)", "” with this adventure's party (the original stays as it is)") : T("Gravar o grupo numa partida nova", "Create a new save with the party"), _botao, GUILayout.Height(_situacao == Situacao.Mudou ? 60f : 44f)))
-            { try { erro = NovoSave(); } catch (Exception ex) { Log.Erro("criando o save novo", ex); erro = ex.Message; } feito = erro == null; }
-            if (GUILayout.Button(T("Descartar (a partida gravada fica como estava)", "Discard (the save stays as it was)"), _botao, GUILayout.Height(44f)))
+            // (v333: as três respostas, como no quadro do jogo)
+            if (GUILayout.Button(T("Manter como está", "Keep it as it is"), _botao, GUILayout.Height(44f)))
             { Log.Info("grupo do fim descartado"); feito = true; }
+            if (_situacao == Situacao.Igual && GUILayout.Button(T("Adicionar itens encontrados", "Add the items found"), _botao, GUILayout.Height(44f)))
+            { try { erro = LevarAoSave(); } catch (Exception ex) { Log.Erro("levando o grupo ao save", ex); erro = ex.Message; } feito = erro == null; }
+            if (_situacao != Situacao.Sumiu && GUILayout.Button(T("Salvar como novo grupo", "Save as a new party"), _botao, GUILayout.Height(44f)))
+            { try { erro = NovoSave(); } catch (Exception ex) { Log.Erro("criando o save novo", ex); erro = ex.Message; } feito = erro == null; }
             GUILayout.EndArea();
             if (erro != null) _aviso = erro;
-            if (feito) { _fim = null; _fimOrigem = null; _fimNome = null; _aviso = null; try { Menu.PainelMapas.Reler(); } catch { } }
+            if (feito) { Reserva = false; _fim = null; _fimOrigem = null; _fimNome = null; _aviso = null; try { Menu.PainelMapas.Reler(); } catch { } }
         }
     }
 }

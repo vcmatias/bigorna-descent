@@ -97,8 +97,9 @@ namespace Bigorna.Motor
             foreach (var g in m.Gatilhos) if (g.Desligado) _desligados.Add(g.Id);
             Objetos.AoUsar = AoUsarObjeto;
             MostrarObjetivo();
-            if (!string.IsNullOrEmpty(m.Metadados.Intro)) Dialogos.Mensagem(m.Metadados.Intro, null, m.NomeVisivel);
-            if (!string.IsNullOrEmpty(m.Metadados.Regras)) Dialogos.Mensagem(m.Metadados.Regras, null, Idioma.T("Regra especial", "Special rule"));
+            // (v316: com cena de abertura (o gatilho "opening-scene"), a introducao e a regra especial esperam a cena acabar)
+            _introDepoisDaCena = m.Gatilhos.Any(g => g != null && g.Id == "opening-scene");
+            if (!_introDepoisDaCena) MostrarIntro(m);
             Log.Info("roteiro em marcha: " + m.Gatilhos.Count + " gatilhos, " + _principais.Count + " objetivo(s)" + (_opcionais.Count > 0 ? " e " + _opcionais.Count + " opcional(is)" : "") + ", " + m.Roteiro.Derrota.Count + " condição(ões) de derrota");
             Disparar("mapStart");
             AgendarTemporizadores();
@@ -234,6 +235,26 @@ namespace Bigorna.Motor
             Log.Info("rodadas: «" + id + "» a cada " + cada + " rodada(s)" + (vezes > 0 ? ", " + vezes + " vez(es)" : ", até o fim") + "; a próxima é a " + (agora + cada));
         }
         public static void PararCronometro(string id) => _cronometros.RemoveAll(c => c.Id == id);
+        static bool _introDepoisDaCena;
+        static void MostrarIntro(Dmap m)
+        {
+            if (!string.IsNullOrEmpty(m.Metadados.Intro)) Dialogos.Mensagem(m.Metadados.Intro, null, m.NomeVisivel);
+            if (!string.IsNullOrEmpty(m.Metadados.Regras)) Dialogos.Mensagem(m.Metadados.Regras, null, Idioma.T("Regra especial", "Special rule"));
+        }
+        /// <summary>v314: uma cena com nome acabou: dispara sceneEnd (o que o mapa deixou para depois dela) e, na cena de abertura,
+        /// mostra em seguida a introducao e a regra especial do mapa.</summary>
+        public static void FimDaCena(string nome)
+        {
+            if (!EmMarcha) return;
+            Disparar("sceneEnd", ("scene", nome));
+            if (_introDepoisDaCena && string.Equals(nome, "opening", StringComparison.OrdinalIgnoreCase) && Mapa != null) { _introDepoisDaCena = false; MostrarIntro(Mapa); }
+        }
+        /// <summary>v313: o objeto saiu da mesa com a peca dele (um ponto sem retorno): as contagens que ele comecou param (as
+        /// ondas de uma emboscada deixada para tras nao continuam chegando).</summary>
+        public static void PararCronometrosDoObjeto(int objeto)
+        {
+            foreach (var c in _cronometros.Where(c => c.Objeto == objeto).ToList()) { _cronometros.Remove(c); Log.Info("rodadas: «" + c.Id + "» param: o objeto " + objeto + " saiu da mesa"); }
+        }
         static void Cronometros(int rodada)
         {
             foreach (var c in _cronometros.Where(c => rodada >= c.Proxima).ToList())
@@ -747,10 +768,27 @@ namespace Bigorna.Motor
             if (!EmMarcha) return;
             EmMarcha = false;
             Log.Info(vitoria ? "VITÓRIA: o roteiro termina" : "DERROTA: o roteiro termina");
+            RegistrarNaEquipe(vitoria);
             Lancador.Resultado = vitoria;
             Tabuleiro.Desmontado();
             _fecharCom = vitoria; Resultado = vitoria;
             _fecharDesde = Time.unscaledTime;
+        }
+
+        /// <summary>v319: o mapa oneshot terminou: o registro da equipe (Formato.Equipes), para o Perigo do proximo mapa.</summary>
+        static void RegistrarNaEquipe(bool vitoria)
+        {
+            try
+            {
+                var o = Lancador.Oneshot; if (o == null) return;
+                int d = o.Dificuldade; int perigo = d > 10 ? d - 10 : d == 0 ? 2 : d == 2 ? 7 : 5;
+                var hs = Jogo.Herois ?? new List<SerializedPlayer>();
+                Formato.Equipes.Pasta = System.IO.Path.Combine(UnityEngine.Application.persistentDataPath, "Bigorna", "Equipes");
+                Formato.Equipes.Registrar(o.Equipe, new Formato.Equipes.Registro { Quando = DateTime.Now.ToString("yyyy-MM-dd HH:mm"), Semente = o.Semente, Mapa = Mapa?.NomeVisivel, Perigo = perigo, Venceu = vitoria, Rodadas = Math.Max(0, Rodada),
+                    Herois = hs.Count, Feridos = hs.Count(h => h.HealthState == HeroHealth.MinorInjury), Graves = hs.Count(h => h.HealthState == HeroHealth.MajorInjury || h.HealthState == HeroHealth.Defeated), Monstros = Derrotados });
+                Log.Info("equipe «" + (o.Equipe ?? "nova") + "»: mapa registrado (perigo " + perigo + ", " + (vitoria ? "vitória" : "derrota") + "); sugestão para o próximo: perigo " + Formato.Equipes.Sugerido(o.Equipe));
+            }
+            catch (Exception ex) { Log.Erro("registro da equipe", ex); }
         }
 
         static bool JogoFechaSozinho()

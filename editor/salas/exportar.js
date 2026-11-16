@@ -17,6 +17,14 @@ const disparosExportados = l => (l || []).filter(d => d && d.quando).map(d => ({
 const efeitosExportados = l => (l || []).map(f => f && f.tipo === 'spawn' ? { ...f, modo: f.modo || 'igual', monstro: f.modo === 'outro' && f.monstro ? idExportado(f.monstro) : '' } : f);
 const varDesbloqueio = noId => 'unlock-' + noId;
 const idItemExportado = id => { if (typeof id === 'string' && id.startsWith('RECEITA:')) return idReceitaExportada(id.slice(8)); if (typeof id === 'string' && id.startsWith('RUNA:')) return 'BIGORNA_RUNE_' + id.slice(5) + '_A'; const i = ITENS_B().find(x => x.id === id); return i ? (i.base || i.id) : id; };
+/* v314: the action of a scene of boxes (the trigger "Play a scene", and the opening scene of a generated map); nome: the
+   scene's name, for the event sceneEnd the mod fires when it ends */
+function acaoDaCena(g, nome) {
+  const cx = (g.caixas || []).filter(c => c.text || c.type === 'choice'); if (!cx.length) return null; const tem = new Set(cx.map(c => c.id));
+          // a box left empty is skipped: what pointed at it goes on to the box after it
+          const alvo = id => { const vistos = new Set(); while (id && !tem.has(id) && !vistos.has(id)) { vistos.add(id); const c = g.caixas.find(z => z.id === id); id = c && c.type !== 'choice' ? c.next : ''; } return id && tem.has(id) ? 'sc-' + g.uid + '-' + id : ''; };
+          return { id: 'playScene', params: { ...(nome ? { scene: nome } : {}), start: alvo(g.inicio) || 'sc-' + g.uid + '-' + cx[0].id, dialogues: cx.map(c => ({ id: 'sc-' + g.uid + '-' + c.id, type: c.type === 'choice' ? 'choice' : 'normal', speaker: c.speaker ? idPersonagemExportado(c.speaker) : '', title: c.title || '', text: c.text || '', cast: (c.cast || []).map(idPersonagemExportado), background: c.background ?? FUNDO_PADRAO,
+            options: c.type === 'choice' ? (c.options || []).filter(o => o.text).map(o => ({ text: o.text, then: alvo(o.next) ? [{ action: 'showDialogue', dialogue: alvo(o.next) }] : [] })) : [], next: c.type === 'choice' ? '' : alvo(c.next), actions: [] })) } }; }
 const idPersonagemExportado = id => { const p = PERSONAGENS_B().find(x => x.id === id); return p ? (p.base || p.id) : id; };
 /* the custom sheets the mod must inject: every bestiary entry that is custom (edited, created or with its own portrait) */
 /* the top of a block goes to the game as PNG: a drawn icon (SVG) is rasterised beforehand and kept here */
@@ -306,7 +314,7 @@ function montarDmapDe(p) {
         case 'move_object': { const alvo = p.salas[g.objSala]?.objetos[g.objIndex], mk = p.salas[g.marcaSala]?.objetos[g.marcaIndex];
           if (alvo && mk) { acoes.push({ id: 'moveObject', params: { interactable: indiceDe.get(alvo), cell: [mk.pos[0], mk.pos[1]], level: mk.level || 0, rot: mk.rot || 0 } }); break; }
           if (alvo && g.cell) acoes.push({ id: 'moveObject', params: { interactable: indiceDe.get(alvo), cell: [g.cell[0], g.cell[1]], level: g.cell[2] || 0 } }); break; }
-        case 'move_heroes': { const cs = g.cells || (g.cell ? [g.cell] : []); if (cs.length) acoes.push({ id: 'moveHeroes', params: { spots: cs.flat(), area: [cs[0][0], cs[0][1], cs[0][0], cs[0][1]], ...(g.text ? { text: g.text } : {}) } }); break; }
+        case 'move_heroes': { const cs = g.cells || (g.cell ? [g.cell] : []); if (cs.length) acoes.push({ id: 'moveHeroes', params: { spots: cs.flatMap(c => [c[0], c[1]]), levels: cs.map(c => c[2] || 0), area: [cs[0][0], cs[0][1], cs[0][0], cs[0][1]], ...(g.text ? { text: g.text } : {}) } }); break; }
         case 'add_object': { const alvo = p.salas[g.objSala]?.objetos[g.objIndex]; if (alvo) acoes.push({ id: 'showObject', params: { interactable: indiceDe.get(alvo) } }); break; }
         case 'remove_object': { const alvo = g.proprio ? (o.ehContador || o.enemy ? null : o) : p.salas[g.objSala]?.objetos[g.objIndex]; if (alvo) acoes.push({ id: 'hideObject', params: { interactable: indiceDe.get(alvo) } }); break; }
         // (a room off the table is no longer open: what waits for "room open" there, an ambush a round later, a nest calling
@@ -330,15 +338,11 @@ function montarDmapDe(p) {
             const depois = comExtra(o, 'op' + i + ':' + g.uid, [...(g.umaVez && !cumul.length ? [{ id: 'setVar', params: { var: vUma(k), value: 1 } }] : []), ...(x.response ? [{ id: 'showMessage', params: { text: x.response } }] : []), ...acoesDe(s, si, o, 'op' + i + ':' + g.uid, extras)]);
             if (depois.length) extras.push({ id: 'ans-' + g.uid + '-' + k, name: 'Answer ' + (k + 1) + ': ' + rotulo(o), once: false, event: { id: 'choiceMade', params: { interactable: idx, option: k } }, conditions: [qual], actions: depois }); });
           break; }
-        case 'scene': { const cx = (g.caixas || []).filter(c => c.text || c.type === 'choice'); if (!cx.length) break; const tem = new Set(cx.map(c => c.id));
-          // a box left empty is skipped: what pointed at it goes on to the box after it
-          const alvo = id => { const vistos = new Set(); while (id && !tem.has(id) && !vistos.has(id)) { vistos.add(id); const c = g.caixas.find(z => z.id === id); id = c && c.type !== 'choice' ? c.next : ''; } return id && tem.has(id) ? 'sc-' + g.uid + '-' + id : ''; };
-          acoes.push({ id: 'playScene', params: { start: alvo(g.inicio) || 'sc-' + g.uid + '-' + cx[0].id, dialogues: cx.map(c => ({ id: 'sc-' + g.uid + '-' + c.id, type: c.type === 'choice' ? 'choice' : 'normal', speaker: c.speaker ? idPersonagemExportado(c.speaker) : '', title: c.title || '', text: c.text || '', cast: (c.cast || []).map(idPersonagemExportado), background: c.background ?? FUNDO_PADRAO,
-            options: c.type === 'choice' ? (c.options || []).filter(o => o.text).map(o => ({ text: o.text, then: alvo(o.next) ? [{ action: 'showDialogue', dialogue: alvo(o.next) }] : [] })) : [], next: c.type === 'choice' ? '' : alvo(c.next), actions: [] })) } }); break; }
+        case 'scene': { const a = acaoDaCena(g); if (a) acoes.push(a); break; }
         case 'rounds': { const dentro = acoesDe(s, si, o, 'rodada:' + g.uid, extras); if (!dentro.length) break;
           // the round counter runs the triggers inside; questions and tests there answer to this holder (the mod sets it when the rounds come)
           extras.push({ id: 'rounds-' + g.uid, name: 'Rounds: ' + rotulo(o), once: false, event: { id: 'roundTimer', params: { timer: g.uid } }, conditions: [], actions: dentro });
-          acoes.push({ id: 'startRoundTimer', params: { timer: g.uid, every: Math.max(1, +g.n || 2), times: g.modo === 'uma' ? 1 : Math.max(0, +g.vezes || 0), interactable: idx ?? -1 } }); break; }
+          acoes.push({ id: 'startRoundTimer', params: { timer: g.uid, every: Math.max(1, +g.n || 2), times: g.modo === 'uma' ? 1 : Math.max(0, +g.vezes || 0), interactable: g.persiste ? -1 : idx ?? -1 } }); break; }   // (v317: persiste: the count is of the map, and goes on when its object leaves the table)
         case 'cutscene': if (g.video?.arquivo) acoes.push({ id: 'playVideo', params: { file: g.video.arquivo } }); else if (g.name) acoes.push({ id: 'playCutscene', params: { cutscene: g.name } }); break;
         case 'sound': if (g.somModo === 'arquivo') { if (g.som?.arquivo) acoes.push({ id: 'playSound', params: { file: g.som.arquivo } }); } else acoes.push({ id: 'playSound', params: { sound: g.name || 'Place_Generic' } }); break;
         case 'item_pool': if (g.item) acoes.push({ id: g.acao === 'remove' ? 'removeItemFromPool' : 'addItemToPool', params: { item: idItemExportado(g.item) } }); break;
@@ -461,6 +465,9 @@ function montarDmapDe(p) {
     case 'trigger': { const ob = missoesObj[fm.uid]; if (ob) { const k = optional.indexOf(ob); if (k >= 0) optional.splice(k, 1); primary = { ...ob, text: fm.texto || ob.text }; } break; }
   }
   if (!primary) primary = { id: 'defeat_all', params: {}, text: fm.texto || LE2('Defeat every monster.', 'Derrotem todos os monstros.') };
+  // (v314: objectives before the final one, in order (meta.missoesAntes: a counter that reaches 1 ends each): the map shows
+  //  the first, and each one fulfilled gives way to the next; the generator's surprise story starts with "Explore the place")
+  const antes = (p.meta.missoesAntes || []).filter(m => m && m.contador && m.texto).map(m => ({ id: 'counter_at_least', params: { var: varDoContador(m.contador), n: 1 }, text: m.texto }));
   const failConditions = [{ id: 'all_heroes_defeated', params: {} }];
   if (p.meta.limite > 0) failConditions.push({ id: 'round_limit', params: { rounds: p.meta.limite } });
   // the pressure of the map (generator): fatigue at the start of every round from a round on, or a warning before the limit
@@ -477,7 +484,11 @@ function montarDmapDe(p) {
   // now always starts at 0: the Counts window no longer offers a start)
   const inicios = (p.contadores || []).filter(c => c.nome && +c.inicio);
   // what the heroes find in the starting room, once the board is set up
-  if (p.salas[0]?.textoDepois) triggers.unshift({ id: 'room-1-found', name: 'Starting room: what the heroes find', once: true, event: { id: 'mapStart', params: {} }, conditions: [], actions: [{ id: 'showMessage', params: { text: p.salas[0].textoDepois } }] });
+  // (v314: the opening scene (meta.cenaInicial, a scene as the trigger "Play a scene"): it plays as the map starts, and what the
+  //  heroes find in the starting room is said when it ends)
+  const cenaIni = p.meta.cenaInicial && (p.meta.cenaInicial.caixas || []).some(c => c.text) ? acaoDaCena(p.meta.cenaInicial, 'opening') : null;
+  if (p.salas[0]?.textoDepois) triggers.unshift({ id: 'room-1-found', name: 'Starting room: what the heroes find', once: true, event: cenaIni ? { id: 'sceneEnd', params: { scene: 'opening' } } : { id: 'mapStart', params: {} }, conditions: [], actions: [{ id: 'showMessage', params: { text: p.salas[0].textoDepois } }] });
+  if (cenaIni) triggers.unshift({ id: 'opening-scene', name: 'Opening scene', once: true, event: { id: 'mapStart', params: {} }, conditions: [], actions: [cenaIni] });
   if (inicios.length) triggers.unshift({ id: 'counters-start', name: 'Counters: start values', once: true, event: { id: 'mapStart', params: {} }, conditions: [], actions: inicios.map(c => ({ id: 'initVariable', params: { var: varDoContador(c.nome), value: +c.inicio } })) });
   const id = slug(p.meta.name);
   const r0 = p.salas[0]?.reserva || { add: [], remove: [] };
@@ -488,13 +499,21 @@ function montarDmapDe(p) {
       created: new Date().toISOString().slice(0, 10), editor: 'bigorna-rooms' },
     board: { gridSize: [60, 60], levels: niveis, tiles, blocked: [], floor: 'flagstone' },
     spawns: { heroStart: (p.salas[0]?.herois || []).map(h => [h[0], h[1], h[2] || 0]), enemies, interactables, reserve: [...new Set([...(p.reserva || []).filter(x => !(r0.remove || []).includes(x)), ...(r0.add || [])])].map(idExportado), itemPool: (p.itensPool || []).map(idItemExportado), ...(enemies.some(e => e.enemy === POOL_ID) ? { balance: (r => ({ minTier: r.min, maxTier: r.max, progression: r.progresso }))(regraDoBalanceio(p)) } : {}) },
-    objectives: { primary: [primary], optional, failConditions },
+    objectives: { primary: antes.concat([primary]), optional, failConditions },
     triggers,
     custom: conteudoCustom(),
     bigornaSalas: copiaSemPacotes(p, !!campanha)
   };
 }
-function gruposDaSalaDe(p, si) { const s = p.salas[si]; const g = []; if ((s.inimigos || []).some(e => !ehPool(e.enemy))) g.push('room-' + (si + 1)); if (vagasPoolDaSala(s)) g.push('room-' + (si + 1) + '-pool'); donosDaSala(s).map(({ o }) => o).concat(inimigosDaSala(s).map(({ e }) => e)).forEach(o => todosGatilhos(o).forEach(x => { if (x.tipo === 'spawn' && (x.fonte === 'pool' ? (x.cells || []).length : x.inimigos?.length) && !g.includes(x.uid)) g.push(x.uid); })); return g; }
+/* v332: the monsters that come into room si from elsewhere (a timer of the door before it, an ambush): their spawn cells are on
+   its floor. Without them, «defeat the monsters of the room» was an empty list, and the gate never opened */
+function gruposQueEntramNaSala(p, si, g) {
+  const casas = new Set(p.salas[si].pecas.flatMap(q => casasDaPeca(q)).map(([x, y]) => x + ',' + y));
+  p.salas.forEach(s2 => donosDaSala(s2).map(({ o }) => o).concat(inimigosDaSala(s2).map(({ e }) => e)).forEach(o => todosGatilhos(o).forEach(x => {
+    if (x.tipo === 'spawn' && (x.fonte === 'pool' ? (x.cells || []).length : x.inimigos?.length) && !g.includes(x.uid) && (x.cells || []).some(c => casas.has(c[0] + ',' + c[1]))) g.push(x.uid); })));
+  return g;
+}
+function gruposDaSalaDe(p, si) { const s = p.salas[si]; const g = []; if ((s.inimigos || []).some(e => !ehPool(e.enemy))) g.push('room-' + (si + 1)); if (vagasPoolDaSala(s)) g.push('room-' + (si + 1) + '-pool'); donosDaSala(s).map(({ o }) => o).concat(inimigosDaSala(s).map(({ e }) => e)).forEach(o => todosGatilhos(o).forEach(x => { if (x.tipo === 'spawn' && (x.fonte === 'pool' ? (x.cells || []).length : x.inimigos?.length) && !g.includes(x.uid)) g.push(x.uid); })); return g.length ? g : gruposQueEntramNaSala(p, si, g); }
 
 /* the roads of the campaign's own world map (whole units) and the city's spot on it */
 function estradasExportadas() {

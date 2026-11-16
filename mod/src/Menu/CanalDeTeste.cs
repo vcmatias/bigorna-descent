@@ -50,6 +50,13 @@ namespace Bigorna.Menu
         /// <summary>v300: com o canal ligado, as cenas do jogo e os vídeos próprios são pulados (o que vem depois deles segue).</summary>
         public static bool PularCenas => Ligado && _pularCenas;
         static bool _pularCenas;
+        /// <summary>v305: os avisos (quadros de um botão só, do mod e do jogo) e o «toque para continuar» da carga fecham sozinhos,
+        /// depois de irem para a transcrição. As perguntas e os testes ficam para o roteiro.</summary>
+        static bool _passarAvisos;
+        /// <summary>v305: com os avisos passando, as perguntas e os testes também se respondem: uma opção ao acaso (as ativas), e no
+        /// teste de habilidade um número de sucessos ao acaso, de 0 a 4. A semente fica na transcrição, para repetir o caminho.</summary>
+        static bool _sortear; static System.Random _sorte = new System.Random();
+        static string _avisoVisto; static float _avisoDesde;
         class Espera { public JToken Id; public string Ate, Valor; public float Limite; public int Linhas; public JObject Pedido; }
         static readonly List<Espera> _esperas = new List<Espera>();
         static int _linhasAnotadas;
@@ -78,6 +85,7 @@ namespace Bigorna.Menu
             Descarregar();
             LerComandos();   // (v301: também gravando; os comandos que mexem no jogo esperam a gravação, os de olhar respondem)
             if (_esperas.Count > 0) Esperas();
+            if (_passarAvisos) PassarAvisos();
             if (agora >= _proximoEstado)
             {
                 _proximoEstado = agora + 1f;
@@ -86,12 +94,78 @@ namespace Bigorna.Menu
                 try
                 {
                     var qj = Dialogos.Ocupado ? null : QuadroDoJogo(); var assin = qj?["textos"]?.ToString(Formatting.None);
-                    if (assin != _ultimoDoJogo) { _ultimoDoJogo = assin; if (qj != null) Anotar("jogo:" + (string)qj["tipo"], string.Join(" / ", qj["textos"].Select(t => (string)t).ToArray()), null, qj["botoes"].Select(t => (string)t).ToList()); }
+                    if (assin != _ultimoDoJogo) { _ultimoDoJogo = assin; if (qj != null && !JaDoMod(qj)) Anotar("jogo:" + (string)qj["tipo"], string.Join(" / ", qj["textos"].Select(t => (string)t).ToArray()), null, qj["botoes"].Select(t => (string)t).ToList()); }
                 }
                 catch { }
             }
         }
         static string _ultimoDoJogo;
+
+        /// <summary>v305: fecha o aviso aberto (um botão só) uns instantes depois de ele aparecer, com o texto já na transcrição.
+        /// O quadro do mod já foi anotado quando abriu; o do jogo é anotado aqui, antes do clique (o batimento de 1 s o perderia).
+        /// Perguntas (duas opções ou mais), testes e janelas do mod ficam abertos.</summary>
+        static void PassarAvisos()
+        {
+            try
+            {
+                if (Jogo.Salvando) return;
+                var tl = Jogo.UI?.LoadingScreen;
+                if (tl != null && tl.IsWaitingForInput && tl.ButtonLoadingContinue != null && tl.ButtonLoadingContinue.gameObject.activeInHierarchy && tl.ButtonLoadingContinue.interactable)
+                { if (Pronto("carga")) { Anotar("canal", "carga: continuar"); Clicar(tl.ButtonLoadingContinue.gameObject); } return; }
+                var m = Dialogos.Descrever(); var tipo = m == null ? null : (string)m["tipo"];
+                if (tipo == "janela") { _avisoVisto = null; return; }
+                var ui = Jogo.UI; if (ui == null) return;
+                // (a ativação de um monstro na fase da escuridão: o texto vai para a transcrição e o «Concluído» fecha)
+                if (ui.EnemyActivationDialog != null && ui.EnemyActivationDialog.IsVisible)
+                {
+                    var d = (Component)ui.EnemyActivationDialog;
+                    var fim = d.GetComponentsInChildren<Button>(false).FirstOrDefault(b => b.isActiveAndEnabled && b.interactable && b.name == "Button_Finish");
+                    if (fim == null) { _avisoVisto = null; return; }
+                    var textos = d.GetComponentsInChildren<TMP_Text>(false).Where(t => t.GetComponentInParent<Selectable>() == null).Select(t => Limpo(t.text)).Where(t => t.Length > 0).Distinct().ToArray();
+                    var assinA = "ativ:" + string.Join("|", textos);
+                    if (!Pronto(assinA)) return;
+                    Anotar("jogo:ativacao", string.Join(" / ", textos)); _avisoVisto = null; Clicar(fim.gameObject); return;
+                }
+                Component q = ui.StoryMessageDialog != null && ui.StoryMessageDialog.IsVisible ? (Component)ui.StoryMessageDialog : ui.MessageDialog != null && ui.MessageDialog.IsVisible ? ui.MessageDialog : null;
+                if (q == null) { _avisoVisto = null; return; }
+                var todos = q.GetComponentsInChildren<Button>(false).Where(x => x.isActiveAndEnabled && x.interactable).ToList();
+                bool Numero(Button b) => b.name.IndexOf("Increase", StringComparison.OrdinalIgnoreCase) >= 0 || b.name.IndexOf("Decrease", StringComparison.OrdinalIgnoreCase) >= 0;
+                bool Volta(Button b) => b.name.IndexOf("Back", StringComparison.OrdinalIgnoreCase) >= 0 || b.name.IndexOf("Close", StringComparison.OrdinalIgnoreCase) >= 0 || b.name.IndexOf("Debug", StringComparison.OrdinalIgnoreCase) >= 0;
+                var mais = todos.FirstOrDefault(b => b.name.IndexOf("Increase", StringComparison.OrdinalIgnoreCase) >= 0);
+                var bs = todos.Where(b => !Numero(b) && !Volta(b)).ToList();
+                if (bs.Count == 0) { _avisoVisto = null; return; }
+                bool teste = tipo == "teste" || mais != null;
+                if ((bs.Count > 1 || teste || tipo == "escolha") && !_sortear) { _avisoVisto = null; return; }
+                var qj = QuadroDoJogo(); var assin = qj?["textos"]?.ToString(Formatting.None) ?? q.name;
+                if (!Pronto(assin)) return;
+                if (m == null && assin != _ultimoDoJogo && qj != null)
+                { _ultimoDoJogo = assin; if (!JaDoMod(qj)) Anotar("jogo:" + (string)qj["tipo"], string.Join(" / ", qj["textos"].Select(t => (string)t).ToArray()), null, qj["botoes"].Select(t => (string)t).ToList()); }
+                _avisoVisto = null;
+                if (teste)
+                {
+                    // (o teste do jogo: os botões de mais e menos do número de sucessos, e o de continuar)
+                    int n = _sorte.Next(0, 5); if (mais != null) for (int i = 0; i < n; i++) Clicar(mais.gameObject);
+                    var ok = bs.FirstOrDefault(b => b.name.IndexOf("Continue", StringComparison.OrdinalIgnoreCase) >= 0) ?? bs[0];
+                    Anotar("sorteio", n + " sucesso(s)"); Clicar(ok.gameObject); return;
+                }
+                // (um quadro do próprio jogo com dois botões, como «Terminar a Fase da Escuridão? Interromper | Continuar»: o que segue
+                // o jogo; o sorteio vale para as perguntas e os testes do mapa)
+                string TextoDe(Button b) => string.Join(" ", b.GetComponentsInChildren<TMP_Text>(false).Select(t => Limpo(t.text)).Where(t => t.Length > 0).ToArray());
+                var segue = m == null ? bs.FirstOrDefault(b => b.name.IndexOf("Continue", StringComparison.OrdinalIgnoreCase) >= 0 || b.name.IndexOf("Finish", StringComparison.OrdinalIgnoreCase) >= 0
+                    || new[] { "Continuar", "Continue", "Concluído", "OK", "Ok" }.Contains(TextoDe(b))) : null;
+                var sorteaveis = bs.Where(b => b.name.IndexOf("Interrupt", StringComparison.OrdinalIgnoreCase) < 0).ToList(); if (sorteaveis.Count == 0) sorteaveis = bs;
+                var alvo = bs.Count == 1 ? bs[0] : segue ?? sorteaveis[_sorte.Next(sorteaveis.Count)];
+                if (bs.Count > 1) Anotar(segue != null ? "clique" : "sorteio", TextoDe(alvo));
+                Clicar(alvo.gameObject);
+            }
+            catch (Exception ex) { _passarAvisos = false; Anotar("erro", "passar avisos parou: " + ex.Message); }
+        }
+        /// <summary>O mesmo quadro visto por um quarto de segundo (o texto assentou e o jogo já ligou o botão).</summary>
+        static bool Pronto(string assin)
+        {
+            if (assin != _avisoVisto) { _avisoVisto = assin; _avisoDesde = Time.unscaledTime; return false; }
+            return Time.unscaledTime - _avisoDesde >= 0.25f;
+        }
 
         /// <summary>v300: a trava da instância: o arquivo "trava" aberto sem partilha enquanto o canal está ligado. A segunda
         /// instância do jogo não consegue abri-lo e fica de fora (antes, as duas liam os mesmos comandos).</summary>
@@ -118,7 +192,7 @@ namespace Bigorna.Menu
             Application.logMessageReceived -= DoRegistro;
             try { _trava?.Dispose(); } catch { } _trava = null;
             if (Mathf.Abs(Time.timeScale - _velocidade) < 0.01f && _velocidade != 1f) Time.timeScale = 1f;
-            _velocidade = 1f; _pularCenas = false; HeroisPedidos = null; _esperas.Clear(); _errosVistos.Clear();
+            _velocidade = 1f; _pularCenas = false; HeroisPedidos = null; _esperas.Clear(); _errosVistos.Clear(); _passarAvisos = false; _sortear = false; _avisoVisto = null;
             Log.Info("canal de teste desligado");
         }
 
@@ -161,6 +235,17 @@ namespace Bigorna.Menu
             if (opcoes != null && opcoes.Count > 0) linha.Append(" {").Append(string.Join(" | ", opcoes.Select(Limpo).ToArray())).Append("}");
             var l = linha.ToString();
             lock (_buffer) { _buffer.AppendLine(l); _linhasAnotadas++; _recentes.Add(l); if (_recentes.Count > 200) _recentes.RemoveAt(0); }
+            if (tipo == "aviso" || tipo == "escolha" || tipo == "cena" || tipo == "teste") { var n = Normal(texto); if (n.Length > 0) { _doMod.Add(n); if (_doMod.Count > 30) _doMod.RemoveAt(0); } }
+        }
+        /// <summary>v305: os textos dos quadros do mod já anotados. O quadro do mod é mostrado pelo quadro do jogo, e o batimento
+        /// que anota os quadros do jogo o via de novo (o mesmo texto duas vezes na transcrição).</summary>
+        static readonly List<string> _doMod = new List<string>();
+        static string Normal(string t) => new string(Limpo(t ?? "").Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+        static bool JaDoMod(JObject qj)
+        {
+            var partes = qj?["textos"]?.Select(t => Normal((string)t)).Where(t => t.Length > 0).ToList(); if (partes == null || partes.Count == 0) return false;
+            var maior = partes.OrderByDescending(t => t.Length).First();
+            return _doMod.Any(m => m.Contains(maior) || maior.Contains(m) && m.Length >= 12);
         }
 
         static void Descarregar()
@@ -349,6 +434,15 @@ namespace Bigorna.Menu
                     float v = Mathf.Clamp((float?)c["valor"] ?? 1f, 1f, 4f); _velocidade = v; Time.timeScale = v;
                     Anotar("canal", "velocidade " + v); return Ok(v);
                 }
+                case "passarAvisos":
+                {
+                    _passarAvisos = (bool?)c["valor"] ?? true; _avisoVisto = null;
+                    _sortear = _passarAvisos && ((string)c["perguntas"] ?? "sortear") == "sortear";
+                    int semente = (int?)c["semente"] ?? Environment.TickCount; _sorte = new System.Random(semente);
+                    if (_sortear) Depuracao.TestesPassam = false;   // (o teste aparece, e o sorteio responde)
+                    Anotar("canal", "passar avisos: " + _passarAvisos + (_sortear ? " · perguntas e testes ao acaso, semente " + semente : ""));
+                    return Ok(new JObject { ["passarAvisos"] = _passarAvisos, ["sortear"] = _sortear, ["semente"] = semente });
+                }
                 case "pularCenas": _pularCenas = (bool?)c["valor"] ?? true; Anotar("canal", "pular cenas: " + _pularCenas); return Ok(_pularCenas);
                 case "captura":
                 {
@@ -504,7 +598,7 @@ namespace Bigorna.Menu
             {
                 ["hora"] = DateTime.Now.ToString("s"),
                 ["quadro"] = Time.frameCount, ["tempoDoJogo"] = Math.Round(Time.unscaledTime, 1), ["pid"] = System.Diagnostics.Process.GetCurrentProcess().Id,   // (v300: o batimento)
-                ["livre"] = Livre(), ["velocidade"] = Time.timeScale, ["pularCenas"] = _pularCenas, ["esperas"] = _esperas.Count,
+                ["livre"] = Livre(), ["velocidade"] = Time.timeScale, ["pularCenas"] = _pularCenas, ["passarAvisos"] = _passarAvisos, ["sortear"] = _sortear, ["esperas"] = _esperas.Count,
                 ["versao"] = Bootstrap.Versao,
                 ["cena"] = Jogo.CenaAtual()?.ToString(),
                 ["salvando"] = Jogo.Salvando,

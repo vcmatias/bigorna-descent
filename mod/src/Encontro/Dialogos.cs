@@ -141,6 +141,7 @@ namespace Bigorna.Encontro
         /// <summary>Fecha o quadro narrativo que ficou aberto para a proxima caixa (fim da cena, ou antes de um filme ou de outro quadro).</summary>
         public static void FecharNarrativa()
         {
+            _cenaAberta = false; _lugares.Clear();   // (v325: the next scene places its people anew)
             if (!_continuando) return;
             _continuando = false;
             try
@@ -254,13 +255,21 @@ namespace Bigorna.Encontro
                 var gente = new List<string>();
                 if (!string.IsNullOrEmpty(p.Personagem)) gente.Add(p.Personagem);
                 foreach (var e in p.Elenco ?? new List<string>()) if (!string.IsNullOrEmpty(e) && !gente.Contains(e)) gente.Add(e);
-                for (int i = 0; i < gente.Count && i < vagas.Length; i++)
+                // v325: within one scene, each person keeps the place where they first appeared (before, whoever spoke went to
+                // the first place, and the heroes swapped sides at every line)
+                if (!_cenaAberta) _lugares.Clear();
+                var lugar = new string[vagas.Length];
+                foreach (var g in gente) if (_lugares.TryGetValue(g, out var k) && k < lugar.Length && lugar[k] == null) lugar[k] = g;
+                foreach (var g in gente) { if (Array.IndexOf(lugar, g) >= 0) continue; int k = Array.IndexOf(lugar, null); if (k < 0) break; lugar[k] = g; _lugares[g] = k; }
+                _cenaAberta = p.Continua;
+                for (int i = 0; i < lugar.Length; i++)
                 {
+                    if (lugar[i] == null) continue;
                     try
                     {
-                        var modelo = UserCollectionManager.GetStoryCharacter(gente[i], true);
-                        if (modelo != null) { vagas[i].Character = modelo; vagas[i].IsSpeaking = i == 0 && !string.IsNullOrEmpty(p.Personagem); }
-                        else Log.Info("personagem «" + gente[i] + "» não existe nesta coleção; sai sem retrato");
+                        var modelo = UserCollectionManager.GetStoryCharacter(lugar[i], true);
+                        if (modelo != null) { vagas[i].Character = modelo; vagas[i].IsSpeaking = !string.IsNullOrEmpty(p.Personagem) && lugar[i] == p.Personagem; }
+                        else Log.Info("personagem «" + lugar[i] + "» não existe nesta coleção; sai sem retrato");
                     }
                     catch (Exception ex) { Log.Info("personagem: " + ex.Message); }
                 }
@@ -295,6 +304,7 @@ namespace Bigorna.Encontro
             return true;
         }
 
+        static readonly Dictionary<string, int> _lugares = new Dictionary<string, int>(); static bool _cenaAberta;
         static System.Collections.IEnumerator RetratosDepois() { yield return null; yield return null; Personalizados.AplicarRetratosDoQuadro(); yield return new WaitForSeconds(0.3f); Personalizados.AplicarRetratosDoQuadro(); }
 
         static StoryMessageBackgroundType Fundo(string nome)

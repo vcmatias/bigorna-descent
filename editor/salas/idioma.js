@@ -37,7 +37,7 @@ const OUTRA_LINGUA = LINGUA_TEXTOS !== 'en' && LINGUA_TEXTOS !== 'pt';
 const chaveDoTexto = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16).padStart(8, '0'); };
 /* the numbers of a text, outside its own marks ({vilao}, [n], <style=…>, {#var}), as {n0}, {n1}… */
 const numerosDoModelo = (s, nums) => s.split(/(\{[^{}]*\}|\[[^\[\]]*\]|<[^<>]*>)/).map((p, i) => i % 2 ? p : p.replace(/\d+/g, d => '{n' + (nums.push(d) - 1) + '}')).join('');
-const _pecasDadas = new Map();   // a text the table gave → its length in English (the pieces a later sentence may carry)
+const _pecasDadas = new Map();   // a text the table gave → its English (the pieces a later sentence may carry; v353: the English is the key of its sheet)
 const _letra = /[\p{L}\p{N}]/u;
 function modeloDoTexto(en) {
   const pecas = [], nums = []; let t = en;
@@ -55,35 +55,113 @@ function modeloDoTexto(en) {
   t = numerosDoModelo(t, nums).replace(/\u0001([A-Z])\u0002/g, (m, c) => '{s' + ordem.indexOf(c.charCodeAt(0) - 0x41) + '}');
   return { t, pecas: ordem.map(k => pecas[k]), nums };
 }
-const _registrar = (en, saida) => { if (en.length < 3 || !saida) return; _pecasDadas.set(saida, en.length);
-  const c = saida.charAt(0), C = c.toUpperCase(), l = c.toLowerCase(); if (C !== c) _pecasDadas.set(C + saida.slice(1), en.length); if (l !== c) _pecasDadas.set(l + saida.slice(1), en.length); };
+const _registrar = (en, saida) => { if (en.length < 3 || !saida) return; _pecasDadas.set(saida, en);
+  const c = saida.charAt(0), C = c.toUpperCase(), l = c.toLowerCase(); if (C !== c) _pecasDadas.set(C + saida.slice(1), en); if (l !== c) _pecasDadas.set(l + saida.slice(1), en); };
 const recomecarTraducao = () => _pecasDadas.clear();   // (at the start of each map)
 /* a text in the language made from the table's (a template filled with names): a piece, too, for the sentences that carry it */
-const pecaNaLingua = s => { if (OUTRA_LINGUA && typeof s === 'string' && s.length >= 3) _registrar('...', s); return s; };
+const pecaNaLingua = s => { if (OUTRA_LINGUA && typeof s === 'string' && (s.length >= 3 || (s.length >= 1 && /[\u1100-\u11ff\u3040-\u30ff\u3400-\u9fff\uac00-\ud7a3]/.test(s)))) _registrar('...', s); return s; };   // (v353: a short Korean or Chinese name is a whole word too)
 const TRADZ = en => { if (!OUTRA_LINGUA || typeof en !== 'string' || !en) return en;
   const qq = LINGUA_TEXTOS === 'qq';
   const tab = !qq && typeof window !== 'undefined' && window.GERADOR_TRAD ? window.GERADOR_TRAD[LINGUA_TEXTOS] : null;
   if (!qq && !tab) return en;
   if (_pecasDadas.has(en)) return en;   // (a text the table already gave, passed again: it is in the language)
-  if (tab) { const v = tab[chaveDoTexto(en)]; if (typeof v === 'string' && v) { _registrar(en, v); return v; } }
+  if (tab) { const v = tab[chaveDoTexto(en)]; if (typeof v === 'string' && (v || /^\s*(the|an?)\s*$/i.test(en))) { _registrar(en, v); return v; } }   // (v370: an article the language has none for comes empty)
   const m = modeloDoTexto(en);
   if (qq) { if (typeof window !== 'undefined' && window._coletaTrad) window._coletaTrad(m.t, en); const o = '\u27e6' + en + '\u27e7'; _registrar(en, o); return o; }   // (a test language: every text it would look up comes marked)
   const v = m.t === en ? null : tab[chaveDoTexto(m.t)];
   if (typeof v !== 'string' || !v) { if (typeof window !== 'undefined' && window._faltaTrad) window._faltaTrad(m.t, en); return en; }   // (the tests count what is missing)
-  const r = v.replace(/\{([sn])(\d+)\}/g, (x, k, n) => { const a = k === 's' ? m.pecas[+n] : m.nums[+n]; return a !== undefined ? a : x; });
+  // (v353: the marks of the language: ⟨s0:m=er|f=sie|n=es⟩ agrees with the piece, ⟨n0:one=…|few=…|many=…⟩ with the number,
+  //  {s0:dat} asks for a form of the piece)
+  const peca = (k, n) => k === 's' ? m.pecas[+n] : m.nums[+n];
+  const r = v.replace(/\u27e8([sn])(\d+):([^\u27e9]*)\u27e9/g, (x, k, n, ops) => { const a = peca(k, n); if (a === undefined) return x; const o = rotuloNaLingua(a, ops, k === 'n'); return o == null ? x : o; })
+    .replace(/\{([sn])(\d+)(?::([^{}]+))?\}/g, (x, k, n, f, i, t) => { const a = peca(k, n); if (a === undefined) return x; const r2 = k === 's' && f ? formaNaLingua(a, f) : a;
+      // (a name the translation put at the start of a sentence gets the capital there; a fragment keeps its own start)
+      return k === 's' && ((i === 0 && /^\P{Ll}/u.test(en)) || (i > 0 && /[.!?。！？]\s+$/.test(t.slice(0, i)))) ? r2.charAt(0).toUpperCase() + r2.slice(1) : r2; });
   _registrar(en, r); return r; };
+/* v353: the grammar of the names in the other languages. A sheet per name and language (tools/gerador_trad/formas/<lang>.json,
+   window.GERADOR_FORMAS[lang], keyed by the hash of the name's English, or by '=' and its text in the language): its gender (g),
+   number (num: s or p), animate (anim), and the forms the sentences ask for, by the names of the language's own grammar (de: nom,
+   ak, dat, gen; pl: mian, dop, cel, bier, narz, miejsc; fr: art, de, a…). A translated sentence asks for a form by {key:form}
+   and for an agreement by ⟨key:label=text|label=text⟩ (the label: the gender of the name, pl for a plural, * for any; for a
+   number, the plural categories of the language: one, few, many, other). With no sheet, Korean particles and Hungarian suffixes
+   come by rule; any other form missing leaves the name as it is (the nominative). */
+const _formas = () => (typeof window !== 'undefined' && window.GERADOR_FORMAS && window.GERADOR_FORMAS[LINGUA_TEXTOS]) || null;
+function fichaDe(s) {
+  const F = _formas(); s = String(s ?? ''); if (!F || !s) return null;
+  const en = _pecasDadas.get(s); const baixa = s.charAt(0).toLowerCase() + s.slice(1);
+  return (typeof en === 'string' && en !== '...' && F[chaveDoTexto(en)]) || F['=' + s] || F['=' + baixa] || F[chaveDoTexto(s)] || null;
+}
+// (Korean: the particle by the last syllable, with or without a final consonant; 으로/로 also takes 로 after ㄹ)
+const PARTICULAS_KO = [['을', '를'], ['이', '가'], ['은', '는'], ['과', '와'], ['아', '야'], ['이나', '나'], ['이랑', '랑'], ['으로', '로'], ['이라는', '라는'], ['이에요', '예요']];
+function particulaKo(s, f) {
+  const par = PARTICULAS_KO.find(p => p.includes(f)); if (!par) return ['의', '에', '에서', '에게', '도', '만', '까지', '부터'].includes(f) ? s + f : null;   // (these do not change)
+  const c = String(s).trim().slice(-1).charCodeAt(0);
+  if (!(c >= 0xac00 && c <= 0xd7a3)) return s + par[0] + '(' + par[1] + ')';   // (not Hangul: both, as Korean writes it)
+  const jong = (c - 0xac00) % 28;
+  return s + (par[0] === '으로' ? (jong && jong !== 8 ? '으로' : '로') : (jong ? par[0] : par[1]));
+}
+// (Hungarian: the suffix by vowel harmony; a final a or e gets long before it)
+const SUFIXOS_HU = { ba: ['ba', 'be'], ban: ['ban', 'ben'], bol: ['ból', 'ből'], ra: ['ra', 're'], rol: ['ról', 'ről'], nak: ['nak', 'nek'], hoz: ['hoz', 'hez', 'höz'], tol: ['tól', 'től'], val: ['val', 'vel'], ert: ['ért', 'ért'], ig: ['ig', 'ig'], nal: ['nál', 'nél'], on: ['on', 'en', 'ön'] };
+function sufixoHu(s, f) {
+  const suf = SUFIXOS_HU[f]; if (!suf) return null; let w = String(s); const ult = (w.split(/\s+/).pop() || '').toLowerCase();
+  const tras = /[aáoóuú]/.test(ult), vogais = ult.match(/[aáeéiíoóöőuúüű]/g) || []; const uv = vogais[vogais.length - 1] || 'e';
+  let k = tras ? 0 : /[öőüű]/.test(uv) ? 2 : 1; if (k >= suf.length) k = 1;
+  let x = suf[k];
+  if (f === 'val') { const di = /(cs|dz|gy|ly|ny|sz|ty|zs)$/i.exec(w); const fim = w.slice(-1);
+    if (di) { w = w.slice(0, -2) + di[1][0] + di[1]; x = x.slice(1); }   // (a double letter: szekrény → szekrénnyel)
+    else if (/[bcdfghjklmnprstvzy]/i.test(fim)) x = fim + x.slice(1); }   // (-val after a consonant doubles it: kard → karddal)
+  const vogalFinal = /[aáeéiíoóöőuúüű]$/i.test(w);
+  if (/a$/.test(w)) w = w.slice(0, -1) + 'á'; else if (/e$/.test(w)) w = w.slice(0, -1) + 'é';
+  if (f === 'on' && vogalFinal) x = 'n';   // (-on after a vowel is just -n: almán, kapun)
+  return w + x;
+}
+function formaNaLingua(s, f) {
+  s = String(s ?? ''); if (!f) return s; const fi = fichaDe(s);
+  let r = fi && typeof fi[f] === 'string' ? fi[f] : null;
+  if (r == null && /^ko/.test(LINGUA_TEXTOS)) r = particulaKo(fi && fi.t || s, f);
+  if (r == null && LINGUA_TEXTOS === 'hu') r = sufixoHu(fi && fi.t || s, f);
+  if (r == null) return s;
+  return /^\p{Lu}/u.test(s) && !/^\p{Lu}/u.test(r) ? r.charAt(0).toUpperCase() + r.slice(1) : r;
+}
+/* the option of an agreement mark: the labels of the name's sheet, from the most precise (fp, the gender in the plural) to the
+   most general (*), else the first option; a number picks by the plural rules of the language. null: the mark has no labels (the Portuguese ⟨k:o|a⟩) */
+const _plurais = {};
+function rotuloNaLingua(s, ops, numero) {
+  const itens = String(ops).split('|').map(x => { const i = x.indexOf('='); return i < 0 ? null : { l: x.slice(0, i).split(',').map(y => y.trim()), t: x.slice(i + 1) }; });
+  if (!itens.length || itens.some(x => !x)) return null;
+  let cand;
+  if (numero || /^\d+$/.test(String(s).trim())) {
+    const lg = LINGUA_TEXTOS.split('-')[0]; let pr = _plurais[lg]; try { pr = pr || (_plurais[lg] = new Intl.PluralRules(lg)); } catch { pr = null; }
+    cand = [pr ? pr.select(+String(s).trim()) : 'other', 'other', '*'];
+  } else {
+    const fi = fichaDe(s) || {}; const g = String(fi.g || ''); const p = fi.num === 'p';
+    cand = [];
+    if (g) cand.push(g + (p ? 'p' : 's'));
+    if (p) { if (fi.vir || g === 'mo') cand.push('vir'); cand.push('pl'); }
+    if (g) { cand.push(g); if (g.length > 1) cand.push(g[0]); }
+    if (fi.anim) cand.push('anim');
+    if (!p) cand.push('sg');
+    cand.push('*');
+  }
+  for (const c of cand) { const o = itens.find(x => x.l.includes(c)); if (o) return o.t; }
+  return itens[0].t;   // (no label of the name: the first option)
+}
 /* texts written in both languages: L2(en, pt), T2({en, pt}), TXT of {en, pt} (a list: its first), LP() the key, EM the list
    of {en: [...], pt: [...]} in the language of the texts (the same length: a draw picks the same one in every language) */
 const LP = () => LINGUA_TEXTOS === 'pt' ? 'pt' : 'en';
 const L2 = (en, pt) => LINGUA_TEXTOS === 'pt' ? pt : OUTRA_LINGUA ? TRADZ(en) : en;
-const LF = (en, pt, ...v) => { const r = L2(en, pt).replace(/\{(\d+)\}/g, (m, k) => v[+k] !== undefined ? v[+k] : m); return OUTRA_LINGUA ? pecaNaLingua(r) : r; };
+/* (v361: a translated template may ask for a form of what fills it, {0:dat}, {1:을}, or agree with it, ⟨0:f=…|*=…⟩, as it does
+   with a name of the story) */
+const _encherNumerados = (t, v) => String(t).replace(/\u27e8(\d+):([^\u27e9]*)\u27e9/g, (x, k, ops) => { if (v[+k] === undefined) return x; const o = rotuloNaLingua(String(v[+k]), ops, typeof v[+k] === 'number'); return o == null ? x : o; })
+  .replace(/\{(\d+)(?::([^{}]+))?\}/g, (m, k, f) => v[+k] === undefined ? m : f && OUTRA_LINGUA ? formaNaLingua(v[+k], f) : v[+k]);
+const LF = (en, pt, ...v) => { const r = _encherNumerados(L2(en, pt), v); return OUTRA_LINGUA ? pecaNaLingua(r) : r; };
 const EM = x => { if (!x) return []; if (OUTRA_LINGUA) return Array.isArray(x[LINGUA_TEXTOS]) ? x[LINGUA_TEXTOS] : (x.en || []).map(TRADZ); return x[LP()] || x.en || []; };
 /* a text that goes into the exported file (the players read it in the game): in the language of the work being exported
    (the original, or the language a translated copy is being exported in), not in the language of the editor */
 const LE2 = (en, pt) => { if (OUTRA_LINGUA) return TRADZ(en); let l = '', o = ''; try { o = linguaOriginal(); l = LINGUA_EDICAO || o; } catch { l = o = IDIOMA; }
   // (a language other than these two keeps the original's text: only the author's own translations go into the file)
   if (!/^(pt|en)/.test(l || '')) l = o; return /^pt/.test(l || '') ? pt : en; };
-const LEF = (en, pt, ...v) => { const r = LE2(en, pt).replace(/\{(\d+)\}/g, (m, k) => v[+k] !== undefined ? v[+k] : m); return OUTRA_LINGUA ? pecaNaLingua(r) : r; };
+const LEF = (en, pt, ...v) => { const r = _encherNumerados(LE2(en, pt), v); return OUTRA_LINGUA ? pecaNaLingua(r) : r; };
 /* a pronoun (she, his…) that goes inside an English sentence looked up whole: it stays English there, so the table has the
    sentence with it (each language agrees it its own way); in Portuguese, the Portuguese */
 const PRON = (en, pt) => LINGUA_TEXTOS === 'pt' ? pt : en;

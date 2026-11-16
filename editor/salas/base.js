@@ -479,7 +479,10 @@ const regraDoBalanceio = (p = projeto) => ({ min: 1, max: 3, progresso: 20, ...(
 const CUSTO_TIER = [10, 15, 20, 30, 40, 55, 70, 90, 120, 160, 240, 320];
 const custoTier = t => CUSTO_TIER[Math.max(0, Math.min(CUSTO_TIER.length - 1, t - 1))];
 const vagasPoolDaSala = s => (s.inimigos || []).filter(e => ehPool(e.enemy)).length;
-const intensidadeDoGatilho = g => Math.max(1, Math.min(10, g.intensidade || (g.cells || []).length || 1));
+/* v367: the intensity goes up to 10 as the map is written; the adjustment of the Danger and the size of the party may take it
+   two steps further (to 12), so Hard +2 and a party of 4 on Hard still mean more monsters (at 10 every step above was lost) */
+const INTENSIDADE_MAX = 12;
+const intensidadeDoGatilho = g => Math.max(1, Math.min(INTENSIDADE_MAX, g.intensidade || (g.cells || []).length || 1));
 /* hand-placed monsters: the room's intensity (default: how many of them there are) and the tiers the game's points
    would buy each one for 1–2, 3 and 4 heroes, every step above the one before (like the game's bosses: 7, 8, 9) */
 const monstrosComuns = lista => Math.max(1, (lista || []).filter(e => !ehPool(e.enemy)).length);
@@ -491,7 +494,7 @@ function tiersPelaRegra(m, intensidade, divisao, p = projeto) {
   const t2 = tierPara(2), t3 = Math.max(tierPara(3), acima(t2)), t4 = Math.max(tierPara(4), acima(t3));
   return [t2, t2, t3, t4];
 }
-const intensidadeDaSala = s => Math.max(1, Math.min(10, s.intensidade || vagasPoolDaSala(s) || 1));
+const intensidadeDaSala = s => Math.max(1, Math.min(INTENSIDADE_MAX, s.intensidade || vagasPoolDaSala(s) || 1));
 /* what the game would put in the balanced spaces of a room (without the leftover points of earlier spawns): the tier
    and how many monsters; which monster of the pool is drawn at the table */
 function simularBalanceio(s, si, herois, p = projeto) { return simularVagas(vagasPoolDaSala(s), intensidadeDaSala(s), poolDe(p, si), herois, p, (s.inimigos || []).filter(e => !ehPool(e.enemy)).map(e => monstro(e.enemy)?.tipo).filter(Boolean)); }
@@ -509,7 +512,7 @@ function simularVagas(vagas, intensidade, poolIds, herois, p = projeto, ocupadas
   if (!pool.length || !vagas) return { n: 0, tier: 0, pontos: 0, pool: pool.length };
   const fig = {}; pool.forEach(m => { const f = figurasDoTipo(m.tipo); fig[m.tipo] = f === null ? Infinity : f; }); ocupadas.forEach(t => { if (t in fig) fig[t]--; });
   const livre = m => fig[m.tipo] > 0; let limitado = false;
-  let pontos = Math.round(Math.max(1, Math.min(10, intensidade)) * 0.1 * Math.floor(herois * 1.5) * Math.max(1, r.progresso)); const inicio = pontos;
+  let pontos = Math.round(Math.max(1, Math.min(INTENSIDADE_MAX, intensidade)) * 0.1 * Math.floor(herois * 1.5) * Math.max(1, r.progresso)); const inicio = pontos;
   const tem = t => pool.some(m => livre(m) && m.tiers.some(x => x.tier === t)); let n = 0, tier = max;
   const minF = Math.max(0, Math.min(5, vagas, minimo || 0));
   while (n < Math.min(5, vagas) && pontos >= custoTier(min)) { const reserva = Math.max(0, minF - n - 1) * custoTier(min); let t = tier; while (t >= min && (custoTier(t) + (t > min ? reserva : 0) > pontos || !tem(t))) t--; if (t < min) { limitado = !pool.some(livre); break; } tier = t; pontos -= custoTier(t); n++;
@@ -760,17 +763,70 @@ function caixaDoTerreno(tipo, atos = ATOS.get()) {
   return n;
 }
 /* what is gone from the table by the time room si opens: the rooms, tiles and objects removed by the objects that open
-   it, and by those that opened the rooms before it (their pieces go back to the box) */
-function removidosAntes(si) {
-  const r = { salas: new Set(), pecas: new Set(), objetos: new Set() }; const vistas = new Set();
-  const subir = s => { if (s < 0 || vistas.has(s)) return; vistas.add(s);
-    abridoresDe(s).forEach(({ r: ref, o }) => { todosGatilhos(o).forEach(g => {
-      if (g.tipo === 'remove_room' && g.sala !== '' && g.sala !== undefined) r.salas.add(+g.sala);
-      if (g.tipo === 'remove_tile' && g.sala !== undefined && g.peca !== undefined) r.pecas.add(g.sala + ':' + g.peca);
-      if (g.tipo === 'remove_object') { if (g.proprio) r.objetos.add(ref.sala + ':' + ref.objeto); else if (g.objIndex !== undefined) r.objetos.add(g.objSala + ':' + g.objIndex); } });
-      subir(ref.sala); }); };
-  subir(si); return r;
+   it, and by those that opened the rooms before it (their pieces go back to the box).
+   v351: and by everything those openings wait for, which the heroes cannot skip: the pieces a lock asks (when every piece
+   that adds to the count is needed), the object that brings a hidden opener to the table (the lever of the loft), and what
+   those wait for in turn. A white token that opens the way, a piece picked up, a lever pulled: each that leaves the table
+   when used gives its piece back before the room opens. Pure: it reads the triggers of p, never the room links kept in it */
+function foraAntesDe(p, si) { return foraDeCadaSala(p).at(si) || { salas: new Set(), pecas: new Set(), objetos: new Set() }; }
+/* the same for every room of p at once (one reading of the triggers) */
+function foraDeCadaSala(p) {
+  const salas = p.salas || []; const todos = new Map(); const abre = new Map(), traz = new Map(), somam = new Map();
+  salas.forEach((x, ri) => (x.objetos || []).forEach((o, oi) => { if (!o) return; const k = ri + ':' + oi; const gs = todosGatilhos(o); todos.set(k, { ri, oi, o, gs });
+    gs.forEach(g => { if (g.tipo === 'open_room' && +g.sala !== ri) { const l = abre.get(+g.sala) || []; l.push(k); abre.set(+g.sala, l); }
+      if (g.tipo === 'add_object') { const t = (+g.objSala) + ':' + (+g.objIndex); const l = traz.get(t) || []; l.push(k); traz.set(t, l); }
+      if (g.tipo === 'counter' && g.contador && (g.acao || 'add') === 'add') { const m = somam.get(g.contador) || new Map(); m.set(k, (m.get(k) || 0) + (+g.n || 1)); somam.set(g.contador, m); } }); }));
+  return salas.map((x0, si) => {
+    const r = { salas: new Set(), pecas: new Set(), objetos: new Set() }; const vistas = new Set(), usados = new Set();
+    const usar = k => { if (usados.has(k)) return; usados.add(k); const x = todos.get(k); if (!x) return;
+      x.gs.forEach(g => {
+        if (g.tipo === 'remove_room' && g.sala !== '' && g.sala !== undefined) r.salas.add(+g.sala);
+        if (g.tipo === 'remove_tile' && g.sala !== undefined && g.peca !== undefined) r.pecas.add(g.sala + ':' + g.peca);
+        if (g.tipo === 'remove_object') { if (g.proprio) r.objetos.add(k); else if (g.objIndex !== undefined) r.objetos.add(g.objSala + ':' + g.objIndex); } });
+      // (a hidden object comes to the table by another one: that one is used first)
+      if (x.o.hidden) { const l = traz.get(k) || []; if (l.length === 1) usar(l[0]); }
+      // (a lock: the count it asks, when the pieces that add to it are exactly enough, all of them)
+      (x.o.gatilhos || []).forEach(g => (g.requisitos || []).forEach(q => { if (q.tipo !== 'counter' || !q.contador) return; const m = somam.get(q.contador); if (!m) return;
+        let total = 0; m.forEach((n, kk) => { if (kk !== k) total += n; }); if (total > 0 && total <= (+q.meta || 1)) m.forEach((n, kk) => { if (kk !== k) usar(kk); }); }));
+      subir(x.ri); };
+    const subir = s0 => { if (s0 < 0 || vistas.has(s0)) return; vistas.add(s0); (abre.get(s0) || []).forEach(usar); };
+    subir(si); return r; });
 }
+function removidosAntes(si) { return foraAntesDe(projeto, si); }
+/* v351: the pieces of kind g on the table at each moment of the map. When room t opens, a room j may already be on the table
+   unless it opens only after t (its opening passes through t: a room further on, a detour of one) or it is gone by then;
+   in it, what is gone by then is left out. The marker of a "Move an object" and the same piece in several states on one
+   square count once. usoDesde: the most of them at any moment while room si is on the table: what a piece put in room si
+   has to share the box with */
+function paisDasSalas(p) {
+  const salas = p.salas || []; const pai = salas.map(() => -1);
+  salas.forEach((x, ri) => (x.objetos || []).forEach(o => todosGatilhos(o).forEach(g => { if (g.tipo === 'open_room' && salas[+g.sala] && +g.sala !== ri && pai[+g.sala] < 0) pai[+g.sala] = ri; })));
+  return pai;
+}
+function depoisDe(p) {
+  const salas = p.salas || []; const pai = paisDasSalas(p);
+  return salas.map((x, t) => { const d = new Set(); salas.forEach((y, j) => { let r = j; for (let k = 0; k < salas.length && r >= 0; k++) { r = pai[r]; if (r === t) { d.add(j); break; } } }); return d; });
+}
+/* (the moment room t opens: the rooms it passes through are open; every other room may be open or not. The count is the
+   worst case: a room is taken as open when that adds pieces, and opening it takes away what leaves the table for it, the
+   white token that opened it among them) */
+function contagemNoTempo(p, g, filtro) {
+  const salas = p.salas || []; const fora = foraDeCadaSala(p); const depois = depoisDe(p); const pai = paisDasSalas(p); let mk = { objetos: new Set() }; try { mk = marcasDoMapa(p); } catch { }
+  const filhos = salas.map(() => []); pai.forEach((r, j) => { if (r >= 0) filhos[r].push(j); });
+  const pecas = (j, sai) => { const x = salas[j]; const out = []; if (!x || x._previa) return out; const casasFora = new Set(); (x.pecas || []).forEach((q, pi) => { if (sai.pecas.has(j + ':' + pi)) casasDaPeca(q).forEach(c => casasFora.add(c.join(','))); });
+    const vistos = new Set(); (x.objetos || []).forEach((o, oi) => { const k = j + ':' + oi; if (!o || grupoDoTerreno(o.type) !== g || mk.objetos.has(k) || sai.objetos.has(k) || (filtro && !filtro(o, x))) return;
+      if (casasFora.size && casasDoObjeto(o).every(c => casasFora.has(c.join(',')))) return; const kk = (o.pos || []).join(',') + ':' + (o.level || 0); if (vistos.has(kk)) return; vistos.add(kk); out.push(k); }); return out; };
+  return salas.map((x0, t) => { const F = fora[t]; const abertas = new Set([t]); for (let r = pai[t], k = 0; r >= 0 && k < salas.length; k++, r = pai[r]) abertas.add(r);
+    const dentro = new Set(); salas.forEach((x, j) => { if (!F.salas.has(j) && !depois[t].has(j) && !x._previa) dentro.add(j); });
+    const base = new Set(); abertas.forEach(j => { if (dentro.has(j)) pecas(j, F).forEach(k => base.add(k)); });
+    // (what a room adds: its pieces, less those counted above it that leave the table when it opens; then its own rooms)
+    const melhor = (c, contados, k = 0) => { if (!dentro.has(c) || abertas.has(c) || k > salas.length) return 0; const sai = { salas: F.salas, pecas: new Set([...F.pecas, ...fora[c].pecas]), objetos: new Set([...F.objetos, ...fora[c].objetos]) };
+      const proprias = pecas(c, sai); let v = proprias.length - [...contados].filter(kk => fora[c].objetos.has(kk)).length;
+      const abaixo = new Set([...contados].filter(kk => !fora[c].objetos.has(kk)).concat(proprias)); filhos[c].forEach(d => { v += Math.max(0, melhor(d, abaixo, k + 1)); }); return v; };
+    let n = base.size; abertas.forEach(j => filhos[j].forEach(c => { n += Math.max(0, melhor(c, base)); }));
+    return { n, dentro }; });
+}
+function usoDesde(p, g, si, filtro) { let m = 0; contagemNoTempo(p, g, filtro).forEach(x => { if (x.dentro.has(si)) m = Math.max(m, x.n); }); return m; }
 /* pieces that stand on another piece of the box: the Act II bell hangs in its frame, so a bell on the table takes the
    frame, and with the frame on the table (alone) there is none left for the bell */
 const PARTILHA_TERRENO = { Bell: 'BellFrame' };
@@ -798,6 +854,8 @@ function terrenoEmUso(tipo, si = salaAtual) { const g = grupoDoTerreno(tipo);
   if (g === 'Bell' || g === 'BellFrame') return usoDosSinos(g, x => terrenoEmUsoSo(x, si), () => terrenoEmUsoSo('Bell', si, sinoNoArco), x => caixaDoTerreno(x));
   return usoPartilhado(g, x => terrenoEmUsoSo(x, si), x => caixaDoTerreno(x)); }
 function terrenoEmUsoSo(tipo, si = salaAtual, filtro = null) {
+  // (v351: by the moments of the map: the most pieces on the table at once from the opening of room si on, as the generator counts)
+  if (si >= 0 && projeto.salas[si] && !projeto.salas[si]._previa) return usoDesde(projeto, grupoDoTerreno(tipo), si, filtro);
   const g = grupoDoTerreno(tipo); const fora = removidosAntes(si); let n = 0;
   projeto.salas.forEach((s, ri) => { if (fora.salas.has(ri) || s._previa && ri !== si) return;
     const casasFora = new Set(); s.pecas.forEach((q, pi) => { if (fora.pecas.has(ri + ':' + pi)) casasDaPeca(q).forEach(c => casasFora.add(c.join(','))); });
@@ -1192,6 +1250,30 @@ function guardarOficina(todos) {
     _oficinaGravando = (_oficinaGravando || Promise.resolve()).then(() => guardarAssets(novos)).then(() => { if (novos.size) local(); return guardarNoBanco(CHAVE_OFICINA, comQuando); }).catch(e => { _oficinaGuardada = null; console.warn('workshop not kept', e); });
     return _oficinaGravando;
   } catch (e) { console.warn('workshop', e); return Promise.resolve(); }
+}
+/* v362: an entry changed by a deliberate save (the Forge of the weapons) is written over the file it came from: one's own
+   Workshop at once, an entry of another package of the folder into that package's pacote.bigorna (and its pacote.json, the
+   file the mod reads), so whoever reads the package (the game, an AI agent, a copy shared) sees the change. The entry stays
+   an entry of that package (it is not turned into one's own). What the editor keeps to undo (…AntesDaForja) stays out */
+const SO_DO_EDITOR = new Set(['_doPacote', 'pacote', 'retratoAntesDaForja', 'imagemAntesDaForja']);
+function salvarNaOrigem(...xs) {
+  const b = oficina(); const alvos = [];
+  xs.filter(x => x && typeof x === 'object').forEach(x => { const k = Object.keys(b).find(c => Array.isArray(b[c]) && b[c].includes(x)); if (!k) return;
+    if (doPacote(x)) { _comoVeio.set(chaveDoOriginal(k, x), assinaturaDe(x)); alvos.push({ k, x, P: x._doPacote }); } });   // (at once: the next keeping of the Workshop must not adopt it)
+  const feitos = [guardarOficina()];
+  if (!Arquivos.ativo) return Promise.all(feitos);
+  const porPacote = new Map(); alvos.forEach(a => { if (!porPacote.has(a.P)) porPacote.set(a.P, []); porPacote.get(a.P).push(a); });
+  porPacote.forEach((lista, P) => feitos.push((async () => {
+    const info = PACOTES_DA_PASTA.find(p => p.id === P); const pasta = 'Pacotes/' + ((info && info.pasta) || (typeof pastaDoPacote === 'function' ? pastaDoPacote(P) : P));
+    const t = await Arquivos.ler(pasta + '/pacote.bigorna'); if (!t) throw new Error(tr('the package file was not found') + ': ' + pasta);
+    const pk = JSON.parse(t); if (!pk || pk.id !== P || !pk.conteudo) throw new Error(tr('the package file is not this package') + ': ' + pasta);
+    lista.forEach(({ k, x }) => { const limpo = JSON.parse(JSON.stringify(x, (c, v) => SO_DO_EDITOR.has(c) ? undefined : v));
+      const l = pk.conteudo[k] = Array.isArray(pk.conteudo[k]) ? pk.conteudo[k] : []; const i = l.findIndex(y => y && y.id === x.id);
+      if (i >= 0) l[i] = limpo; else l.push(limpo); });
+    await Arquivos.gravar(pasta + '/pacote.bigorna', typeof textoAvulso === 'function' ? await textoAvulso(pk) : await textoOriginal(pk));   // (its pictures inside, as the package came)
+    if (typeof garantirPacotesDoMod === 'function') await garantirPacotesDoMod([{ ...pk, _pasta: pasta.slice('Pacotes/'.length) }], true);
+  })().catch(e => { console.warn('package not written', e); avisoLongo(tr('The change could not be written in the package') + ': ' + (e && e.message || e)); })));
+  return Promise.all(feitos);
 }
 /* the entries of another package come into the Workshop: those with an id one's own Workshop already has stay out (one's
    copy is the one that counts); the media come into the browser like the files uploaded by hand */

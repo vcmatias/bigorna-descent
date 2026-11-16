@@ -42,6 +42,7 @@ namespace Bigorna
             try { PacoteVirtual.Garantir(); } catch { }
             try { HeroisProprios.RetratosNaTela(); } catch { }
             try { if (Jogo.EmEncontro) Objetos.VigiarHeroi(); } catch { }
+            try { if (Jogo.EmEncontro) Encontro.Proximas.Batimento(); else Encontro.Proximas.Esconder(); } catch (Exception ex) { Log.Erro("próximas salas", ex); }   // (v363)
             try { VozesProprias.Batimento(); } catch (Exception ex) { Log.Erro("sons dos monstros", ex); }
             try { CanalDeTeste.Batimento(); } catch (Exception ex) { Log.Erro("canal de teste", ex); }   // (v268: desligado sem o arquivo Bigorna\Teste\ativo)
             // enquanto o jogo grava a partida, nada entra nem sai da mesa (a gravacao cairia no meio)

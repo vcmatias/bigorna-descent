@@ -234,7 +234,7 @@ namespace Bigorna.Encontro
             var go = UnityEngine.Object.Instantiate(prefab.gameObject, pai);
             go.name = prefab.name;
             go.transform.rotation = Quaternion.Euler(0f, p.Rot, 0f);
-            if (EhCaixaDoJogo(p.Tile)) { var e = go.transform.localScale; go.transform.localScale = new Vector3(e.x, e.y * 1.5f, e.z); go.name = NomeDaCaixa; }   // (topo 2 → 3)
+            if (EhCaixaDoJogo(p.Tile)) { var e = go.transform.localScale; go.transform.localScale = new Vector3(e.x, e.y * (Jogo.Altura(3) / Jogo.Altura(2)), e.z); go.name = NomeDaCaixa; }   // (topo 2 → 3; v311: a altura do nível 3 do jogo, 4,15, e não 1,5 × 2,2: a plataforma e o cofre em cima dela ficavam soltos no ar)
             go.SetActive(true);
             var tile = go.GetComponent<GameTile>();
             Alinhar(tile, p);
@@ -808,6 +808,58 @@ namespace Bigorna.Encontro
             return GrupoDe(x, y);
         }
 
+        // ------------------------------------------------------------ v363: as salas que ainda vao abrir (o quadro "Proximas salas")
+        /// <summary>A peca fisica de uma peca numerada (12a e 12b sao a mesma peca, um lado e o outro); null para o resto.</summary>
+        static string PecaFisica(GameTile t)
+        {
+            var id = ((_pecaDe.TryGetValue(t, out var p) ? p?.Tile : null) ?? "").Trim().ToLowerInvariant();
+            int n = id.Length; if (n < 2 || (id[n - 1] != 'a' && id[n - 1] != 'b')) return null;
+            for (int i = 0; i < n - 1; i++) if (!char.IsDigit(id[i])) return null;
+            return id.Substring(0, n - 1);
+        }
+        static int NumeroDoGrupo(string g)
+        {
+            g = g ?? ""; int i = g.Length; while (i > 0 && char.IsDigit(g[i - 1])) i--;
+            return i < g.Length && int.TryParse(g.Substring(i), out var n) ? n : int.MaxValue;
+        }
+        /// <summary>As salas ainda fechadas, na ordem, com o nome de cada peca. Uma peca fisica que aparece mais de uma vez (na
+        /// mesa agora e numa sala por abrir, ou em duas salas por abrir) diz que havera desmonte: vai como "Segredo".</summary>
+        public static List<(string Grupo, List<string> Pecas)> PorAbrir(string segredo)
+        {
+            var r = new List<(string, List<string>)>(); if (_ocultas.Count == 0) return r;
+            var fechadas = new HashSet<GameTile>(_ocultas.Values.SelectMany(l => l).Where(t => t != null));
+            var uso = new Dictionary<string, int>();
+            foreach (var t in _postas)
+            {
+                if (t == null || (!fechadas.Contains(t) && !t.gameObject.activeInHierarchy)) continue;   // (fora da mesa: nao conta)
+                var f = PecaFisica(t); if (f != null) uso[f] = (uso.TryGetValue(f, out var n) ? n : 0) + 1;
+            }
+            foreach (var kv in _ocultas.OrderBy(kv => NumeroDoGrupo(kv.Key)).ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                var nomes = new List<string>();
+                foreach (var t in kv.Value)
+                {
+                    if (t == null) continue; var f = PecaFisica(t);
+                    if (f != null && uso.TryGetValue(f, out var n) && n > 1) { nomes.Add(segredo); continue; }
+                    // (the pillars that hold it up go with it: "21A + 3 small pillars")
+                    var pil = _indiceDe.TryGetValue(t, out var ip) ? Objetos.PilaresDaPeca(ip).Where(o => o != null && !o.Usado && !o.EscondidoPorAcao && string.IsNullOrEmpty(o.Dados?.Revelar)).ToList() : new List<Objetos.NaMesa>();
+                    var extra = pil.GroupBy(o => (o.Dados?.Tipo ?? "").IndexOf("Short", StringComparison.OrdinalIgnoreCase) >= 0).OrderBy(g => g.Key ? 1 : 0)
+                        .Select(g => g.Key ? (g.Count() == 1 ? Idioma.T("1 pilar pequeno", "1 small pillar") : Idioma.TF("{0} pilares pequenos", "{0} small pillars", g.Count()))
+                                           : (g.Count() == 1 ? Idioma.T("1 pilar", "1 pillar") : Idioma.TF("{0} pilares", "{0} pillars", g.Count()))).ToArray();
+                    nomes.Add(NomeNaMesa(t) + (extra.Length > 0 ? " + " + string.Join(" + ", extra) : ""));
+                }
+                r.Add((kv.Key, nomes));
+            }
+            return r;
+        }
+        /// <summary>A sala fechada de uma peca do .dmap (pelo indice), ou null.</summary>
+        public static string GrupoDaPeca(int indice)
+        {
+            var l = _mapa?.Board?.Pecas; if (l == null || indice < 0 || indice >= l.Count) return null;
+            var g = l[indice]?.Grupo; return GrupoOculto(g) ? g : null;
+        }
+        /// <summary>O numero de uma sala do editor (room-3 → 3), ou 0.</summary>
+        public static int NumeroDaSala(string g) { var n = NumeroDoGrupo(g); return n == int.MaxValue ? 0 : n; }
         public static string GrupoDe(int[] pos) => pos != null && pos.Length >= 2 ? GrupoDe(pos[0], pos[1]) : null;
     }
 }
