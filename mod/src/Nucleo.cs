@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Bigorna.Encontro;
 using Bigorna.Menu;
 using Bigorna.Motor;
@@ -34,6 +34,7 @@ namespace Bigorna
             try { Encontro.Lancador.DestravarCarga(); } catch { }   // (v288: o quadro de carregamento escondido)
             try { Menu.BotaoDoMenu.Batimento(); } catch (Exception ex) { Log.Erro("botão do menu", ex); }
             try { Menu.TelaDeMapas.Batimento(); } catch (Exception ex) { Log.Erro("tela de mapas", ex); }
+            try { Menu.NivelDoJogo.Batimento(); } catch (Exception ex) { Log.Erro("quadro de dificuldade", ex); }   // (v372)
             try { GrupoDoSave.Batimento(); } catch (Exception ex) { Log.Erro("quadro do grupo", ex); }   // (v286)   // (v280: o Novo jogo + que volta do quadro de dificuldade)
             try { Menu.PainelMapas.Batimento(); if (Jogo.CenaAtual() == Scene.Titlescene) Menu.PainelMapas.Aquecer(); } catch (Exception ex) { Log.Erro("lendo os mapas da comunidade", ex); }   // (v263: a pasta lida ao fundo; na tela de título, antes do primeiro clique)
             try { Campanha.SavesDaComunidade.Batimento(); } catch (Exception ex) { Log.Erro("partidas da comunidade", ex); }

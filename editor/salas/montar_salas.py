@@ -113,6 +113,9 @@ def conferir_sintaxe():
 
 
 # v274: a página só do gerador do mapa oneshot (Bigorna-Gerador.html), sem a tela do editor: as partes que o gerador usa
+# v375: the dictionaries of the other languages of the interface: each in a block of its own (text), read only when the
+# editor is in that language (the page keeps them all, the script parses one)
+IDIOMAS_DA_INTERFACE = ['es', 'fr', 'de', 'it', 'pl', 'hu', 'cs', 'ru', 'ko', 'zh-cn', 'zh-tw']
 FORA_DO_GERADOR = {"RELATOS", "DESENHO", "TEXTURAS", "PAPELAO", "TRES", "INTERFACE", "FORJA_FUNDO", "ACERVO", "TUTORIAL", "OFICINA_HISTORIAS"}
 PARTES_DO_GERADOR = tuple(p for p in PARTES if p[0] not in FORA_DO_GERADOR)
 
@@ -171,6 +174,12 @@ def montar(saida, fontes):
     try: versao = open(os.path.join(AQUI, "..", "..", "mod", "VERSAO"), encoding="utf-8").read().strip()
     except OSError: versao = ""
     html = html.replace("@@VERSAO_BIGORNA@@", versao)
+    blocos = []
+    for l in IDIOMAS_DA_INTERFACE:
+        c = open(os.path.join(AQUI, "idioma_" + l + ".js"), encoding="utf-8").read().rstrip("\n")
+        if "</script" in c.lower(): sys.exit("«</script» em idioma_" + l + ".js")
+        blocos.append('<script type="text/plain" id="bigorna-idioma-' + l + '">\n' + c + '\n</script>')
+    html = html.replace("<!--@@IDIOMAS@@-->", "\n".join(blocos), 1)
     html = html.replace("/*@@CARREGADOR@@*/", open(os.path.join(AQUI, "carregador.js"), encoding="utf-8").read().rstrip("\n"), 1)
     os.makedirs(os.path.dirname(os.path.abspath(saida)), exist_ok=True)
     with open(saida, "w", encoding="utf-8", newline="\n") as f:

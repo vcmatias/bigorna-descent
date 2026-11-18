@@ -122,5 +122,5 @@ the DLLs from your `Legends of the Dark_Data\Managed` folder into `source/refs/`
 
 ## Language
 
-The mod follows the game's language, in its 13 languages. The editor speaks English and Portuguese: it starts in the
-game's language (English when the game is in another one) and has its own choice in its settings.
+The mod and the editor follow the game's language, in its 13 languages. The editor starts in the game's language and has
+its own choice in its settings.

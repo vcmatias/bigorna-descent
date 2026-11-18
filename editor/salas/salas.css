@@ -73,7 +73,9 @@ main{flex:1;display:flex;min-height:0}
 .missao{cursor:default}
 #conferencia{list-style:none;padding:0;margin:0}#conferencia li{padding:4px 0 4px 18px;position:relative;font-size:12px;color:var(--fraco)}#conferencia li::before{content:"✓";position:absolute;left:2px;color:var(--ok)}#conferencia li.falta{color:#f0c8c4}#conferencia li.falta::before{content:"!";color:var(--erro);font-weight:700}
 .no .face{width:26px;height:26px;border-radius:50%;object-fit:cover;flex:none;background:#0f0d0b}.no .face.quadrada{border-radius:4px;object-fit:contain}.no .ponto{width:12px;height:12px;border-radius:50%;flex:none}.no .editar{flex:none;padding:2px 7px;margin-left:auto}
-.ponto.map{background:#e0a458}.ponto.side{background:#e5c15a}.ponto.travel{background:#69b4a1}.ponto.dialogue{background:#8fa8ff}.ponto.scene{background:#b48fe0}
+.ponto.map{background:#e0a458}.ponto.side{background:#e5c15a}.ponto.travel{background:#69b4a1}.ponto.dialogue{background:#8fa8ff}.ponto.scene{background:#b48fe0}.ponto.branch{background:#d98ab4}
+.explicaVars ul{margin:4px 0 6px 18px;padding:0}.explicaVars li{margin:2px 0}
+.condNum{gap:6px;margin:-4px 0 6px}.condNum select,.condNum input{flex:1;min-width:0}.condEntre{display:flex;flex-wrap:wrap;gap:2px 12px;margin:0 0 4px}.saidaRamo .sub{display:flex;align-items:center;gap:4px}.saidaRamo .sub .sep{flex:1}.marcasTx{margin:2px 0 6px}.marcasTx .ok{color:#8fd19e}.marcasTx .ruim{color:#e88}
 
 /* floating panels */
 .flutuante{position:fixed;top:140px;right:16px;width:340px;max-height:calc(100vh - 160px);resize:both;overflow:hidden;min-width:240px;min-height:120px;background:var(--painel);border:1px solid var(--borda);border-radius:10px;box-shadow:var(--sombra);display:flex;flex-direction:column;z-index:50}
@@ -228,6 +230,7 @@ main{flex:1;display:flex;min-height:0}
 .contador { border: 1px solid var(--borda, #3a3530); border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
 .contador > .linha { display: flex; gap: 10px; align-items: center; }
 .contador > .linha > input:first-child { flex: 1; font-weight: 600; }
+.contador > .linha > select { flex: 0 0 auto; width: auto; }
 .contador .usos { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 6px; }
 .contador .usos .rotuloTx { min-width: 96px; }
 .contador .usoCont small { opacity: .7; margin-left: 4px; }

@@ -107,7 +107,7 @@ O mod compila contra as DLLs do próprio jogo, que ficam fora deste repositório
 `Legends of the Dark_Data\Managed` para uma pasta `refs/` na raiz do repositório e rode `bash mod/build.sh` (precisa
 do SDK do .NET e do Python 3). A DLL leva dentro a página do editor montada por `editor/salas/montar_salas.py --publico`.
 
-O mod e o editor falam português e inglês: escolha o idioma no instalador e troque quando quiser no painel **Mapas da comunidade** do jogo ou nas configurações do editor.
+O mod e o editor falam as 13 línguas do jogo e seguem a língua dele. Para trocar, mude a língua nas opções do jogo; o editor também tem a própria escolha nas configurações dele.
 
 ## Licença
 

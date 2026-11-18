@@ -43,7 +43,7 @@ function editorDeReceitas(el, alvo, refazer) {
         <div class="previaTx"><div class="rotuloTx">${esc(tr('In the camp:'))}</div><b>${esc(itemAlvo(r.item)?.nome || alvo.nome || '?')}</b> ← ${esc(custoResumo(r))}</div></div>`; }).join('')
     + doJogo.map((c, n) => `<div class="linha receitaJogo"><span class="ajuda">${esc(tr('Recipe of the game'))}: ${esc((c.Ingredients || []).map(x => x.qty + ' ' + nomeMaterial(x.id)).join(', ') || '—')}</span><button class="sm" data-rjogo="${n}">${esc(tr('Bring it in'))}</button></div>`).join('')
     + `<div class="botoes"><button class="sm" data-rnova>+ ${esc(tr(lista.length ? 'Another recipe' : 'A recipe for it'))}</button></div>`
-    + (lista.length || doJogo.length ? '' : `<p class="ajuda">${esc(tr('No recipe crafts it yet: with one, the heroes can craft it in the camp, paying its materials.'))}</p>`);
+    + (lista.length || doJogo.length ? '' : `<p class="ajuda">${esc(tr('No recipe crafts it yet. With a recipe, the heroes can craft it in the camp by paying its materials.'))}</p>`);
   const R = n => lista[+n]; const par = s => s.split(':').map(Number);
   const mudou = r => { r.custom = true; };
   el.querySelectorAll('[data-rq]').forEach(i => i.oninput = () => { const [n, k] = par(i.dataset.rq); R(n).custos[k].qtd = Math.max(0, +i.value || 0); mudou(R(n)); });
@@ -107,7 +107,7 @@ function fichaReceita(c, r) {
   const orig = !!r.base, rj = orig ? receitaDoJogo(r.base) : null;
   const mudado = orig && !!rj && JSON.stringify([r.item, r.valor || 0, (r.custos || []).map(x => [x.mat, x.qtd])]) !== JSON.stringify([rj.item, rj.valor || 0, (rj.custos || []).map(x => [x.mat, x.qtd])]);
   c.innerHTML = `<div class="cabF"><h2>${esc(nomeReceita(r))} ${etiquetaEstado(r)}</h2><div class="botoes">${orig ? `<button class="sm primario" id="fr_dup">⧉ ${esc(tr('Duplicate'))}</button>` : ''}${mudado ? `<button class="sm" id="fr_volta">↺ ${esc(tr('Back to the game’s'))}</button>` : ''}<button class="sm perigo" id="fr_apaga">Delete</button></div></div>
-    ${orig ? avisoOficial(mudado ? 'This original was changed by an older version of the editor: “↺ Back to the game’s” undoes it.' : '', 'Whether the party knows it from the start may change here.') : ''}
+    ${orig ? avisoOficial(mudado ? 'An older version of the editor changed this original. To undo it, use “↺ Back to the game’s”.' : '', 'Whether the party knows it from the start may change here.') : ''}
     <div class="folha"><div class="col">
       <div class="retrato"><div class="quadro">${a && a.img ? `<img loading="lazy" decoding="async" ${imgTardia(a.img)} alt="">` : '<span>no item</span>'}</div><div>
         <label class="campo">Crafts <select id="fr_item"><option value="">— pick an item —</option>${opcoes}</select></label>
@@ -115,7 +115,7 @@ function fichaReceita(c, r) {
       <div class="sub">Cost in materials</div>
       <div id="fr_custos"></div>
       <button class="sm" id="fr_mais">+ Material</button>
-      <p class="ajuda">What crafting the item takes, unit by unit. Base materials (leather, metal…) are common; essences (Ignos, Lumos…) are uncommon.</p>
+      <p class="ajuda">The materials crafting the item takes, unit by unit. Base materials (leather, metal…) are common. Essences (Ignos, Lumos…) are uncommon.</p>
       <div class="duas"><label class="campo">Price of the recipe (gold) <input type="number" min="0" id="fr_valor" value="${r.valor || 0}"></label>
       <label class="chk"><input type="checkbox" id="fr_inicio" ${r.inicio ? 'checked' : ''}> The party knows it from the start</label></div>
       <div class="previaTx"><div class="rotuloTx">In the camp:</div><b>${esc(a ? a.nome : '?')}</b> ← ${esc(custoResumo(r))}</div>

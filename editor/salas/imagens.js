@@ -236,7 +236,7 @@ async function recolherImagens(x) {
   const tem = await Deposito.existem(nomes); const falta = nomes.filter(n => !tem.has(n)); if (!falta.length) return [];
   const faltam = await Deposito.recolher(falta);
   if (Deposito.app) for (const n of falta.filter(n => !faltam.includes(n))) { try { const b = await Deposito.ler(n); const l = b && await fazerImgLeve(b); if (l) await Arquivos.gravar(Deposito.caminhoLeve(n.slice(0, 32)), l); } catch { } }
-  if (faltam.length && typeof avisoLongo === 'function') avisoLongo(tr('Some pictures of this file were not found (they go in the “imagens” folder beside it)') + ': ' + faltam.length);
+  if (faltam.length && typeof avisoLongo === 'function') avisoLongo(tr('Some pictures of this file were not found. They go in the “imagens” folder beside the file') + ': ' + faltam.length);
   return faltam;
 }
 /* (export) a file into the folder with its pictures beside it; downloaded alone, with its pictures inside */

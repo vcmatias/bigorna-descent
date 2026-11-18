@@ -53,7 +53,7 @@ function renderPericias() {
   $('#esqF').innerHTML = `<div class="bloco"><h2>Skills <span class="etq">${lista.length}</span></h2>
     <div class="botoes"><button class="sm" id="f_importarP">Import…</button><button class="sm primario" id="f_novaP">+ New skill</button>${botaoLote()}</div>
     <div class="botoes"><button class="sm" id="f_pdfP" ${comCartas.length ? '' : 'disabled'}>Print the cards (PDF)…</button></div>
-    <p class="ajuda">Skill cards are played at the table; the app unlocks them (the reward of a feat) and lists them in each hero’s skill window. Import the game’s skills to rename them or change their cost, or create new ones for a hero: a feat can then reward them. Each skill can hold the pictures of your own cards (56 × 88 mm), to print.</p>
+    <p class="ajuda">You play skill cards at the table. The app unlocks them as the reward of a feat and lists them in each hero’s skill window. Import the game’s skills to rename them or change their cost. Or create new skills for a hero, and a feat can reward them. Each skill can also hold pictures of your own cards (56 × 88 mm), ready to print.</p>
     <div id="f_lista"></div></div>`;
   const l = $('#f_lista');
   botaoDeFiltro($('#esqF .bloco'), lista, renderPericias);
@@ -76,19 +76,19 @@ function fichaPericia(c, p) {
   const premiam = (oficina().facanhas || []).filter(f => (f.premios || f.premiosJogo || []).includes(idPericiaExportada(p)));
   const orig = !!p.base, mudado = orig && !!jogo && ((p.nome && p.nome !== (p.nomeJogo || jogo.name_en)) || (p.custo || 1) !== (jogo.XPCost || 1));
   c.innerHTML = `<div class="cabF"><h2 data-sem-traducao>${esc(nomePericia(p))} ${etiquetaEstado(p)}</h2><div class="botoes">${orig ? `<button class="sm primario" id="fp_dup">⧉ ${esc(tr('Duplicate'))}</button>` : ''}${mudado ? `<button class="sm" id="fp_volta">↺ ${esc(tr('Back to the game’s'))}</button>` : ''}<button class="sm perigo" id="fp_apaga">Delete</button></div></div>
-    ${orig ? avisoOficial(mudado ? 'This original was changed by an older version of the editor: “↺ Back to the game’s” undoes it.' : '', 'The pictures of its cards and your notes may change here.') : ''}
+    ${orig ? avisoOficial(mudado ? 'An older version of the editor changed this original. To undo it, use “↺ Back to the game’s”.' : '', 'The pictures of its cards and your notes may change here.') : ''}
     <div class="folha"><div class="col">
       <label class="campo">Name <input id="fp_nome" value="${esc(p.nome || '')}" placeholder="${esc(jogo ? jogo.name_en : '')}"></label>
       <div class="duas"><label class="campo">Hero <select id="fp_heroi" ${p.base ? 'disabled' : ''}>${HEROIS_IDS.map(h => `<option value="${h}" ${p.heroi === h ? 'selected' : ''}>${esc(nomeHeroiPericia(h))}</option>`).join('')}${p.base ? '' : `<option value="" ${!p.heroi ? 'selected' : ''}>${esc(nomeHeroiPericia(''))}</option>`}</select></label>
       <label class="campo">XP cost <select id="fp_custo">${[1, 2, 3].map(n => `<option value="${n}" ${(p.custo || 1) === n ? 'selected' : ''}>${n} XP</option>`).join('')}</select></label></div>
-      <p class="ajuda">${p.base ? 'A skill of the game: it stays as in the game (duplicate it to make a new skill from it).' : p.heroi ? 'A new skill of this hero: the game lists it, locked, in the hero’s skill window; a feat of the Feats tab can reward it (or the rewards of the campaign).' : 'Tied to no hero, the skill stays only here, for its cards: the game does not see it.'}</p>
+      <p class="ajuda">${p.base ? 'A skill of the game. It stays as in the game. To change it, duplicate it and edit the copy.' : p.heroi ? 'A new skill of this hero. The game lists it, locked, in the hero’s skill window. A feat in the “Feats” tab can reward it, and so can the campaign rewards.' : 'This skill has no hero, so it stays only here, for its cards. The game ignores it. To bring it into the game, tie it to a hero.'}</p>
       ${p.heroi ? `<div class="sub">Rewarded by</div><div>${premiam.map(f => `<span class="tag">${esc(nomeFacanha(f))}</span>`).join('') || '<span class="ajuda">No feat of the workshop rewards it yet.</span>'} <button class="sm" id="fp_facanha">+ A feat that rewards it</button></div>` : ''}
       <label class="campo">Notes <textarea id="fp_notas" rows="3" placeholder="What the card does, for your own control">${esc(p.notas || '')}</textarea></label>
     </div><div class="col">
       <div class="sub">Cards (56 × 88 mm)</div>
       <div class="cartasP">${(p.cartas || []).map((k, i) => `<div class="cartaP"><img loading="lazy" decoding="async" ${imgTardia(k.img)} alt=""><div class="linha"><button class="sm" data-cesq="${i}" title="Move left" ${i ? '' : 'disabled'}>◂</button><button class="sm perigo" data-cdel="${i}" title="Remove">✕</button></div></div>`).join('')}</div>
-      <div class="linha"><label class="sm botaoArquivo">+ Add card pictures <input type="file" accept="image/*" multiple id="fp_cartas" hidden></label><button class="sm" id="fp_gerar" title="${esc(tr('Make a card for this skill: its name, its XP cost, the hero chosen above and the text of the notes'))}">✦ ${esc(tr('Generate card'))}</button></div>
-      <p class="ajuda">Your own pictures of this skill’s cards (both sides, or several versions), for your fun or your control. A landscape picture is turned. They are kept at print quality and printed at 56 × 88 mm with the button “Print the cards (PDF)”; they never go into the exported map.</p>
+      <div class="linha"><label class="sm botaoArquivo">+ Add card pictures <input type="file" accept="image/*" multiple id="fp_cartas" hidden></label><button class="sm" id="fp_gerar" title="${esc(tr('Makes a card for this skill with its name, its XP cost, the hero chosen above and the text of the notes'))}">✦ ${esc(tr('Generate card'))}</button></div>
+      <p class="ajuda">Your own pictures of this skill’s cards: both sides, or several versions, as you like. A landscape picture is turned upright. They are kept at print quality. The button “Print the cards (PDF)” prints them at 56 × 88 mm. They never go into the exported map.</p>
     </div></div>`;
   $('#fp_nome').oninput = e => { p.nome = e.target.value; mudou(); const h = c.querySelector('.cabF h2'); if (h && h.firstChild) h.firstChild.textContent = nomePericia(p) + ' '; };
   $('#fp_nome').onchange = () => renderPericias();
@@ -97,7 +97,7 @@ function fichaPericia(c, p) {
   $('#fp_notas').oninput = e => { p.notas = e.target.value; };
   $('#fp_apaga').onclick = () => { if (!confirm(tr('Delete this skill?'))) return; oficina().pericias = oficina().pericias.filter(x => x !== p); fichaSel = null; renderPericias(); };
   const nf = $('#fp_facanha'); if (nf) nf.onclick = () => { novaFacanha(); const f = oficina().facanhas[oficina().facanhas.length - 1]; if (f) { f.heroi = p.heroi; f.premios = [idPericiaExportada(p)]; renderFichas(); } };
-  $('#fp_gerar').onclick = async () => { if (!p.heroi) return aviso(tr('Pick the hero of the skill first: the card shows them.')); try { p.cartas.push({ uid: uid(), img: await cartaGeradaDaPericia(p), gerada: true }); renderPericias(); aviso(tr('Card made: the hero, the name, the cost and the notes of the skill. Write in the notes what the card does, and make it again.')); } catch (e) { console.error(e); aviso(tr('The card could not be made.')); } };
+  $('#fp_gerar').onclick = async () => { if (!p.heroi) return aviso(tr('Pick the hero of the skill first: the card shows them.')); try { p.cartas.push({ uid: uid(), img: await cartaGeradaDaPericia(p), gerada: true }); renderPericias(); aviso(tr('Card made with the hero, the name, the cost and the notes of the skill. Write in the notes what the card does, then make it again.')); } catch (e) { console.error(e); aviso(tr('The card could not be made.')); } };
   $('#fp_cartas').onchange = async e => { const fs = [...e.target.files]; for (const f of fs) { try { p.cartas.push({ uid: uid(), img: await imagemDeCarta(f) }); } catch { aviso('A picture could not be read.'); } } renderPericias(); };
   c.querySelectorAll('[data-cdel]').forEach(b => b.onclick = () => { p.cartas.splice(+b.dataset.cdel, 1); renderPericias(); });
   c.querySelectorAll('[data-cesq]').forEach(b => b.onclick = () => { const i = +b.dataset.cesq; const [k] = p.cartas.splice(i, 1); p.cartas.splice(i - 1, 0, k); renderPericias(); });
@@ -165,7 +165,7 @@ function imagemDeCarta(arquivo) {
 function imprimirCartas() {
   const lista = oficina().pericias.filter(p => (p.cartas || []).length); if (!lista.length) return;
   const marcadas = new Set(lista.map(p => p.id));
-  modal('Print the skill cards', `<p class="ajuda">Nine cards to a page at their real size (56 × 88 mm), with crop marks. Print at 100% (“actual size”), without fitting to the page.</p>
+  modal('Print the skill cards', `<p class="ajuda">Nine cards per page, at real size (56 × 88 mm), with crop marks. In the print window, choose 100% (“actual size”) and turn off fit to page.</p>
     <div class="linha"><label class="campo">Paper <select id="pc_papel"><option value="a4">A4</option><option value="letter">Letter</option></select></label>
     <label class="campo">Copies of each card <input type="number" id="pc_copias" min="1" max="9" value="1" style="width:60px"></label></div>
     <div class="listaImp">${lista.map(p => `<label class="chk"><input type="checkbox" data-pc="${esc(p.id)}" checked> <span data-sem-traducao>${esc(nomePericia(p))}</span> <small>(${esc(nomeHeroiPericia(p.heroi))} · ${(p.cartas || []).length} ${tr('card(s)')})</small></label>`).join('')}</div>
@@ -309,7 +309,7 @@ function painelDePericias(c, hid) {
   const titulo = hid ? tr('Skills of') + ' ' + nomeDoPerfil(hid) : tr('Skills with no hero (cards only)');
   c.innerHTML = `<div class="proezasDuas">${hid ? '<aside class="todasProezas" id="fk_todas"></aside>' : '<div></div>'}<div class="proezasDoHeroi">
     <div class="cabF"><h2>${esc(titulo)} <span class="etq">${todas.length}</span></h2><div class="botoes"><button class="sm" id="fk_volta">◂ ${esc(tr('The party'))}</button>${comCartas ? `<button class="sm" id="fk_pdf">${esc(tr('Print the cards (PDF)…'))}</button>` : ''}<button class="sm primario" id="fk_nova">+ ${esc(tr('New skill'))}</button></div></div>
-    <p class="ajuda">${esc(hid ? tr('The skills of the hero, by their XP cost: the game’s come with the hero, as in the game (open one to add its cards and notes; duplicate it to change it). Add others from the column on the left, or make new ones.') : tr('A skill tied to no hero stays only in the Workshop, for its cards: the game does not see it. Give it a hero on its sheet.'))}</p>
+    <p class="ajuda">${esc(hid ? tr('These are the hero’s skills, sorted by XP cost. The game’s skills come with the hero, as in the game. Open one to add its cards and notes; duplicate it to change it. You can add others from the column on the left, or make new ones.') : tr('This skill has no hero, so it stays only in the Workshop, for its cards. The game does not see it. Choose a hero on its sheet to use it in the game.'))}</p>
     <div class="tiersProezas">${periciasPorXp(hid).filter(g => g.n || g.ps.length).map(g => { const falta = Math.max(0, g.n - g.ps.length); const aberto = !hid || _xpAbertos.has(hid + ':' + g.x) || g.ps.some(s => s.chave === fichaSel || (s.p && s.p.id === fichaSel));
       return `<details class="tierProeza ${falta ? 'falta' : ''}" data-xp="${g.x}" ${aberto ? 'open' : ''}><summary><span class="nomeTier">${g.x} XP</span><span class="casasTier">${casasDoXp(g, false)}</span><small>${falta ? esc(falta + ' ' + tr(falta > 1 ? 'places empty' : 'place empty')) : g.ps.length ? '✓' : ''}</small></summary>
         <div class="listaProezas">${g.ps.map(s => { const p = s.p; const ativo = fichaSel && (s.chave === fichaSel || (p && p.id === fichaSel));

@@ -19,21 +19,21 @@ const SO_PORTA = '#gradeObj .item:not([data-obj="Door"])', SO_BAU = '#gradeObj .
    padrao: the objects' default script held 'sim' / 'nao' (and hidden) / null (the user's box); gatilhos: the only triggers
    offered; ao: what the step does when it starts */
 const PASSOS_TUTORIAL = [
-  { id: 'sala', titulo: 'The starting room', texto: 'Every map starts with the starting room: it is the only room on the table when the map begins. Let’s put it down.', alvo: '#btnNovaSala', libera: ['#btnNovaSala'], padrao: 'nao', gatilhos: [],
+  { id: 'sala', titulo: 'The starting room', texto: 'Every map begins in the starting room. It is the only room on the table when the map begins. Let’s put it down.', alvo: '#btnNovaSala', libera: ['#btnNovaSala'], padrao: 'nao', gatilhos: [],
     feito: () => projeto.salas.length >= 1 },
-  { id: 'pecas', titulo: 'Tiles', texto: 'With Tile (T), pick a tile from the palette and click the board. R rotates it. Put down at least two. Remember: each physical tile can appear only once in a room.', alvo: '[data-f="peca"]', libera: ['[data-f="peca"]', '[data-f="apagar"]'], padrao: 'nao', gatilhos: [],
+  { id: 'pecas', titulo: 'Tiles', texto: 'With Tile (T), pick a tile in the palette and click the board to place it. R rotates it. Put down at least two. Each physical tile can appear only once in a room.', alvo: '[data-f="peca"]', libera: ['[data-f="peca"]', '[data-f="apagar"]'], padrao: 'nao', gatilhos: [],
     feito: () => (projeto.salas[0]?.pecas || []).length >= 2 },
   { id: 'herois', titulo: 'Where the heroes start', texto: 'With Hero (H), click the squares where the heroes start: choose 2 to 4 squares in the starting room.', alvo: '[data-f="heroi"]', libera: ['[data-f="heroi"]'], padrao: 'nao', gatilhos: [],
     feito: () => (projeto.salas[0]?.herois || []).length >= 2 },
-  { id: 'porta', titulo: 'The next room', texto: 'Rooms are born from an object. With Object (O), place a Door at the edge of the room. Select it, add the “Open a room” trigger, and choose a new room. It appears, ready for its tiles.', alvo: '[data-f="objeto"]', libera: ['[data-f="objeto"]'], tranca: [SO_PORTA], padrao: 'nao', gatilhos: ['open_room'], destaque: true,
+  { id: 'porta', titulo: 'The next room', texto: 'Every new room opens from an object. With Object (O), place a Door at the edge of the room. Select it, add the “Open a room” trigger and choose a new room. The room appears, ready for its tiles.', alvo: '[data-f="objeto"]', libera: ['[data-f="objeto"]'], tranca: [SO_PORTA], padrao: 'nao', gatilhos: ['open_room'], destaque: true,
     // (the arrow goes with the work: the Object button, the door in the palette, the door placed, the button of its triggers)
     agora: () => { const s0 = projeto.salas[0]; const di = s0 ? s0.objetos.findIndex(o => ehTipo(o, 'Door')) : -1;
       if (di < 0) return ferramenta === 'objeto' ? { alvo: '#gradeObj .item[data-obj="Door"]', rotulo: 'The door' } : { alvo: '[data-f="objeto"]' };
       if (!(sel && sel.tipo === 'objeto' && sel.sala === 0 && sel.i === di)) return { ponto: () => Tutorial.centroDoObjeto(0, di), rotulo: 'Click the door', extra: 'Select the door you placed: click it.' };
-      return { alvo: '#o_add', rotulo: 'Add the trigger here', extra: 'In the panel of the door, press “+ Add” beside Triggers and choose “Open a room”.' }; },
+      return { alvo: '#o_add', rotulo: 'Add the trigger here', extra: 'In the panel of the door, click “+ Add” beside Triggers and choose “Open a room”. This trigger makes the next room appear when a hero opens the door.' }; },
     feito: () => projeto.salas.length >= 2 && projeto.salas[0].objetos.some(o => ehTipo(o, 'Door') && (o.gatilhos || []).some(g => g.tipo === 'open_room' && g.sala !== '' && g.sala != null)) },
-  { id: 'pecas2', titulo: 'The tiles of the new room', texto: 'With Tile (T), lay at least two tiles in the new room. It is the active room now (highlighted in the list of rooms); another room becomes the active one with a click in the list, or a double click on the board.', alvo: '[data-f="peca"]', padrao: 'nao', gatilhos: [],
-    janela: ['Nice work!', 'The first room is already tied to its door: when a hero opens it, the next room appears on the table. Now lay out the tiles of the new room: at least two.'],
+  { id: 'pecas2', titulo: 'The tiles of the new room', texto: 'With “Tile” (T), lay at least two tiles in the new room. It is the active room now, highlighted in the list of rooms. To make another room active, click it in the list or double-click it on the board.', alvo: '[data-f="peca"]', padrao: 'nao', gatilhos: [],
+    janela: ['Nice work!', 'The first room is already tied to its door: when a hero opens the door, the next room appears on the table. Now lay out the tiles of the new room: at least two.'],
     ao: () => { const k = Tutorial.salaDaPorta(); if (k != null) { salaAtual = k; nivel = 0; sel = null; } ferramenta = 'peca'; tudo(); },
     feito: () => { const k = Tutorial.salaDaPorta(); return k != null && (projeto.salas[k]?.pecas || []).length >= 2; } },
   { id: 'bau', titulo: 'A chest for the party', texto: 'Place a Chest (Object) in a room, select it and add the “Give or take away an item” trigger. Choose what it gives the party when it is opened.', alvo: '[data-f="objeto"]', tranca: [SO_BAU], padrao: 'nao', gatilhos: ['give_item'],
@@ -41,11 +41,11 @@ const PASSOS_TUTORIAL = [
     // (the step waits for what the chest gives: an item picked, or a draw from the item pool, or gold)
     agora: () => projeto.salas.some(s => s.objetos.some(o => ehTipo(o, 'Chest') && (o.gatilhos || []).some(g => g.tipo === 'give_item'))) ? { extra: 'Now choose what the chest gives: in its trigger, pick the item (or another option under “What”).' } : {},
     feito: () => projeto.salas.some(s => s.objetos.some(o => ehTipo(o, 'Chest') && (o.gatilhos || []).some(g => g.tipo === 'give_item' && g.acao !== 'remove' && (g.item || ['newitem', 'random', 'gold'].includes(g.modo))))) },
-  { id: 'padrao', titulo: 'The default script', texto: 'With “Default script” ticked (it glows over the objects), place a new Door at the edge of a room.', alvo: 'label:has(#objPadrao)', reserva: '[data-f="objeto"]', destaque: true, tranca: [SO_PORTA], padrao: 'sim', gatilhos: [],
-    janela: ['The default script', 'Look at the “Default script” box above the objects. With it, each object arrives with the behavior it has in the game: a chest gives items, a tree has three answers, and a door opens a new room. Place a door and see it in action.'],
+  { id: 'padrao', titulo: 'The default script', texto: 'Tick “Default script” (the box glows above the objects). Then place a new Door at the edge of a room.', alvo: 'label:has(#objPadrao)', reserva: '[data-f="objeto"]', destaque: true, tranca: [SO_PORTA], padrao: 'sim', gatilhos: [],
+    janela: ['The default script', 'Look at the “Default script” box above the objects. While it is ticked, each object arrives with the behavior it has in the game: a chest gives items, a tree has three answers, a door opens a new room. Place a door and see it in action.'],
     feito: () => projeto.salas.length >= Tutorial.marca('salas') + 1 },
   { id: 'pecas3', titulo: 'A brand-new room', texto: 'With Tile (T), lay at least two tiles in the new room (the active room now).', alvo: '[data-f="peca"]', padrao: 'nao', gatilhos: [],
-    janela: ['A brand-new room', 'The door came with its script and has already created a new room tied to it. Lay out its tiles now: at least two.'],
+    janela: ['A brand-new room', 'The door came with its script and already created a new room tied to it. That room is now the active room. Lay out its tiles: at least two.'],
     // (the new room: the last one when the step began)
     ao: () => { salaAtual = Tutorial.marca('salas') - 1; nivel = 0; sel = null; ferramenta = 'peca'; tudo(); },
     feito: () => (projeto.salas[Tutorial.marca('salas') - 1]?.pecas || []).length >= 2 },
@@ -55,25 +55,25 @@ const PASSOS_TUTORIAL = [
     janela: ['Monsters', 'Now for some monsters: the Enemy button is unlocked.'],
     feito: () => (ferramenta === 'inimigo' && MONSTROS().length > 0) || Tutorial.inimigosNoMapa() > Tutorial.marca('inimigos') },
   { id: 'importar', titulo: 'The monster workshop', texto: 'In the Workshop, press “Import…” and bring in about 10 monsters from the game for this map.', alvo: '#f_importar', libera: ['#btnOficina'], tranca: ['#abasF button:not([data-aba="monstros"])'], padrao: null, gatilhos: null,
-    janela: ['Ops!', 'Oops, there are no monsters available yet. They come from the Workshop: “Import…” brings in monsters from your game, with filters for act, type, and size, while “+ Create” lets you make your own. Import about 10 monsters for this map.'],
+    janela: ['Ops!', 'Oops, there are no monsters yet. They come from the Workshop. “Import…” brings monsters from your game, with filters for act, type and size. “+ Create” lets you make your own. Import about 10 monsters for this map.'],
     ao: () => { abrirFichas('monstros'); }, feito: () => MONSTROS().length >= 10 },
   { id: 'oficinas', titulo: 'The workshops', texto: 'Have a look around the other workshops if you like, then head back to Rooms (◂ Rooms).', alvo: '#fVoltar', libera: ['#btnOficina'], padrao: null, gatilhos: null,
-    janela: ['The spawn pool', 'These monsters automatically go into the map’s spawn pool, and the game draws balanced groups for each room from it. So import only the monsters you actually want to fight. There is also a workshop for every part of the game: NPCs, items, weapons, recipes, feats, skills, heroes, tiles, and objects. They are all unlocked now. Have a look around.'],
+    janela: ['The spawn pool', 'These monsters go straight into the map’s spawn pool. For each room, the game draws balanced groups from it. So import only the monsters you really want to fight. Every part of the game has its own workshop: NPCs, items, weapons, recipes, feats, skills, heroes, tiles and objects. They are all unlocked now. Have a look around.'],
     feito: () => $('#telaFichas').hidden },
-  { id: 'colocar', titulo: 'Monsters in a room', texto: 'With Enemy (E), pick a monster in the palette and click a square of a room. Place at least one.', alvo: '[data-f="inimigo"]', libera: ['[data-f="inimigo"]'], padrao: null, gatilhos: null,
-    janela: ['Monsters in a room', 'Monsters placed in a room enter when it opens (those of the starting room are there from the start). The palette has the monsters of the Workshop and the balanced group: a space the game fills when the room opens, with monsters of the spawn pool, as strong as the number of heroes asks. Place at least one monster.'],
+  { id: 'colocar', titulo: 'Monsters in a room', texto: 'Pick Enemy (E), choose a monster in the palette and click a square inside a room. Place at least one.', alvo: '[data-f="inimigo"]', libera: ['[data-f="inimigo"]'], padrao: null, gatilhos: null,
+    janela: ['Monsters in a room', 'A monster you place in a room enters when that room opens. The monsters of the starting room are there from the start. The palette has the monsters of the Workshop and the balanced group. The balanced group is a space the game fills when the room opens: it draws monsters from the spawn pool, as strong as the number of heroes asks. Place at least one monster.'],
     ao: () => { $('#telaFichas').hidden = true; if (salaAtual < 0 && projeto.salas.length) salaAtual = 0; ferramenta = 'inimigo'; sel = null; tudo(); },
     feito: () => Tutorial.inimigosNoMapa() > Tutorial.marca('inimigos') },
-  { id: 'porta2', titulo: 'A door with no script', texto: 'Untick “Default script” (it glows) and place a Door at the edge of a room. This time, it stays quiet and opens nothing by itself.', alvo: 'label:has(#objPadrao)', reserva: '[data-f="objeto"]', destaque: true, libera: ['#m_nome', '#btnMapa'], tranca: [SO_PORTA, '[data-f="peca"]', '[data-f="heroi"]', '[data-f="apagar"]', '[data-f="inimigo"]', '[data-f="pilar"]', '#btnOficina', '#m_nome', '#btnMapa'], padrao: null, gatilhos: [], semPadrao: true,
-    janela: ['Rooms made for you', 'Besides building rooms by hand, the editor can build them for you: choose the object that will open the room, and the generator creates one with tiles, objects, and monsters according to your settings. The map name and Map setup are unlocked now too. First, we want a door with no script. A door with the default script would open a new room by itself, and that is not what we want here.'],
+  { id: 'porta2', titulo: 'A door with no script', texto: 'Untick “Default script” (it glows) and place a Door at the edge of a room. This door stays quiet: it opens a room only when you tell it to.', alvo: 'label:has(#objPadrao)', reserva: '[data-f="objeto"]', destaque: true, libera: ['#m_nome', '#btnMapa'], tranca: [SO_PORTA, '[data-f="peca"]', '[data-f="heroi"]', '[data-f="apagar"]', '[data-f="inimigo"]', '[data-f="pilar"]', '#btnOficina', '#m_nome', '#btnMapa'], padrao: null, gatilhos: [], semPadrao: true,
+    janela: ['Rooms made for you', 'You can build rooms by hand, and the editor can also build them for you. Choose the object that will open the room, and the generator makes one with tiles, objects and monsters, following your settings. The map name and “Map setup” are unlocked now too. First, place a door with no script. A door with the default script opens a new room by itself, and here the generator will make that room.'],
     ao: () => { ferramenta = 'objeto'; objetoEscolhido = 'Door'; tudo(); }, feito: () => Tutorial.portasSemScript() > Tutorial.marca('portas') },
   { id: 'gerar', titulo: 'Generate a room', texto: 'Press ✦ Generate room, then click the door you have just placed.', alvo: '#btnGerarSala', libera: ['#btnGerarSala'], padrao: null, gatilhos: null,
     janela: ['Generate a room', 'Now for the room generator. Press ✦ Generate room and click the door that will connect to the new room.'],
     feito: () => { const j = $('#janelaGerador'); return !!(j && !j.hidden); } },
-  { id: 'posicionar', titulo: 'Place the room', texto: 'Press ✦ Generate in the window, move the room (drag, arrows, R) next to its door, then “Use this”.', alvo: '[data-usar]', reserva: '#gr_gerar', destaque: true, padrao: null, gatilhos: null, umCandidato: true,
+  { id: 'posicionar', titulo: 'Place the room', texto: 'Press ✦ Generate in the window. Move the room next to its door: drag it, use the arrows, or press R to turn it. Then press “Use this”.', alvo: '[data-usar]', reserva: '#gr_gerar', destaque: true, padrao: null, gatilhos: null, umCandidato: true,
     // ("Use this" waits until the room has moved or turned; meanwhile the arrow points at the room itself)
     agora: () => GER.previa == null ? { alvo: '#gr_gerar' } : Tutorial.previaMovida() ? { alvo: '[data-usar]' } : { ponto: Tutorial.centroDaPrevia(), rotulo: 'Drag me · R turns', tranca: ['[data-usar]'], extra: 'First move the room (drag it or use the arrows) or turn it (R). “Use this” becomes available as soon as the room has moved.' },
-    janela: ['Where it goes', 'Generate a room. For this tutorial, one is enough (the generator usually offers three). Before placing it on the map, click the new room to move it and press R to turn it. Preferably, place it next to the door that will open it, although a room can be opened by any object and placed anywhere. Once it is where you want it, press “Use this”.'],
+    janela: ['Where it goes', 'Generate a room. For this tutorial one is enough (the generator usually offers three). Before you place it, click the new room to move it, and press R to turn it. It works best next to the door that opens it, but any object can open a room, and the room can stand anywhere. When it is in place, press “Use this”.'],
     ao: () => { const j = $('#janelaGerador'); if (j) { j.style.left = '8px'; j.style.top = '70px'; j.style.right = 'auto'; } }, feito: () => projeto.salas.length > Tutorial.marca('salas') && !projeto.salas.some(s => s._previa) },
   { id: 'campanha', titulo: 'The campaign', texto: 'Press “Start a campaign”: everything is unlocked from there.', alvo: '#btnCampanha', libera: ['#btnCampanha'], padrao: null, gatilhos: null,
     janela: ['Nice work!', 'You have built rooms by hand, programmed objects, brought in monsters, and generated a room. Now only the campaign remains: it connects maps on the world map, with scenes, choices, and rewards between them. Press “Start a campaign” and the rest of the editor opens up.'],
@@ -83,16 +83,16 @@ const PASSOS_TUTORIAL = [
 ];
 /* the windows of the campaign, the first time each part opens during the tutorial */
 const JANELAS_CAMPANHA = {
-  fluxo: ['The story flow', 'The story flow shows the campaign as cards: maps, scenes, world-map travel, and choices, all linked by arrows. To make a link, drag from a card’s ● to another card. What happens after each map depends on those links and the story variables.'],
-  caixas: ['Scenes', 'A scene is a sequence of boxes: who speaks, the text, the background picture, and questions whose answers can lead to different boxes. Double-click the background to add a box; then drag from a box’s ● to choose what comes next.'],
-  inventario: ['Starting inventory', 'What a veteran party already has when the campaign starts: gold, items, weapon parts, and skills. The generators leave unique items the party already owns out of the loot.'],
-  variaveis: ['Story variables', 'Here are the choices the campaign can remember (spared the prisoner, took the relic…). Use these memories to create story branches. For example: if the prisoner was spared, show answer 1 + a new item; otherwise, show answer 2.'],
-  mundo: ['The world map', 'This is where the campaign’s maps take place. Drag the markers onto the world map and draw the roads the party travels between them.']
+  fluxo: ['The story flow', 'The story flow shows the campaign as cards: maps, scenes, world-map travel and choices, linked by arrows. To link two cards, drag from the ● of one card to the other. What comes after each map depends on these links and on the story variables.'],
+  caixas: ['Scenes', 'A scene is a sequence of boxes. Each box holds who speaks, the text, the background picture and, if you want, questions whose answers lead to different boxes. Double-click the background to add a box. Then drag from the ● of a box to the box that comes next.'],
+  inventario: ['Starting inventory', 'This is what a veteran party already owns when the campaign starts: gold, items, weapon parts and skills. The generators leave out of the loot any unique item the party already has.'],
+  variaveis: ['Story variables', 'Here are the choices the campaign remembers (spared the prisoner, took the relic…). Use them to branch the story. Example: if the prisoner was spared, show answer 1 and a new item; otherwise, show answer 2.'],
+  mundo: ['The world map', 'The world map shows where each map of the campaign takes place. Drag the markers onto it and draw the roads the party travels between them.']
 };
 /* the windows of the tutorial asked by the editor (Tutorial.explicar): a tile laid again */
 const JANELAS_EDITOR = {
-  'pecas-reuso': ['Tiles are limited', 'The box contains one of each physical tile (its A and B sides are the same piece). So each tile can occupy only one place on the table at a time. This one is already in an earlier room; to place it here, the earlier copy has to come off the table first. The next window handles that for you: when a hero opens this room, the game removes the earlier tile. Each button in that window is explained there.'],
-  'pecas-mesma-sala': ['Tiles are limited', 'The box contains one of each physical tile (its A and B sides are the same piece), and this room is already using this one. To place it somewhere else, remove the earlier one first (Erase, or select it and press Delete), or choose another tile from the palette.']
+  'pecas-reuso': ['Tiles are limited', 'The box has one of each physical tile (sides A and B are the same piece). So each tile can be in only one place on the table at a time. This tile is already in an earlier room. To use it here, the earlier one must leave the table first. The next window does that for you: when a hero opens this room, the game removes the earlier tile. The window explains each of its buttons.'],
+  'pecas-mesma-sala': ['Tiles are limited', 'The box has one of each physical tile (sides A and B are the same piece), and this room already uses this one. To place it elsewhere, first remove the earlier one (Erase, or select it and press Delete). Or choose another tile in the palette.']
 };
 var Tutorial = (() => {
   let estado = null, painel = null, estilo = null, relogio = null, janelaAberta = false;
@@ -207,7 +207,7 @@ var Tutorial = (() => {
   function avancar() { if (estado.passo >= PASSOS_TUTORIAL.length - 1) return terminar(true); estado.passo++; entrar(); }
   function terminar(fim) {
     const ja = estado && estado.feito; estado = { passo: PASSOS_TUTORIAL.length - 1, feito: true }; gravar(); aplicar(); desenhar();
-    if (fim && !ja) janela('The map generator', 'Just like rooms, whole maps can be generated too. ✦ Generate map (experimental) builds a map with its story, objectives, and finale. It is still experimental, so feel free to try it and use it. To keep exploring the editor, follow the Hints in the left column: each one disappears after you try what it shows. Found a bug or have a suggestion? Press F9 (“Report a problem”), here in the editor or during the game. Nothing is sent without your click. And if you want to revisit this tutorial, you can repeat it from ⚙ Settings.');
+    if (fim && !ja) janela('The map generator', 'Whole maps can be generated too, just like rooms. ✦ Generate map (experimental) builds a map with its story, objectives and finale. It is still experimental: feel free to try it and use it. To keep exploring the editor, follow the Hints in the left column. Each hint disappears once you try what it shows. Found a bug or have a suggestion? Press F9 (“Report a problem”), in the editor or during the game. Nothing is sent until you click. To see this tutorial again, run it from ⚙ Settings.');
   }
   /* every half second: the task of the step, the windows of the campaign, the Enemy button with no monster */
   function conferir() {
@@ -239,7 +239,7 @@ var Tutorial = (() => {
   }
   /* the first question: the tutorial, or "I know it all" (sure? ⚙ can repeat it) */
   function perguntar() {
-    janela('Welcome to Bigorna Rooms', 'This editor creates maps and campaigns for Descent: Legends of the Dark, played in-game through the Bigorna mod. Want a guided tour, or do you already know your way around?', r => {
+    janela('Welcome to Bigorna Rooms', 'This editor creates maps and campaigns for Descent: Legends of the Dark. You play them in the game itself, through the Bigorna mod. Want a guided tour, or do you already know your way around?', r => {
       if (r === 'tutorial') return iniciar();
       janela('Are you sure about that?', 'The tutorial walks you through the editor step by step. If you ever want to revisit it, you can repeat it from ⚙ Settings.', r2 => { if (r2 === 'sim') { estado = { passo: PASSOS_TUTORIAL.length - 1, feito: true }; gravar(); } else perguntar(); }, [['nao', 'Back'], ['sim', 'Yes, skip it']]);
     }, [['sabe', 'I know my way around'], ['tutorial', 'Start the tutorial']]);

@@ -85,8 +85,8 @@ Um aviso no canto mostra o andamento. No painel "Mapas da comunidade" da tela de
 
 ## Idioma
 
-O mod segue a língua do jogo, nas 13 línguas dele. O editor fala português e inglês: começa na língua do jogo (inglês
-quando o jogo está em outra) e tem a própria escolha nas configurações dele.
+O mod e o editor seguem a língua do jogo, nas 13 línguas dele. O editor começa na língua do jogo e tem a própria escolha
+nas configurações dele.
 
 **Guarde `bigorna-game-data.js` e `bigorna-worldmap.js` só para você**: eles têm textos e imagens do jogo.
 Compartilhe os mapas e campanhas que fizer (`.bmap`, `.bcamp`); quem abrir usa a própria cópia do jogo.

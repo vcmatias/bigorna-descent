@@ -209,7 +209,7 @@ function formaDe(ch, w, h) {
      tesouro                     bau (the chests give items), token (a point of interest does), null
      textos {en:[…], pt:[…]}     provisional entry texts; {tema} becomes the place */
 const ARQUETIPOS_SALA = [
-  { id: 'emboscada', nome: 'Ambush', resumo: 'A quiet room that is not empty: the monsters come from the sides once the heroes are in.', funcoes: ['tensao', 'confronto'],
+  { id: 'emboscada', nome: 'Ambush', resumo: 'The room looks quiet, yet it holds monsters. They come in from the sides once the heroes are inside.', funcoes: ['tensao', 'confronto'],
     area: [24, 44], pecas: [1, 2], formas: { compacta: 2, L: 2, irregular: 1 }, niveis: 0.15, alfombra: 0.2,
     inimigos: { espacos: [4, 5], distancia: [2, 4], padrao: 'flancos', como: 'armadilha' },
     objetos: { base: { InteractToken: 1 }, extras: { Barricade: [0, 2], Tree: [0, 2], StoneTable: [0, 1], Shelf: [0, 1], Cauldron: [0, 1] }, total: [2, 5] },
@@ -245,7 +245,7 @@ const ARQUETIPOS_SALA = [
     objetos: { base: { InteractToken: 1 }, extras: { Well: [0, 1], Fire: [0, 1], RoundTable: [0, 1], Chest: [0, 1] }, total: [1, 3] },
     metas: { visao: [0.7, 1], cobertura: [0, 0.2], densidade: [0.3, 1.6], bloqueio: [0, 0.08] }, pesos: {},
     textos: { en: ['For a moment, all is quiet. Catch your breath.', 'A sheltered corner, untouched by the fighting.'], pt: ['Por um momento, tudo está quieto. Recuperem o fôlego.', 'Um canto abrigado, intocado pela luta.'] } },
-  { id: 'abertura', nome: 'Opening room', resumo: 'Where the map begins: quiet, with little in it, and someone or something that starts telling the story.', funcoes: ['gancho'],
+  { id: 'abertura', nome: 'Opening room', resumo: 'Where the map begins. It is quiet, with little in it, and someone or something starts telling the story.', funcoes: ['gancho'],
     area: [14, 30], pecas: [1, 2], formas: { compacta: 2, L: 2, irregular: 1 }, niveis: 0.1, alfombra: 0.15,
     inimigos: { espacos: [0, 0], distancia: [0, 0], padrao: 'fundo', como: 'nenhum' },
     objetos: { base: {}, extras: { Tree: [0, 1], Fire: [0, 1], Wagon: [0, 1], Well: [0, 1], StoneTable: [0, 1], Statue: [0, 1] }, total: [0, 1] },
@@ -403,7 +403,7 @@ function prepararReserva(p, atos, rng, tipos = [], quantos = 3, tierAte = 0) {
 function mostrarFaltas(el, faltas, atos, precisa, depois) {
   el.innerHTML = `<div class="faltasOficina"><p><b>${tr('The Workshop holds too little to generate with variety')}</b> (${tr(atos === 1 ? 'Act I only' : 'Acts I and II')}):</p>
     <ul>${faltas.map(f => `<li>${tr(f.rotulo)}: <b>${f.tem}</b> / ${f.min}</li>`).join('')}</ul>
-    <p class="ajuda">${tr('The generators use only what is in the Workshop: its monsters, items, materials and objects, within the chosen boxes.')} ${tr('A starter selection brings from the game the monsters the game itself draws at random (no quest-specific ones), the item cards and the crafting materials of the chosen boxes. Trim it in the Workshop as you like.')}</p>
+    <p class="ajuda">${tr('The generators use only what is in the Workshop: its monsters, items, materials and objects, within the chosen boxes.')} ${tr('A starter selection brings in from the game the monsters the game itself draws at random (quest-specific ones stay out), plus the item cards and the crafting materials of the chosen boxes. Trim it in the Workshop as you like.')}</p>
     <div class="linha"><button class="primario" data-selecao>${tr('Add a starter selection')}</button><button data-oficina>${tr('Open the Workshop')}</button></div></div>`;
   el.querySelector('[data-selecao]').onclick = () => { const n = selecaoInicial(atos, { monstros: faltas.some(f => f.chave === 'monstros'), itens: faltas.some(f => f.chave === 'itens') });
     aviso(tr('Added to the Workshop') + ': ' + n.monstros + ' ' + tr('monsters') + ', ' + n.itens + ' ' + tr('items and materials') + '.'); tudo();
@@ -1520,7 +1520,7 @@ function iniciarGerador() {
   descartarPrevia(); const j = $('#janelaGerador'); if (j) j.hidden = true;
   if (gerandoInicial()) { GER.dono = null; return abrirGerador(); }
   if (faltamHerois()) { avisoLongo(L2('Place the starting spaces of the heroes before generating more rooms (Heroes, in the room where the map starts).', 'Coloquem os espaços iniciais dos heróis antes de gerar mais salas (Heróis, na sala onde o mapa começa).'), 8000); return; }
-  pedirClique({ modo: 'object', objetoNovo: true, texto: tr('Click the object or monster that will open the new room, or place a new object with Objects (O): it gets the trigger “Open a room”. Esc cancels.'), cb: (x, y, q) => {
+  pedirClique({ modo: 'object', objetoNovo: true, texto: tr('Click the object or monster that will open the new room. You can also place a new object with Objects (O). It gets the trigger “Open a room”. Esc cancels.'), cb: (x, y, q) => {
     const d = donoDoClique(q); if (!d) { aviso(tr('Click an object or a monster of the map (staircases and bridges are floor).')); return false; }
     GER.dono = d; setTimeout(abrirGerador, 0); return true; } });
 }
@@ -1543,7 +1543,7 @@ function abrirGerador() {
   const pontos = inicial ? [] : dono ? pontosDeLigacao().filter(pt => pt.sala === dono.sala).sort((a, b) => perto(a) - perto(b)) : pontosDeLigacao();
   const arqs = todosArquetipos().filter(a => a.id !== 'niveis');   // (height is a trait of any room, not a kind of its own)
   const sel = (id, lista, v) => `<select id="${id}">${lista.map(([k, t]) => `<option value="${esc(k)}" ${String(v) === String(k) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
-  corpo.innerHTML = `${dono ? `<p class="linha">Opened by: <b data-sem-traducao>${esc(dono.rotulo)}</b> (room ${dono.sala + 1}) <button class="sm" id="gr_outro">Pick another</button></p>` : ''}<p class="ajuda">${dono ? 'The new room starts at an edge of that room, near it (in front of it, when it is a door at the edge). Used, it gets the trigger “Open a room”.' : !inicial ? 'The new room starts at the edge you pick, behind a door or a token of that room that opens it.' : !salasReais().length ? 'The map is empty: the room will be the starting room, with the hero spaces.' : 'No hero spaces on the map yet: the room will be the starting room (room 1), with the hero spaces, beside the map. The rooms already on the map move down one number; give the old room 1 an object that opens it.'} Each click on Generate makes three new candidates, each with its score (how close its measures are to the archetype) and what it does well. The one you pick appears on the board, framed and marked “preview” in the list of rooms, so you see it in place. It becomes a room of the map only with “Use this”.</p>
+  corpo.innerHTML = `${dono ? `<p class="linha">Opened by: <b data-sem-traducao>${esc(dono.rotulo)}</b> (room ${dono.sala + 1}) <button class="sm" id="gr_outro">Pick another</button></p>` : ''}<p class="ajuda">${dono ? 'The new room starts at an edge of that room, next to the object (in front of it, when it is a door at the edge). When you click “Use this”, the object gets the trigger “Open a room”.' : !inicial ? 'The new room starts at the edge you pick, behind a door or a token of that room. That door or token opens it.' : !salasReais().length ? 'The map is empty: the room will be the starting room, with the hero spaces.' : 'The map has no hero spaces yet. So this room will be the starting room (room 1): it comes with the hero spaces and goes beside the map. Each room already on the map moves down one number: room 1 becomes room 2, and so on. Then give the old room 1 an object that opens it.'} Each click on “Generate” makes three new candidates. Each one shows its score (how close its measures are to the archetype) and what it does well. The one you pick appears on the board, framed and marked “preview” in the list of rooms, so you see it in place. Click “Use this” to make it a room of the map.</p>
     <div class="geradorOpcoes">
       <label class="campo">Archetype ${sel('gr_arq', [['random', 'Random']].concat(arqs.map(a => [a.id, tr(a.nome)])), o.arquetipo)}</label>
       <label class="campo">Size ${sel('gr_tam', [['P', 'Small'], ['M', 'Medium'], ['G', 'Large']], o.tamanho)}</label>
@@ -1552,8 +1552,8 @@ function abrirGerador() {
       <label class="campo">Objects ${sel('gr_obj', [['poucos', 'Few'], ['normal', 'Normal'], ['muitos', 'Many']], o.objetos)}</label>
       <label class="campo">Monsters ${sel('gr_ini', [['balanceado', 'Balanced group (the game\'s rule)'], ['escolhidos', 'Monsters I pick'], ['nenhum', 'None']], o.inimigos)}</label>
       <label class="campo">Story function ${sel('gr_fun', [['', 'The archetype\'s own']].concat(FUNCOES_SALA.slice(1)), o.funcao)}</label>
-      <label class="campo" title="Tiles, objects, monsters and items the generator may use: those of the boxes you own">Boxes ${sel('gr_atos', OPCOES_ATOS, o.atos)}</label>
-      <label class="campo" title="Each Generate uses a new seed. To see a room again, type its seed here before generating.">Seed <input id="gr_sem" value="${esc(o.semente)}" style="width:90px"></label>
+      <label class="campo" title="The tiles, objects, monsters and items the generator may use: those of the boxes you own">Boxes ${sel('gr_atos', OPCOES_ATOS, o.atos)}</label>
+      <label class="campo" title="Each click on “Generate” uses a new seed. To get a room again, type its seed here before you generate.">Seed <input id="gr_sem" value="${esc(o.semente)}" style="width:90px"></label>
     </div>
     <div id="gr_escolhidos" ${o.inimigos === 'escolhidos' ? '' : 'hidden'}><div class="sub">Monsters of the room</div><div class="linha" style="flex-wrap:wrap">${MONSTROS().map(m => `<label class="chk"><input type="checkbox" data-m="${m.id}" ${o.escolhidos.includes(m.id) ? 'checked' : ''}> ${esc(m.nome)}</label>`).join('') || '<span class="ajuda">No monster in the Workshop yet.</span>'}</div></div>
     ${pontos.length ? `<div class="linha" style="flex-wrap:wrap"><label class="campo">Where it starts ${sel('gr_pto', [['random', dono ? 'The edges nearest to it' : 'Random edge']].concat(pontos.map((pt, i) => [i, (pt.sala + 1) + ' · ' + projeto.salas[pt.sala].nome + ' · ' + nomeDirecao(pt.dir) + ' (' + pt.casa.join(',') + ')'])), pontos[+o.ponto] ? o.ponto : 'random')}</label>
@@ -1562,8 +1562,8 @@ function abrirGerador() {
     <div class="linha"><button class="primario" id="gr_gerar">✦ Generate</button><button class="sm" id="gr_arqs" title="Write your own archetypes">Archetypes…</button><span class="ajuda" id="gr_info"></span></div>
     <div id="gr_cands" class="geradorCands"></div>
     <div id="gr_lugar" hidden><div class="linha" style="flex-wrap:wrap"><span class="rotuloTx">Place it on the board</span><button class="sm" data-mv="-1,0" title="Left">←</button><button class="sm" data-mv="0,-1" title="Up">↑</button><button class="sm" data-mv="0,1" title="Down">↓</button><button class="sm" data-mv="1,0" title="Right">→</button><button class="sm" id="gr_gira">⟳ Rotate (R)</button><span id="gr_lugarInfo" class="ajuda"></span></div>
-      <p class="ajuda">Drag the room on the board to put it where you want; the arrow keys move it and R turns it.</p></div>
-    <div id="gr_travas" hidden><div class="linha"><span class="rotuloTx">Variations of the picked one: keep its</span><label class="chk"><input type="checkbox" id="gr_tp" checked> tiles</label><label class="chk"><input type="checkbox" id="gr_to"> objects</label><label class="chk"><input type="checkbox" id="gr_ti"> monsters</label><button class="sm" id="gr_regerar">↻ Make variations</button></div><p class="ajuda">Three new candidates with what you keep and the rest made again (tiles kept: same place and shape, new objects and monsters).</p></div>`;
+      <p class="ajuda">Drag the room on the board to place it where you want. The arrow keys move it, and R turns it.</p></div>
+    <div id="gr_travas" hidden><div class="linha"><span class="rotuloTx">Variations of the picked one: keep its</span><label class="chk"><input type="checkbox" id="gr_tp" checked> tiles</label><label class="chk"><input type="checkbox" id="gr_to"> objects</label><label class="chk"><input type="checkbox" id="gr_ti"> monsters</label><button class="sm" id="gr_regerar">↻ Make variations</button></div><p class="ajuda">Makes three new candidates from the picked one. What you tick stays, and the rest is made again. Example: keep only the tiles to get the same place and shape with new objects and monsters.</p></div>`;
   const ler = () => { o.arquetipo = $('#gr_arq').value; o.tamanho = $('#gr_tam').value; o.intensidade = Math.max(1, Math.min(10, +$('#gr_int').value || 5)); o.tema = $('#gr_tema').value; o.objetos = $('#gr_obj').value; o.inimigos = $('#gr_ini').value; o.funcao = $('#gr_fun').value; o.semente = $('#gr_sem').value.trim() || novaSemente(); o.atos = +$('#gr_atos').value === 1 ? 1 : 2; ATOS.set(o.atos);
     o.escolhidos = [...corpo.querySelectorAll('[data-m]:checked')].map(c => c.dataset.m); if ($('#gr_pto')) o.ponto = $('#gr_pto').value; if ($('#gr_abr')) o.abridor = $('#gr_abr').value; };
   $('#gr_ini').onchange = () => { $('#gr_escolhidos').hidden = $('#gr_ini').value !== 'escolhidos'; };
@@ -1732,13 +1732,13 @@ function renderLugarPrevia() {
   const el = $('#gr_lugarInfo'); if (!el) return; const box = $('#gr_lugar'); if (box) box.hidden = GER.previa == null;
   if (GER.previa == null) return; const st = situacaoDaSala(GER.previa);
   el.className = 'ajuda ' + (st.choca ? 'erro' : st.toca || GER.previa === 0 ? 'ok' : 'aviso');
-  el.textContent = st.choca ? tr('It overlaps another room: move it.') : GER.previa === 0 ? tr('The starting room.') : st.toca ? tr('It touches the map.') : tr('It touches no tile of the map: the heroes will be moved there (you will click where).');
+  el.textContent = st.choca ? tr('It overlaps another room: move it.') : GER.previa === 0 ? tr('The starting room.') : st.toca ? tr('It touches the map.') : tr('It touches no tile of the map, so the heroes will be moved there. You will click where they appear.');
 }
 /* the room on the board becomes a room of the map. Placed apart from the map, the heroes are moved there: the user clicks
    the spaces where they appear */
 function usarCandidato(c) {
   // a starting room (hero spaces, no opener) is made only for an empty map: the map has one starting room
-  if ((c.sala.herois || []).length && projeto.salas.some(x => !x._previa) && !semHeroisNoMapa()) { aviso(tr('This candidate is a starting room, made when the map was empty. The map already has its starting room: Generate again for a room of this map.')); return false; }
+  if ((c.sala.herois || []).length && projeto.salas.some(x => !x._previa) && !semHeroisNoMapa()) { aviso(tr('This candidate is a starting room: it was made while the map was empty. Your map already has its starting room. Generate again to get a room for this map.')); return false; }
   if (GER.previaDe !== c || GER.previa == null) mostrarPrevia(c);
   const nova = GER.previa; const s = projeto.salas[nova]; const st = situacaoDaSala(nova);
   if (st.choca) { aviso(tr('It overlaps another room: move it.')); return false; }
@@ -1770,19 +1770,19 @@ function usarCandidato(c) {
 /* a room apart from the map: the object that opens it also moves the heroes there (up to 4 spaces, clicked on the new room) */
 function pedirTransferencia(si, dono) {
   const g = { uid: uid(), tipo: 'move_heroes', cells: [], text: '', requisitos: [] }; dono.gatilhos = (dono.gatilhos || []).concat([g]);
-  const texto = tr('The new room touches no tile of the map, so the heroes will be moved there. Click the spaces of the new room where they appear (up to 4; Esc when done).');
+  const texto = tr('The new room touches no tile of the map, so the heroes will be moved there. Click the spaces of the new room where they appear, up to 4. Press Esc when you are done.');
   avisoLongo(texto);
   pedirClique({ modo: 'space', texto, repetir: true, cb: (x, y) => {
       if (salaNoNivel(x, y, nivel) !== si) { aviso(tr('Click a space of the new room.')); return false; }
       if (g.cells.some(c => c[0] === x && c[1] === y)) return false;
       g.cells.push(nivel > 0 ? [x, y, nivel] : [x, y]); if (g.cells.length >= 4) setTimeout(terminarClique, 0); return true; },
-    aoTerminar: () => { if (!g.cells.length) { dono.gatilhos = dono.gatilhos.filter(x => x !== g); avisoLongo(tr('No space was clicked: the heroes are not moved. Give the object that opens the room a “Move the heroes” trigger later.')); }
+    aoTerminar: () => { if (!g.cells.length) { dono.gatilhos = dono.gatilhos.filter(x => x !== g); avisoLongo(tr('No space was clicked, so the heroes stay where they are. To move them, give the object that opens the room a “Move the heroes” trigger later.')); }
       else aviso(tr('The heroes will be moved to the new room') + ' (' + g.cells.length + ').'); } });
 }
 /* the user's own archetypes: JSON in the browser, same format as ARQUETIPOS_SALA */
 function editarArquetipos() {
   const atual = JSON.stringify(arquetiposProprios(), null, 2);
-  modal(tr('Archetypes of the generator'), `<p class="ajuda">Your own archetypes, in the same format as the built-in ones (see GERADOR.md next to the editor). One with the id of a built-in archetype replaces it. They stay in this browser.</p>
+  modal(tr('Archetypes of the generator'), `<p class="ajuda">Your own archetypes, in the same format as the built-in ones. The file GERADOR.md, next to the editor, explains the format. One with the id of a built-in archetype replaces it. They stay in this browser.</p>
     <textarea id="ga_json" rows="18" style="width:100%;font-family:monospace;font-size:12px" data-sem-traducao>${esc(atual === '[]' ? '' : atual)}</textarea>
     <div class="rodape"><button data-o="modelo">Copy a built-in one as a start</button><button data-o="cancel">Cancel</button><button class="primario" data-o="ok">Save</button></div>`, (el, fechar) => {
     el.querySelector('[data-o="cancel"]').onclick = fechar;

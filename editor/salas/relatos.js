@@ -94,7 +94,7 @@ function salvarPacoteDoRelato(blob, nome) { const a = document.createElement('a'
 
 function abrirRelato() {
   if ($('#rl_texto')) { $('#rl_texto').focus(); return; }
-  modal('Report a problem', `<p class="ajuda">Write what happened and what you expected. The package carries your text, the editor's log of errors, the log of what was done in the editor and, if you leave the box ticked, the work on screen. Nothing is sent without your click.</p>
+  modal('Report a problem', `<p class="ajuda">Write what happened and what you expected to happen. Example: “I clicked the door and room 2 stayed hidden”. The package carries your text, the editor’s error log and the log of what you did in the editor. With the box ticked, it also carries the work on screen. It goes to the author only when you click “Send”.</p>
     <label class="campo">What happened <textarea id="rl_texto" rows="7"></textarea></label>
     <label class="campo">Contact (optional: an e-mail or a Discord name, for an answer) <input id="rl_contato" maxlength="120"></label>
     <label class="campo"><input type="checkbox" id="rl_obra" checked> Send the work on screen (the map or campaign, without its pictures)</label>
@@ -108,7 +108,7 @@ function abrirRelato() {
       const bt = el.querySelector('#rl_enviar'); if (!el.querySelector('#rl_texto').value.trim()) { situacao('Write what happened first.'); return; }
       bt.disabled = true; situacao('Sending…');
       let p; try { p = pacote(); } catch (e) { console.error('report', e); situacao('The package could not be made.'); bt.disabled = false; return; }
-      if (p.blob.size > RELATO_LIMITE) { salvarPacoteDoRelato(p.blob, p.nome); situacao('The package is too big to send. It was saved as a file: send it to the author (attach it to an issue on GitHub):', RELATO_ISSUES); bt.disabled = false; return; }
+      if (p.blob.size > RELATO_LIMITE) { salvarPacoteDoRelato(p.blob, p.nome); situacao('The package is too big to send, so it was saved as a file. Attach it to an issue on GitHub to send it to the author:', RELATO_ISSUES); bt.disabled = false; return; }
       const corpo = JSON.stringify({ chave: RELATO_CHAVE, pessoa: pessoaDoRelato(), versao: 'editor ' + VERSAO_DO_EDITOR, jogo: (window.BIGORNA_JOGO || {}).jogo || '-',
         mapa: 'editor' + (p.obra ? ': ' + p.obra : ''), campanha: '', contato: p.contato, texto: p.texto, nome: p.nome, arquivo: await base64DoBlob(p.blob) });
       let r = null;
@@ -118,8 +118,8 @@ function abrirRelato() {
       if (r && r.ok) { situacao('Sent. Thank you! Report number:', r.id || ''); el.querySelector('#rl_texto').value = ''; el.querySelector('#rl_contato').value = ''; return; }
       salvarPacoteDoRelato(p.blob, p.nome);
       if (r && (r.erro === 'limite da pessoa' || r.erro === 'limite do dia'))
-        situacao(r.erro === 'limite da pessoa' ? 'You have already sent 5 reports today, the daily limit. The package was saved as a file: send it tomorrow, or attach it to an issue on GitHub:' : 'Today\'s report limit has been reached. The package was saved as a file: send it tomorrow, or attach it to an issue on GitHub:', RELATO_ISSUES);
-      else situacao('The report could not be sent (no internet?). The package was saved as a file: send it to the author (attach it to an issue on GitHub):', RELATO_ISSUES);
+        situacao(r.erro === 'limite da pessoa' ? 'You have already sent 5 reports today, the daily limit. The package was saved as a file. Send it tomorrow, or attach it to an issue on GitHub now:' : 'Today’s report limit has been reached. The package was saved as a file. Send it tomorrow, or attach it to an issue on GitHub now:', RELATO_ISSUES);
+      else situacao('The report could not be sent (no internet?). The package was saved as a file. Attach it to an issue on GitHub to send it to the author:', RELATO_ISSUES);
     };
     setTimeout(() => el.querySelector('#rl_texto').focus(), 0);
   });

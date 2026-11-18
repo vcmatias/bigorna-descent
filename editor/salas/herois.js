@@ -59,7 +59,7 @@ function renderHerois() {
   esq.innerHTML = `<div class="bloco"><h2>Heroes <span class="etq">${heroisNovos().length} in the roster</span></h2>
     <p class="ajuda">The six profiles of the game (class, weapons, skills and feats) go into the ${campanha ? 'campaign' : 'map'}. Each is played by the game’s hero (as in the game) or by a hero of your roster, put in it on the hero’s own sheet.</p>
     <button class="sm botaoEquipe ${heroiSel === EQUIPE || String(heroiSel).startsWith(PROEZAS) || String(heroiSel).startsWith(PERICIAS) ? 'ativo' : ''}" id="fh_equipe" title="${esc(tr('The six heroes side by side; change any of them for a hero of the roster'))}"><span aria-hidden="true">👥</span> ${campanha ? 'In the campaign' : 'In the map'}</button><div id="f_lista"></div>
-    <div class="sub">Roster</div><div id="f_rol"></div>${heroisNovos().length ? `<p class="ajuda">${campanha ? tr('To put a hero of the roster in the campaign: on its sheet, pick its Profile (or, on the sheet of a game hero, pick who plays it).') : tr('To put a hero of the roster in the map: on its sheet, pick its Profile (or, on the sheet of a game hero, pick who plays it).')}</p>` : ''}
+    <div class="sub">Roster</div><div id="f_rol"></div>${heroisNovos().length ? `<p class="ajuda">${campanha ? tr('To put a hero of the roster in the campaign, pick its Profile on its sheet. Or open the sheet of a game hero and pick who plays it.') : tr('To put a hero of the roster in the map, pick its Profile on its sheet. Or open the sheet of a game hero and pick who plays it.')}</p>` : ''}
     <div class="botoes"><button class="sm primario" id="fh_novo">+ New hero</button><button class="sm" id="fh_doNpc">From an NPC…</button>${botaoLote()}</div></div>`;
   const l = $('#f_lista');
   HEROIS_JOGO.forEach(hj => {
@@ -69,12 +69,12 @@ function renderHerois() {
     d.onclick = () => { heroiSel = quem; renderHerois(); }; l.appendChild(d);
   });
   const rol = $('#f_rol'); const fora = heroisNovos().filter(h => !h.perfil).concat(HEROIS_JOGO.filter(hj => ocupanteDoPerfil(hj.id)).map(hj => ({ id: hj.id, jogo: true })));
-  if (!fora.length) rol.innerHTML = `<p class="ajuda">${tr('No hero out of the profiles. New heroes, the heroes of an imported package and those made from an NPC wait here until they get a profile.')}</p>`;
+  if (!fora.length) rol.innerHTML = `<p class="ajuda">${tr('Every hero has a profile. New heroes, heroes of an imported package and heroes made from an NPC wait here until they get one.')}</p>`;
   fora.forEach(x => { const d = document.createElement('div'); d.className = 'no' + (heroiSel === x.id ? ' ativo' : '');
     const r = x.jogo ? ((heroiEditado(x.id) || {}).retrato || (RETRATOS.herois || {})[x.id] || '') : (x.retrato || '');
     d.innerHTML = `${r ? `<img class="face" loading="lazy" decoding="async" ${imgTardia(r)} alt="">` : '<span class="face"></span>'}<div><div>${esc(x.jogo ? (heroiEditado(x.id)?.nome || nomeDoHeroiJogo(x.id)) : (x.nome || tr('New hero')))}</div><small>${x.jogo ? esc(tr('the game’s hero, out: another plays this profile')) : esc(tr('not in the profiles'))}</small></div>`;
     d.onclick = () => { heroiSel = x.id; renderHerois(); }; rol.appendChild(d); });
-  $('#fh_novo').onclick = () => { const h = { id: 'HN_' + uid(), novo: true, nome: tr('New hero') }; const livre = HEROIS_IDS.find(id => !ocupanteDoPerfil(id)); oficina().herois.push(h); heroiSel = h.id; renderHerois(); if (livre) aviso(tr('Pick its profile on the sheet: the hero takes the class, weapons, skills and feats of the game hero it replaces.')); };
+  $('#fh_novo').onclick = () => { const h = { id: 'HN_' + uid(), novo: true, nome: tr('New hero') }; const livre = HEROIS_IDS.find(id => !ocupanteDoPerfil(id)); oficina().herois.push(h); heroiSel = h.id; renderHerois(); if (livre) aviso(tr('Now pick its profile on its sheet. The hero takes the class, weapons, skills and feats of the game hero it replaces.')); };
   $('#fh_doNpc').onclick = () => heroiDeNpc();
   $('#fh_equipe').onclick = () => { heroiSel = EQUIPE; renderHerois(); };
   if (heroiSel === EQUIPE) { equipeDeHerois($('#centroF')); return; }
@@ -99,7 +99,7 @@ function equipeDeHerois(c) {
   // (a group picture: the six standing together, the back row a step higher and smaller, each with its name below)
   const pos = [[9, 0], [25, 1], [41, 0], [59, 1], [75, 0], [91, 1]];
   c.innerHTML = `<div class="cabF"><h2>${esc(tr(campanha ? 'The party of the campaign' : 'The party of the map'))} <span class="etq ${trocados ? 'custom' : ''}">${trocados ? esc(trocados + ' ' + tr(trocados > 1 ? 'heroes of the roster' : 'hero of the roster')) : esc(tr('as in the game'))}</span></h2></div>
-    <p class="ajuda">${esc(tr('The six heroes the players choose from. Click one to change it for a hero of the roster, who takes the class, the two weapons, the skills and the feats of that profile.'))}</p>
+    <p class="ajuda">${esc(tr('These are the six heroes the players choose from. Click one to swap it for a hero of the roster. The new hero takes the class, the two weapons, the skills and the feats of that profile.'))}</p>
     <div class="equipeWrap"><div class="fotoEquipe"><div class="chaoEquipe"></div>${HEROIS_JOGO.map((hj, i) => { const o = ocupanteDoPerfil(hj.id); const f = figuraDoHeroi(hj.id); const [x, tras] = pos[i];
       const nome = nomeDoHeroi(hj.id);
       return `<button class="membro${tras ? ' tras' : ''}${o ? ' trocado' : ''}${f.corpo ? '' : ' camafeu'}" data-membro="${hj.id}" style="left:${x}%" title="${esc(nome)}">
@@ -124,7 +124,7 @@ function equipeDeHerois(c) {
     const chip = (val, img, nome, nota, ativo) => `<button class="chipHeroi${ativo ? ' ativo' : ''}" data-quem="${esc(val)}" title="${esc(nome + (nota ? ' · ' + nota : ''))}">${img ? `<img loading="lazy" decoding="async" ${imgTardia(img)} alt="">` : `<i>${esc((nome || '?').slice(0, 1).toUpperCase())}</i>`}<span>${esc(nome)}</span>${nota ? `<small>${esc(nota)}</small>` : ''}</button>`;
     pop.innerHTML = `<div class="tit">${esc(tr('Who plays the profile of') + ' ' + nomeDoHeroiJogo(id))}</div>
       <div class="chips">${chip('', rj, nomeDoHeroiJogo(id), tr('the game’s hero'), !atual)}${rol.map(h => chip(h.id, h.retrato || '', h.nome || tr('New hero'), h.perfil && h.perfil !== id ? tr('now in') + ' ' + nomeDoHeroiJogo(h.perfil) : '', h.perfil === id)).join('')}</div>
-      ${rol.length ? '' : `<p class="ajuda">${esc(tr('The roster is empty: make heroes with “+ New hero” or “From an NPC…” on the left.'))}</p>`}
+      ${rol.length ? '' : `<p class="ajuda">${esc(tr('The roster is empty. To make a hero, use “+ New hero” or “From an NPC…” on the left.'))}</p>`}
       <div class="rodapeEscolha"><button class="sm" data-ficha="${esc(atual ? atual.id : id)}">${esc(tr('Open the sheet'))}</button></div>`;
     // (the window under the picture, its arrow pointing at the figure)
     const r = b.getBoundingClientRect(), rf = foto.getBoundingClientRect(); pop.hidden = false;
@@ -142,7 +142,7 @@ function equipeDeHerois(c) {
    portrait and description; the NPC's picture, whole, becomes its animated figure */
 function heroiDeNpc() {
   const npcs = bestiario().personagens || []; if (!npcs.length) return aviso(tr('The Workshop has no NPC yet.'));
-  modal(tr('A hero from an NPC'), `<p class="ajuda">${tr('Tick the NPCs that become heroes of the roster (the NPCs stay as they are). Then give each one a profile on its sheet.')}</p>
+  modal(tr('A hero from an NPC'), `<p class="ajuda">${tr('Tick the NPCs that become heroes of the roster. The NPCs themselves stay as they are. Then give each new hero a profile on its sheet.')}</p>
     <div style="max-height:52vh;overflow:auto">${npcs.map((p, i) => { const r = retratoDoPersonagem(p); return `<label class="chk">${r ? `<img loading="lazy" decoding="async" ${imgTardia(r)} alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px">` : ''}<input type="checkbox" data-i="${i}"> ${esc(p.nome || '')}</label>`; }).join('')}</div>
     <div class="rodape"><button data-o="cancel">Cancel</button><button class="primario" data-o="ok">Make heroes</button></div>`, (el, fechar) => {
     el.querySelector('[data-o="cancel"]').onclick = fechar;
@@ -165,14 +165,14 @@ function fichaHeroi(c, hj, novo) {
   // (the sheet of a game hero chooses who plays its profile: the game hero, or a hero of the roster)
   const quemJoga = !novo ? `<div class="sub">Profile</div>
       <label class="campo">Who plays this profile <select id="fh_quem"><option value="">${esc(nomeDoHeroiJogo(hj.id))} (${esc(tr('the game’s hero'))})</option>${heroisNovos().map(x => `<option value="${x.id}" ${x.perfil === hj.id ? 'selected' : ''}>${esc(x.nome || tr('New hero'))}${x.perfil && x.perfil !== hj.id ? ' · ' + esc(tr('now in the profile of') + ' ' + nomeDoHeroiJogo(x.perfil)) : ''}</option>`).join('')}</select></label>
-      <p class="ajuda">${heroisNovos().length ? tr('Pick a hero of the roster to play this profile in the place of the game’s hero.') : tr('Make heroes with “+ New hero” or “From an NPC…” on the left; they can then play this profile.')}</p>` : '';
+      <p class="ajuda">${heroisNovos().length ? tr('Pick a hero of the roster to play this profile in the place of the game’s hero.') : tr('Make heroes with “+ New hero” or “From an NPC…” on the left. Then they can play this profile.')}</p>` : '';
   const perfil = novo ? `<div class="sub">Profile</div>
       <label class="campo">Profile in the ${campanha ? 'campaign' : 'map'} <select id="fh_perfil"><option value="">${tr('None: stays in the roster')}</option>${HEROIS_JOGO.map(x => { const o = ocupanteDoPerfil(x.id); return `<option value="${x.id}" ${novo.perfil === x.id ? 'selected' : ''}>${esc(perfilNome(x.id))}${o && o !== novo ? ' · ' + esc(tr('now') + ' ' + (o.nome || '')) : ''}</option>`; }).join('')}</select></label>
-      <p class="ajuda">The hero takes the place of a game hero: the class, the two weapons, the skills and the feats of that profile, and its place in the hero choice. A hero already there goes back to the roster.</p>` : '';
+      <p class="ajuda">The hero takes the place of a game hero. It gets the class, the two weapons, the skills and the feats of that profile, and its place in the hero choice. A hero already there goes back to the roster.</p>` : '';
   // (a hero of the game only reads: name, voice and weapons as in the game; the pictures and who plays its profile stay open)
   const oficialMudou = !novo && !!(h.nome || h.voz || (oficina().maos || []).some(x => x && x.id === hj.id));
   c.innerHTML = `<div class="cabF"><h2>${esc(h.nome || nomeJogo)} <span class="etq ${heroiMudou(h) ? 'custom' : ''}">${esc(etq)}</span></h2><div class="botoes">${novo ? '<button class="sm perigo" id="fh_apagar">Delete hero</button>' : `<button class="sm primario" id="fh_dup">⧉ ${esc(tr('Duplicate'))}</button>` + (heroiMudou(h) ? '<button class="sm" id="fh_volta">↺ Back to the game’s hero</button>' : '')}</div></div>
-    ${novo ? '' : avisoOficial(oficialMudou ? 'This hero was changed by an older version of the editor: “↺ Back to the game’s hero” undoes it.' : '', 'Who plays its profile may change here; a duplicate is a hero of the roster, with pictures of its own, to put in a profile.')}
+    ${novo ? '' : avisoOficial(oficialMudou ? 'An older version of the editor changed this hero. To undo it, use “↺ Back to the game’s hero”.' : '', 'Here you can change who plays this hero’s profile. A duplicate is a hero of the roster with pictures of its own: you can put it in a profile.')}
     <div class="folha"><div class="col">
       <label class="campo">Name <input id="fh_nome" value="${esc(novo ? (novo.nome || '') : (h.nome || ''))}" placeholder="${esc(nomeJogo)}"></label>
       ${perfil}${quemJoga}
@@ -187,18 +187,18 @@ function fichaHeroi(c, hj, novo) {
       ${h.arteModo === 'imagem' ? `<div class="retrato" style="margin-top:8px"><div class="quadro alto">${h.arte ? `<img loading="lazy" decoding="async" ${imgTardia(h.arte)} alt="">` : '<span>no picture</span>'}</div><div>
         <label class="sm botaoArquivo">Upload the picture (PNG)<input type="file" accept="image/png,image/webp,image/jpeg" id="fh_arte" hidden></label>${h.arte ? `<button class="sm" data-ajustar="arte" title="${esc(tr('Size, position and mirror of the picture'))}">✎ ${esc(tr('Adjust'))}</button>` : ''}
         ${ajustesArte(h, true, k => 'id="fh_' + k + '"')}
-        <p class="ajuda">Takes the place of the animated hero in the windows that show it. Transparent PNG, taller than wide.</p></div></div>` : `<p class="ajuda">${novo ? 'The animated drawing of the game hero of its profile.' : 'The animated drawing of the game.'}</p>`}
+        <p class="ajuda">Your picture takes the place of the animated hero in the windows that show the hero. Use a transparent PNG, taller than wide.</p></div></div>` : `<p class="ajuda">${novo ? 'The animated drawing of the game hero of its profile.' : 'The animated drawing of the game.'}</p>`}
       <div class="sub">Voice</div>
       <label class="campo">Voice <select id="fh_voz">${HEROIS_JOGO.map(x => { const propria = hj ? hj.id : null; return `<option value="${x.id}" ${(h.voz || propria || HEROIS_JOGO[0].id) === x.id ? 'selected' : ''}>${esc(nomeDoHeroiJogo(x.id))}${x.id === propria ? ' ' + tr(novo ? '(the profile’s)' : '(own voice)') : ''}</option>`; }).join('')}</select></label>
-      <p class="ajuda">The lines the hero says when attacking, wounded, receiving treasure, completing a feat, chosen for a quest, winning or losing. One of the six voices of the game (its Act II lines in Act II); the hero’s music theme goes with it.</p>
+      <p class="ajuda">The lines the hero says when attacking, wounded, receiving treasure, completing a feat, chosen for a quest, winning or losing. Pick one of the six voices of the game (in Act II it uses its Act II lines). The hero’s music theme comes with it.</p>
       ${novo && novo.desc ? `<div class="sub">Notes</div><p class="ajuda">${esc(novo.desc)}</p>` : ''}
     </div><div class="col">
       <div class="sub">Weapons</div>
       ${hj ? `<div class="duas">${[0, 1].map(i => `<label class="campo">Weapon ${i + 1} <select data-mao="${i}">${ARMAS_DOS_12().map(k => `<option value="${k}" ${maosDe(hj.id)[i] === k ? 'selected' : ''}>${esc(nomeDaArma(armaDaClasse(k)))} (${NOME_CLASSE[k]})${donoDaClasse(k) !== hj.id ? ' · now ' + esc(nomeDoHeroi(donoDaClasse(k))) : ''}</option>`).join('')}</select></label>`).join('')}</div>
-      <p class="ajuda">Each weapon has one hero in the game (its parts, the shop, the inventory and the feats follow it). Picking the weapon of another hero hands him this one in exchange. The numbers come from the weapons: they are changed in the Weapons tab.${novo ? ' The weapons belong to the profile: they stay with it if the hero leaves.' : ''}</p>
+      <p class="ajuda">Each weapon belongs to one hero in the game. Its parts, the shop, the inventory and the feats follow it. If you pick the weapon of another hero, that hero gets this one in exchange. The numbers come from the weapons: you change them in the Weapons tab.${novo ? ' The weapons belong to the profile: they stay with it if the hero leaves.' : ''}</p>
       ${oficina().maos.length ? '<p><button class="sm" id="fh_maosJogo">Game’s weapons for every hero</button></p>' : ''}
       ${maosDe(hj.id).map((k, i) => resumoArmaDoHeroi(k, i)).join('')}
-      ${rolDeProezas(hj.id)}${rolDePericias(hj.id)}` : `<p class="ajuda">${tr('A hero of the roster gets the weapons of the profile it plays. Pick a profile on the left.')}</p>`}
+      ${rolDeProezas(hj.id)}${rolDePericias(hj.id)}` : `<p class="ajuda">${tr('A hero of the roster gets the weapons of the profile it plays. Pick a profile on the left to see them.')}</p>`}
     </div></div>`;
   const editar = () => novo || heroiParaEditar(hj.id);
   const apos = () => renderHerois();

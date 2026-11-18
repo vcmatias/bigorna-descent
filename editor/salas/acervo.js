@@ -217,7 +217,7 @@ async function publicarNoAcervo(idPacote, vinculos) {
   let preparo, id, edicao, guardar;
   if (idPacote) {
     const pk = typeof idPacote === 'object' ? idPacote : await lerDaBiblioteca(idPacote); if (!pk) return aviso(tr('This package is no longer in this browser.'));
-    if (!ID_ACERVO.test(pk.id || '')) return avisoLongo(tr('This package has an id the community library does not take. Export it again as a new package.'));
+    if (!ID_ACERVO.test(pk.id || '')) return avisoLongo(tr('The community library refuses the id of this package. Export it again as a new package, and it gets a valid id.'));
     id = pk.id; edicao = pk.edicao || 1;
     const la = indice.find(f => f.id === id);
     if (la && la.tipo !== 'pacote') return avisoLongo(tr('The community library has something else with this id.'));
@@ -248,7 +248,7 @@ async function publicarNoAcervo(idPacote, vinculos) {
   const linguaDe = l => LINGUA_DE[codigoDeLingua(l)] ? codigoDeLingua(l) : linguaPadrao();
   const lingua = linguaDe(idPacote ? null : (campanha ? campanha.meta.lingua : projeto.meta.lingua));
   const resumo0 = idPacote ? '' : ((campanha ? campanha.meta.description : projeto.meta.description) || '');
-  modal(tr('Publish to the community library'), `<p class="ajuda">${tr('The community library is where players find maps, campaigns and packages, in the game and in the editor. The editor saves the file for the community library and opens a form on GitHub, already filled: drop the file into it and send it (you need a free GitHub account). If it passes the automatic check, it goes into the community library by itself.')}</p>
+  modal(tr('Publish to the community library'), `<p class="ajuda">${tr('The community library is where players find maps, campaigns and packages, in the game and in the editor. To publish, the editor saves the file for the library and opens a form on GitHub, already filled in. Drop the file into the form and send it. You need a free GitHub account. If the file passes the automatic check, it enters the community library by itself.')}</p>
     <p><b>${esc(tr(NOME_TIPO_ACERVO[preparo.tipo]))}</b> · ${tr('edition')} ${edicao}${edicao > 1 ? ' <small class="ajuda">(' + tr('a new edition of what is in the community library') + ')</small>' : ''}</p>
     <label class="campo">${tr('Name')} <input id="ac_nome" value="${esc(preparo.nome)}" data-sem-traducao></label>
     <label class="campo">${tr('Author')} <input id="ac_autor" value="${esc(autorGuardado() || '')}" data-sem-traducao></label>
@@ -273,7 +273,7 @@ async function publicarNoAcervo(idPacote, vinculos) {
       window.open(urlDoFormulario(ficha), '_blank', 'noopener');
       modal(tr('Almost there'), `<ol class="passos"><li>${tr('The file')} <b data-sem-traducao>${esc(arquivo)}</b> ${tr('was saved (in Downloads, or the folder of your browser).')}</li>
         <li>${tr('On the GitHub page that opened, drag that file into the “File” box and press “Create” (or “Submit new issue”).')}</li>
-        <li>${tr('A check runs by itself and answers in the page. If all is right, it goes into the community library in a few minutes; if not, the answer says what to fix (edit the request and it runs again).')}</li></ol>
+        <li>${tr('A check runs by itself and answers on the page. If all is right, the entry goes into the community library within a few minutes. If something is wrong, the answer says what to fix; edit the request and the check runs again.')}</li></ol>
         <p class="ajuda">${tr('The page did not open?')} <a href="${esc(urlDoFormulario(ficha))}" target="_blank" rel="noopener">${tr('Open the form')}</a></p>`, null);
     };
   }, true);
@@ -287,7 +287,7 @@ function pedirPacoteDaObra(preparo, indice, vinculos) {
   const meta = campanha ? campanha.meta : projeto.meta;
   const pacotes = indice.filter(f => f.tipo === 'pacote');
   const ligados = new Set([...preparo.exigidos.map(q => q.id), ...vinculos.map(v => v.id)]);
-  modal(tr('Workshop content of your own'), `<p class="ajuda">${esc(obra + ' ' + tr('uses Workshop content of your own. In the community library that content goes in a package, published on its own: the work requires the package, and players download it first.'))}</p>
+  modal(tr('Workshop content of your own'), `<p class="ajuda">${esc(obra + ' ' + tr('uses Workshop content of your own. In the community library, that content goes in a package published on its own. The work requires the package, so players download it first.'))}</p>
     <div class="listaPacote" id="pp_lista">${listaDeProprios(preparo.proprios)}</div>
     ${preparo.dentro.length ? `<p class="ajuda">${esc(tr('Packages of your library that did not count'))}: ${preparo.dentro.map(q => '<span data-sem-traducao>' + esc(q.nome) + '</span> (' + esc(q.porque) + ')').join('; ')}</p>` : ''}
     <h4>${esc(tr('Link to packages of the community library'))}</h4>
@@ -295,7 +295,7 @@ function pedirPacoteDaObra(preparo, indice, vinculos) {
       <div class="linha"><span class="ajuda" id="pp_estado"></span><span class="espaco"></span><button class="primario" id="pp_ligar">${esc(tr('Link and continue'))}</button></div>`
       : `<p class="ajuda">${esc(tr('The community library has no packages yet.'))}</p>`}
     <h4>${esc(tr('Make a package with this content'))}</h4>
-    <p class="ajuda">${esc(tr('Pick the Workshop entries that go in the package (what this work uses comes ticked) and publish it on its own. Once it is in the community library (a few minutes after the check), publish the work again: it is linked to the package by itself.'))}</p>
+    <p class="ajuda">${esc(tr('Tick the Workshop entries that go in the package. What this work uses comes already ticked. Then publish the package on its own. Once it is in the community library (a few minutes after the check), publish the work again: it links to the package by itself.'))}</p>
     <div class="linha"><span class="espaco"></span><button id="pp_montar">${esc(tr('Make the package…'))}</button></div>`, (el, fechar) => {
     const lembrar = idp => { meta.acervo = { ...(meta.acervo || {}), vinculos: [...new Set([...((meta.acervo && meta.acervo.vinculos) || []), idp])] }; tudo(); };
     const bt = el.querySelector('#pp_ligar');
@@ -334,7 +334,7 @@ async function escolherPacoteParaPublicar(opcoes = {}) {
   const marcarDe = () => { marcadas = new Map(CATEGORIAS_PACOTE.map(c => [c.k, new Set(lista(c).filter(x => usados.size ? usa(x) : pkBase ? ((pkBase.conteudo || {})[c.k] || []).some(y => y.id === x.id) : true).map(x => x.id))])); };
   const edicaoDe = () => { if (!base) return 1; const la = indice.find(f => f.id === base.id); return la ? Math.max(base.edicao || 1, la.edicao || 0) + 1 : (base.edicao || 1); };
   marcarDe();
-  modal(tr('Publish a package to the community library'), `<p class="ajuda">${esc(tr('A package carries Workshop entries (monsters, items, heroes, NPCs, weapons, skills, feats, recipes, tiles, objects) to the community library, published on its own. Whoever downloads it gets those entries; maps and campaigns that use them require the package, and players download it first. Tick what goes in it.'))}</p>
+  modal(tr('Publish a package to the community library'), `<p class="ajuda">${esc(tr('A package takes Workshop entries (monsters, items, heroes, NPCs, weapons, skills, feats, recipes, tiles, objects) to the community library. It is published on its own. Whoever downloads it gets those entries. Maps and campaigns that use them require the package, so players download it first. Tick what goes in it.'))}</p>
     <div class="linha"><label class="campo">${tr('Package')} <select id="pa_base"><option value="">${tr('A new package')}</option>${meus.map(p => `<option value="${esc(p.id)}">${esc(tr('New edition of'))} “${esc(p.nome || p.id)}”</option>`).join('')}</select></label>
       <label class="campo">${tr('Package name')} <input id="pa_nome" value="${esc(opcoes.nome || '')}" placeholder="${esc(tr('My creations'))}" data-sem-traducao></label></div>
     <p class="ajuda" id="pa_edicao"></p>
@@ -371,7 +371,7 @@ async function escolherPacoteParaPublicar(opcoes = {}) {
 // ------------------------------------------------------------ the community packages (into the library)
 async function abrirAcervoDePacotes(destaque) {
   const quer = new Set((destaque || []).map(q => q.id));   // (v241: the packages a work asked for, first and marked)
-  modal(tr('Community packages'), `<p class="ajuda">${tr('Workshop packages shared by other authors. A package downloaded here goes into your library (⚙ → My packages), ready to add to any map or campaign.')}</p>${quer.size ? `<p class="aviso">${esc(tr('The packages marked are needed by the file you tried to open: download them, then open the file again.'))}</p>` : ''}<div id="ac_lista" class="listaPacote"><p class="ajuda">${tr('Asking the community library…')}</p></div>`, async (el, fechar) => {
+  modal(tr('Community packages'), `<p class="ajuda">${tr('Workshop packages shared by other authors. A package downloaded here goes into your library (⚙ → My packages), ready to add to any map or campaign.')}</p>${quer.size ? `<p class="aviso">${esc(tr('The file you tried to open needs the packages marked here. Download them, then open the file again.'))}</p>` : ''}<div id="ac_lista" class="listaPacote"><p class="ajuda">${tr('Asking the community library…')}</p></div>`, async (el, fechar) => {
     let indice;
     try { indice = (await lerIndiceDoAcervo()).filter(f => f.tipo === 'pacote').sort((a, b) => (quer.has(b.id) ? 1 : 0) - (quer.has(a.id) ? 1 : 0)); }
     catch (e) { el.querySelector('#ac_lista').innerHTML = `<p class="aviso">${tr('No connection to the community library')} (${esc(e.message || String(e))}).</p>`; return; }
@@ -415,7 +415,7 @@ async function baixarPacoteDoAcervo(f) {
 // ------------------------------------------------------------ the community library, from the header
 function abrirAcervo() {
   const obra = campanha ? tr('this campaign') : tr('this map');
-  modal(tr('Community library'), `<p class="ajuda">${tr('Like Valkyrie’s: players download maps and campaigns in the game (Community maps → Download maps), and the packages a map needs come along. Authors publish from here.')}</p>
+  modal(tr('Community library'), `<p class="ajuda">${tr('It works like Valkyrie’s: players download maps and campaigns inside the game (Community maps → Download maps), and the packages a map needs come along. Authors publish from here.')}</p>
     <div class="linha"><button class="primario" id="ac_obra">${tr('Publish')} ${esc(obra)}…</button><button id="ac_pacotes">${tr('Community packages…')}</button><button id="ac_meus">${tr('Publish one of my packages…')}</button></div>`, (el, fechar) => {
     el.querySelector('#ac_obra').onclick = () => { fechar(); publicarNoAcervo(); };
     el.querySelector('#ac_pacotes').onclick = () => { fechar(); abrirAcervoDePacotes(); };
@@ -437,7 +437,7 @@ async function pacotesQueFaltam(requires) {
 function avisarPacotesQueFaltam(faltam, oque) {
   modal(tr('Packages needed'), `<p>${esc(oque === 'campanha' ? tr('This campaign needs these Workshop packages, with its assets:') : tr('This map needs these Workshop packages, with its assets:'))}</p>
     <ul>${faltam.map(q => `<li><b data-sem-traducao>${esc(q.nome)}</b> <small>(${esc(tr('edition'))} ${q.edicao}${q.tem ? ' · ' + esc(tr('you have edition')) + ' ' + q.tem : ''})</small></li>`).join('')}</ul>
-    <p class="ajuda">${esc(tr('Get them first (the community library has the packages its authors published; a package file can also be imported in ⚙ → Import a package), then open the file again.'))}</p>
+    <p class="ajuda">${esc(tr('Get them first, then open the file again. The community library has the packages their authors published. You can also import a package file in ⚙ → Import a package.'))}</p>
     <div class="botoes"><button class="primario" data-ac>${esc(tr('Community packages…'))}</button><button data-fecha>${esc(tr('Close'))}</button></div>`, (el, fechar) => {
     el.querySelector('[data-ac]').onclick = () => { fechar(); abrirAcervoDePacotes(faltam); };
     el.querySelector('[data-fecha]').onclick = fechar;

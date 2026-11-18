@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Bigorna.Encontro;
@@ -70,6 +70,14 @@ namespace Bigorna.Motor
                 // ---- do editor
                 case "varEquals": return Roteiro.Var(P.Texto(p, "var")) == P.Inteiro(p, "value", 1);
                 case "campaignVar": return (Bigorna.Campanha.Campanha.Estado?.Var(P.Texto(p, "var")) ?? 0) == P.Inteiro(p, "value", 1);
+                // v377: uma condicao sobre as variaveis da campanha (pelo menos, no maximo, maior que outra, a maior entre...);
+                // fora de uma campanha, as variaveis valem o valor de saida
+                case "campaignCond":
+                {
+                    if (p == null || !p.TryGetValue("cond", out var cj) || cj == null) return true;
+                    var e = (cj as Newtonsoft.Json.Linq.JObject)?.ToObject<Dcamp.Escolha>() ?? Newtonsoft.Json.JsonConvert.DeserializeObject<Dcamp.Escolha>(cj.ToString());
+                    return Bigorna.Campanha.Progresso.Vale(e, Bigorna.Campanha.Campanha.NoMapa ? Bigorna.Campanha.Campanha.Estado : null);
+                }
                 case "varAbove": return Roteiro.Var(P.Texto(p, "var")) > P.Inteiro(p, "value", 1);
                 case "roundAtLeast": return Roteiro.Rodada >= P.Inteiro(p, "round", 3);
                 case "roundBefore": return Roteiro.Rodada < P.Inteiro(p, "round", 3);

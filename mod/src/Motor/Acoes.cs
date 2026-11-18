@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -597,6 +597,15 @@ namespace Bigorna.Motor
                     var v = P.Texto(p, "var"); var est = Campanha.Campanha.Estado;
                     if (string.IsNullOrEmpty(v) || est == null) { Log.Info("  setCampaignVar: sem campanha aberta"); break; }
                     est.PorVar(v, P.Inteiro(p, "value", 1)); Log.Info("  campanha: " + v + " = " + P.Inteiro(p, "value", 1));
+                    break;
+                }
+                case "changeCampaignVar":
+                {
+                    // v377: somar, tirar, definir ou somar outra variavel da campanha (nunca abaixo de 0 nem acima do maximo)
+                    var v = P.Texto(p, "var"); var est = Campanha.Campanha.Estado;
+                    if (string.IsNullOrEmpty(v) || est == null || !Campanha.Campanha.NoMapa) { Log.Info("  changeCampaignVar: sem campanha aberta"); break; }
+                    est.Mudar(v, P.Texto(p, "op", "add"), P.Inteiro(p, "value", 1), P.Texto(p, "other"));
+                    Roteiro.VarMudou("campaign:" + v);   // (o «usar» de uma variavel da campanha olha a mudanca)
                     break;
                 }
                 case "setVariable": Roteiro.Vars[P.Texto(p, "var") ?? ""] = NoLimite(p, P.Inteiro(p, "value", 1)); Log.Info("  " + P.Texto(p, "var") + " = " + P.Inteiro(p, "value", 1)); Roteiro.VarMudou(P.Texto(p, "var")); break;

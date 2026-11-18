@@ -27,6 +27,7 @@ namespace Bigorna.Campanha
                 if (pula != null && pula != d) Tocar(c, pula, fim, fundura + 1); else fim?.Invoke();
                 return;
             }
+            if (d.SoSe != null) Campanha.Estado?.Fixar(d.SoSe);   // (v377: depois de uma Encruzilhada, a saida fica decidida)
             Log.Info("diálogo «" + d.Id + "»" + (string.IsNullOrEmpty(d.Personagem) ? "" : " (" + d.Personagem + ")"));
             var seguinte = c?.DialogoPorId(d.Seguinte);
             Action depois = () => { if (seguinte != null && seguinte != d) Tocar(c, seguinte, fim, fundura + 1); else fim?.Invoke(); };
@@ -46,6 +47,7 @@ namespace Bigorna.Campanha
                 return;
             }
             d = HeroisDoGrupo(d);
+            d = ComValores(d);   // (v377: o valor das variaveis no texto)
             var opcoes = d.Tipo == "choice" ? d.Opcoes.Where(o => !string.IsNullOrEmpty(o.Texto)).Take(5).ToList() : new List<Dcamp.Opcao>();
             if (d.Acoes != null && d.Acoes.Count > 0) { var acoes = d.Acoes; d = new Dcamp.Dialogo { Id = d.Id, Tipo = d.Tipo, Personagem = d.Personagem, Titulo = d.Titulo, Texto = d.Texto, Elenco = d.Elenco, Fundo = d.Fundo, Opcoes = d.Opcoes, Seguinte = d.Seguinte, Acoes = new List<JObject>() }; var depoisReal = depois; depois = () => Executar(c, acoes, depoisReal, fundura); }
             if (opcoes.Count > 0)
@@ -90,6 +92,17 @@ namespace Bigorna.Campanha
             return copia;
         }
 
+        /// <summary>v377: "{var:choice:...}" no texto vira o valor atual da variavel da campanha.</summary>
+        static readonly System.Text.RegularExpressions.Regex _valor = new System.Text.RegularExpressions.Regex(@"\{var:([^{}]+)\}");
+        static Dcamp.Dialogo ComValores(Dcamp.Dialogo d)
+        {
+            bool tem(string x) => !string.IsNullOrEmpty(x) && x.IndexOf("{var:", StringComparison.Ordinal) >= 0;
+            if (!tem(d.Texto) && !tem(d.Titulo) && !(d.Opcoes ?? new List<Dcamp.Opcao>()).Any(o => tem(o.Texto))) return d;
+            string T(string t) => string.IsNullOrEmpty(t) ? t : _valor.Replace(t, m => (Campanha.Estado?.Var(m.Groups[1].Value) ?? 0).ToString());
+            return new Dcamp.Dialogo { Id = d.Id, Tipo = d.Tipo, Personagem = d.Personagem, Titulo = T(d.Titulo), Texto = T(d.Texto), Fundo = d.Fundo, Seguinte = d.Seguinte, Acoes = d.Acoes, Elenco = d.Elenco, Video = d.Video, Cena = d.Cena,
+                Opcoes = (d.Opcoes ?? new List<Dcamp.Opcao>()).Select(o => new Dcamp.Opcao { Texto = T(o.Texto), Entao = o.Entao }).ToList() };
+        }
+
         /// <summary>As acoes de uma resposta: liberar/completar nos, mostrar outro dialogo, dar itens ou materiais, variaveis.</summary>
         static void Executar(Dcamp c, List<JObject> acoes, Action depois, int fundura)
         {
@@ -115,7 +128,9 @@ namespace Bigorna.Campanha
                         case "giveMaterials": Campanha.DarMateriais((int?)a["n"] ?? (int?)a["amount"] ?? 1); break;
                         case "removeMaterials": Dialogos.Narrativa(Idioma.TF("O grupo entrega {0} material(is).", "The party hands over {0} material(s).", ((int?)a["amount"] ?? 1)), null, null); break;
                         case "setVar": Campanha.Estado?.PorVar((string)a["var"], (int?)a["value"] ?? 1); break;
-                        case "addVar": { var v = (string)a["var"]; Campanha.Estado?.PorVar(v, (Campanha.Estado?.Var(v) ?? 0) + ((int?)a["value"] ?? 1)); break; }
+                        case "addVar": Campanha.Estado?.Mudar((string)a["var"], "add", (int?)a["value"] ?? 1, null); break;
+                        // v377: as variaveis com numero (somar, tirar, definir, somar outra)
+                        case "changeVar": Campanha.Estado?.Mudar((string)a["var"], (string)a["op"] ?? "add", (int?)a["value"] ?? 1, (string)a["other"]); break;
                         default: Log.Info("  ação de campanha desconhecida: " + que); break;
                     }
                 }

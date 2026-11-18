@@ -11,8 +11,8 @@
 const MAPA_LIENZO = (MUNDO.map && MUNDO.map.canvas) || [1600, 900];
 const OFICIAIS = [...(MUNDO.quests || []), ...(MUNDO.narrativeEvents || [])].filter(d => d.coords);
 const FUNDO_PADRAO = 7;
-const COR_NO = { map: '#e0a458', side: '#e5c15a', travel: '#69b4a1', dialogue: '#8fa8ff', scene: '#b48fe0' };
-const NOME_TIPO = { map: 'Map', side: 'Side quest', travel: 'Waypoint', dialogue: 'Scene', scene: 'Scene' };
+const COR_NO = { map: '#e0a458', side: '#e5c15a', travel: '#69b4a1', dialogue: '#8fa8ff', scene: '#b48fe0', branch: '#d98ab4' };
+const NOME_TIPO = { map: 'Map', side: 'Side quest', travel: 'Waypoint', dialogue: 'Scene', scene: 'Scene', branch: 'Crossroads' };
 /* how a card shows up: only maps are quests (main or side); waypoints and scenes are narrative events or city visits */
 const MARCADORES = [['main', 'Main quest'], ['side', 'Side quest'], ['narrative', 'Narrative event'], ['city', 'City visit']];
 const MARCADORES_DO_MAPA = [['main', 'Main quest'], ['side', 'Side quest']];
@@ -55,6 +55,7 @@ function novoNo(tipo, missao) {
   const n = { id: idUnico(tipo + '-' + proximoNum(tipo), ids), num: proximoNum(tipo), nome: '', tipo, missao: tipo === 'map' || tipo === 'side' ? missao : null, dialogo: null,
     coords: [0, 0], fluxo: null, descricao: '', depois: [], auto: true, marcador: tipo === 'side' ? 'side' : tipo === 'map' ? 'main' : 'narrative', recompensas: { items: [], materials: 0 } };
   const k = campanha.nos.filter(noMapaMundi).length; n.coords = [-500 + (k % 6) * 180, 250 - Math.floor(k / 6) * 140];
+  if (tipo === 'branch') { n.saidas = [{ cond: null, para: '' }]; n.outros = ''; }
   campanha.nos.push(n);
   if (ehDialogo(n)) { const d = novaCaixa(n); n.dialogo = d.id; if (tipo === 'scene') { let ant = d; for (let i = 1; i < 4; i++) { const c = novaCaixa(n); c.depois = [ant.id]; ant = c; } } }
   return n;
@@ -76,9 +77,10 @@ function normalizarCampanha(c) {
   // dialogues and scenes are one kind now ("Scene"): the old scenes join the numbering
   if ((c.nos || []).some(n => n.tipo === 'scene')) { let k = 0; c.nos.forEach(n => { if (n.tipo === 'scene' || n.tipo === 'dialogue') { n.tipo = 'dialogue'; n.num = ++k; } }); } c.intro = c.intro || ''; c.meta = c.meta || { name: '', author: '', description: '' }; c.bestiario = c.bestiario || { monstros: [], personagens: [], itens: [] };
   c.missoes.forEach((m, i) => { let n = c.nos.find(x => x.missao === i); if (!n) { n = novoNo('map', i); const ant = c.nos.find(x => x.missao === i - 1); if (ant) n.depois = [ant.id]; } n.recompensas = n.recompensas || { items: [], materials: 0 }; n.depois = n.depois || []; });
-  c.nos = c.nos.filter(n => ehDialogo(n) || n.tipo === 'travel' || c.missoes[n.missao]);
+  c.nos = c.nos.filter(n => ehDialogo(n) || n.tipo === 'travel' || n.tipo === 'branch' || c.missoes[n.missao]);
   c.nos.forEach(n => { if (n.tipo === 'event') n.tipo = 'travel'; if (!n.marcador || !marcadoresDe(n).some(([v]) => v === n.marcador)) n.marcador = n.tipo === 'side' ? 'side' : n.tipo === 'map' ? 'main' : 'narrative'; });
   c.nos.forEach(n => { if (!n.num) n.num = proximoNum(n.tipo); });
+  c.nos.filter(n => n.tipo === 'branch').forEach(sincronizarRamo);
   // older boxes: chained by "next" and hung on a card by its head; now every box belongs to a card (cena) and links by depois
   c.dialogos.forEach(d => { d.cast = d.cast || []; d.options = d.options || []; if (d.background === undefined) d.background = FUNDO_PADRAO; d.type = d.type === 'cutscene' ? 'video' : (d.type || 'normal'); d.depois = d.depois || []; d.acoes = d.acoes || []; d.options.forEach(o => { o.acoes = o.acoes || []; if (o.then) { o.then.forEach(a => { if (a.action === 'showDialogue') o.next = o.next || a.dialogue; else o.acoes.push(a); }); delete o.then; } }); });
   c.nos.filter(ehDialogo).forEach(n => {
@@ -176,7 +178,7 @@ function trocarAba(aba) {
   if (aba !== 'caixas') cenaAberta = null;
   $$('#abasC button').forEach(b => b.classList.toggle('ativo', b.dataset.aba === aba));
   $('#cCaixas').hidden = aba !== 'caixas';
-  $('#dicaC').title = aba === 'fluxo' ? 'Drag a card to move it · drag from its ● onto another card to link (the target comes after) · click the ● to see where it leads, or the tip of an arrow to see what comes into a card (remove links there) · ✎ or double-click opens the card · arrows nudge the selected card (or the view) · + and − zoom · Del deletes'
+  $('#dicaC').title = aba === 'fluxo' ? 'Drag a card to move it · drag from its ● onto another card to link (the target comes after) · click the ● to see where it leads, or the tip of an arrow to see what comes into a card (you remove links there) · ✎ or double-click opens the card · arrows nudge the selected card (or the view) · + and − zoom · Del deletes'
     : aba === 'mundo' ? 'Drag a marker to place it on the world map · faded dots are the official destinations · with your own map picture, draw the roads on the left · arrows nudge · + and − zoom'
     : 'Boxes of “' + (cenaAberta ? nomeDoNo(noPorId(cenaAberta)) : '') + '”: drag from a box’s ● (or an answer’s ●) onto another box to say what comes next · only a question may branch · double-click the background adds a box';
   renderC();
@@ -217,7 +219,7 @@ function apagarCampanha() {
       <li>the workshop${oficinaTx ? ': ' + esc(oficinaTx) : ' (empty)'}</li>
       <li>the world map positions, the rewards, the music and videos chosen</li>
     </ul>
-    <p class="ajuda">Files already exported stay in the folder${Config.nomePasta() ? ' (' + esc(Config.nomePasta()) + ')' : ''}; delete them there if you want. Autosave stops following this campaign, so it will not erase them. The game keeps the progress of any party that played it.</p>
+    <p class="ajuda">Files already exported stay in the folder${Config.nomePasta() ? ' (' + esc(Config.nomePasta()) + ')' : ''}; delete them there if you like. Autosave stops following this campaign, so it leaves them in place. The game keeps the progress of every party that played it.</p>
     <button class="op destaque" data-o="exp"><b>Export, then delete</b><small>Writes the .bcamp and its maps${Config.nomePasta() ? ' into ' + esc(Config.nomePasta()) : ' (download)'}, then deletes.</small></button>
     <div class="op perigo" style="cursor:default"><b>Delete without exporting</b><small>Type the name of the campaign to confirm: <b>${esc(nome)}</b></small>
       <div class="linha" style="margin-top:6px"><input id="ca_nome" placeholder="${esc(nome)}"><button class="sm perigo" id="ca_ja" disabled>Delete for good</button></div></div>
@@ -234,10 +236,11 @@ function renderC() { renderEsqC(); renderDirC(); desenharC(); }
 function abrirCaixas(n) { if (!n || !ehDialogo(n)) return; cenaAberta = n.id; noSel = n.id; caixaSel = n.dialogo; mudarAba('caixas'); }
 
 // ------------------------------------------------------------ left column
-const DESTINO_EDICAO = { map: 'Build the rooms of this map', side: 'Build the rooms of this side quest', travel: 'Place this waypoint on the world map', dialogue: 'Write the boxes of this scene', scene: 'Write the boxes of this scene' };
+const DESTINO_EDICAO = { map: 'Build the rooms of this map', side: 'Build the rooms of this side quest', travel: 'Place this waypoint on the world map', dialogue: 'Write the boxes of this scene', scene: 'Write the boxes of this scene', branch: 'Choose the exits of this crossroads' };
 function editarNo(n) {
   if (!n) return; noSel = n.id;
   if (ehDialogo(n)) { abrirCaixas(n); return; }
+  if (n.tipo === 'branch') { if (abaC !== 'fluxo') mudarAba('fluxo'); else renderC(); return; }
   if (n.tipo === 'travel') { if (abaC === 'mundo') { mudarAba('fluxo'); } else mudarAba('mundo'); return; }
   if (n.missao === null || n.missao === undefined || !campanha.missoes[n.missao]) return aviso('This card has no map.');
   trocarMissao(n.missao); fecharCampanha();
@@ -261,17 +264,17 @@ function renderEsqC() {
   }
   el.innerHTML = `<div class="bloco"><h2>${abaC === 'fluxo' ? 'Story flow' : 'World map'}</h2>
     <div id="cListaNos"></div>
-    <p class="ajuda">${abaC === 'fluxo' ? 'Read left to right: map → scene → waypoint (the party moves on the world map) → scene → next maps. Cards with no arrow in are available from the start. Each card keeps its number for good; the name is yours.' : 'Every map, side quest and waypoint has a place here and a marker kind: main quest, side quest, narrative event or city visit.'}</p></div>`
+    <p class="ajuda">${abaC === 'fluxo' ? 'Read from left to right: map → scene → waypoint (the party moves on the world map) → scene → next maps. A card with no arrow coming in is available from the start. Each card keeps its number for good; you choose the name.' : 'Every map, side quest and waypoint has a place here and a marker kind: main quest, side quest, narrative event or city visit.'}</p></div>`
     + (abaC === 'mundo' ? `<div class="bloco"><h2>Map picture</h2><div id="cMapaProprio"></div></div>` : '');
   if (abaC === 'mundo') campoMapaProprio($('#cMapaProprio'));
   const depois = ' (it goes after the selected card)';
-  $('#cBotoes').innerHTML = `<button class="sm" id="cAddMap" title="A new map${depois}">+ Map</button><button class="sm" id="cAddSide" title="A new side quest${depois}">+ Side quest</button><button class="sm" id="cAddTravel" title="The party moves on the world map${depois}">+ Waypoint</button>${abaC === 'fluxo' ? `<button class="sm" id="cAddDlg" title="Boxes of text, questions and videos (your own films), played in a row${depois}">+ Scene</button><span class="sep"></span><button class="sm" id="cArrumar" title="Lay the cards out left to right">Auto-arrange</button>` : ''}`;
+  $('#cBotoes').innerHTML = `<button class="sm" id="cAddMap" title="A new map${depois}">+ Map</button><button class="sm" id="cAddSide" title="A new side quest${depois}">+ Side quest</button><button class="sm" id="cAddTravel" title="The party moves on the world map${depois}">+ Waypoint</button>${abaC === 'fluxo' ? `<button class="sm" id="cAddDlg" title="Boxes of text, questions and videos (your own films), played in a row${depois}">+ Scene</button><button class="sm" id="cAddRamo" title="The story goes one way or another, by the story variables${depois}">${esc(tr('+ Crossroads'))}</button><span class="sep"></span><button class="sm" id="cArrumar" title="Lay the cards out left to right">Auto-arrange</button>` : ''}`;
   const l = $('#cListaNos');
   campanha.nos.forEach(n => {
     if (abaC === 'mundo' && !noMapaMundi(n)) return;
     const dv = document.createElement('div'); dv.className = 'no' + (noSel === n.id ? ' ativo' : '');
     const cab = ehDialogo(n) ? caixaPorId(n.dialogo) : null; const r = cab ? rostoDe(cab.speaker) : '';
-    dv.innerHTML = `${r ? `<img class="face" loading="lazy" decoding="async" ${imgTardia(r)} alt="">` : `<span class="ponto ${n.tipo}"></span>`}<div style="flex:1;min-width:0"><div>${esc(rotuloDoNo(n))}${nomeDoNo(n) !== rotuloDoNo(n) ? ' · ' + esc(nomeDoNo(n)) : ''}</div><small>${n.missao !== null && n.missao !== undefined ? (campanha.missoes[n.missao]?.salas.length || 0) + ((campanha.missoes[n.missao]?.salas.length || 0) === 1 ? ' room' : ' rooms') + ' · progression ' + progressoDoMapa(campanha.missoes[n.missao]) : ehDialogo(n) ? caixasDaCena(n).length + ' box(es)' : MARCADORES.find(m => m[0] === n.marcador)?.[1] || ''}${(n.depois || []).length ? ' · after ' + n.depois.map(noPorId).filter(Boolean).map(rotuloDoNo).join(', ') : ' · from the start'}</small></div><button class="sm editar" title="${esc(DESTINO_EDICAO[n.tipo])}">✎</button>`;
+    dv.innerHTML = `${r ? `<img class="face" loading="lazy" decoding="async" ${imgTardia(r)} alt="">` : `<span class="ponto ${n.tipo}"></span>`}<div style="flex:1;min-width:0"><div>${esc(rotuloDoNo(n))}${nomeDoNo(n) !== rotuloDoNo(n) ? ' · ' + esc(nomeDoNo(n)) : ''}</div><small>${n.missao !== null && n.missao !== undefined ? (campanha.missoes[n.missao]?.salas.length || 0) + ((campanha.missoes[n.missao]?.salas.length || 0) === 1 ? ' room' : ' rooms') + ' · progression ' + progressoDoMapa(campanha.missoes[n.missao]) : ehDialogo(n) ? caixasDaCena(n).length + ' box(es)' : n.tipo === 'branch' ? tr((n.saidas || []).length + 1 + ' exits') : MARCADORES.find(m => m[0] === n.marcador)?.[1] || ''}${(n.depois || []).length ? ' · after ' + n.depois.map(noPorId).filter(Boolean).map(rotuloDoNo).join(', ') : ' · from the start'}</small></div><button class="sm editar" title="${esc(DESTINO_EDICAO[n.tipo])}">✎</button>`;
     dv.onclick = () => { noSel = n.id; renderC(); };
     dv.querySelector('.editar').onclick = ev => { ev.stopPropagation(); editarNo(n); };
     l.appendChild(dv);
@@ -282,6 +285,7 @@ function renderEsqC() {
   $('#cAddSide').onclick = () => { const idx = novaMissao('side', depoisDe()); ligarAoSelecionado(noDaMissao(idx)); noSel = noDaMissao(idx).id; renderC(); };
   $('#cAddTravel').onclick = () => { const n = inserirNo('travel'); noSel = n.id; renderC(); if (abaC === 'fluxo') aviso('Waypoint added. Place it on the World map tab.'); };
   const bd = $('#cAddDlg'); if (bd) bd.onclick = () => { const n = inserirNo('dialogue'); noSel = n.id; renderC(); };
+  const br = $('#cAddRamo'); if (br) br.onclick = () => { const n = inserirNo('branch'); noSel = n.id; renderC(); };
   const ar = $('#cArrumar'); if (ar) ar.onclick = () => { arrumarFluxo(true); desenharC(); enquadrarC(); };
 }
 
@@ -291,24 +295,25 @@ function renderDirC() {
   if (abaC === 'caixas') return renderCaixaProps(el, caixaSel && caixaPorId(caixaSel));
   const n = noSel && noPorId(noSel);
   if (!n) { el.innerHTML = '<div class="bloco"><h2>Selection</h2><p class="ajuda">Click a card or a marker.</p></div>'; return; }
+  if (n.tipo === 'branch') return renderRamo(el, n);
   const m = n.missao !== null && n.missao !== undefined ? campanha.missoes[n.missao] : null;
   el.innerHTML = `<div class="bloco"><h2><span class="ponto ${n.tipo}"></span>${esc(rotuloDoNo(n))}</h2>
     <label class="campo">Name <input id="n_nome" value="${esc(m ? m.meta.name : n.nome || '')}" placeholder="${esc(rotuloDoNo(n))}"></label>
-    ${htmlSeEscolha(n, 'n_seesc')}${n.seEscolha ? `<p class="ajuda">${ehDialogo(n) ? 'Otherwise the scene is skipped (the story goes on).' : 'Otherwise it does not appear on the world map (unless a box unlocks it by hand).'}</p>` : ''}
-    ${ehDialogo(n) ? `<p class="ajuda">${caixasDaCena(n).length} box(es): text, questions and videos (your own films), played one after the other in the same frame. Played at this point of the story: after a map it is the map’s closing scene; after a waypoint it plays on arrival; before anything it opens the campaign.</p><label class="campo">Plays as <select id="n_marcador">${MARCADORES_DA_CENA.map(([v, t]) => `<option value="${v}" ${n.marcador === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>${n.marcador === 'city' ? '<p class="ajuda">It waits for the next visit to the city after the card before it; the scenes that follow it play in the same visit.</p>' : ''}<button id="n_caixas" class="primario largo">Write the boxes ▸</button>`
+    ${htmlCondicao(n.seEscolha, 'n_seesc')}${n.seEscolha ? `<p class="ajuda">${ehDialogo(n) ? 'Otherwise the scene is skipped (the story goes on).' : 'If the condition above fails, it stays off the world map (a box can still unlock it by hand).'}</p>` : ''}
+    ${ehDialogo(n) ? `<p class="ajuda">${caixasDaCena(n).length} box(es): text, questions and videos (your own films), played one after the other in the same frame. Played at this point of the story: after a map it is the map’s closing scene; after a waypoint it plays on arrival; before anything it opens the campaign.</p><label class="campo">Plays as <select id="n_marcador">${MARCADORES_DA_CENA.map(([v, t]) => `<option value="${v}" ${n.marcador === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>${n.marcador === 'city' ? '<p class="ajuda">This card waits for the party’s next visit to the city after the card before it. The scenes after it play during that same visit.</p>' : ''}<button id="n_caixas" class="primario largo">Write the boxes ▸</button>`
       : `<label class="campo">Description (shown on the world map) <textarea id="n_desc" rows="2">${esc(n.descricao || '')}</textarea></label>
-      ${m ? `<button id="n_salas" class="primario largo">Build the rooms ▸</button><p class="ajuda">${m.salas.length} room(s) · campaign progression ${progressoDoMapa(m)} (Map setup → Balancing).</p>` : '<p class="ajuda">A stop on the world map: the party’s marker moves there. Put scene cards after it for what happens on arrival.</p>'}
+      ${m ? `<button id="n_salas" class="primario largo">Build the rooms ▸</button><p class="ajuda">${m.salas.length} room(s) · campaign progression ${progressoDoMapa(m)} (Map setup → Balancing).</p>` : '<p class="ajuda">A stop on the world map. When the party gets there, its marker moves to this spot. Put scene cards after it for what happens on arrival.</p>'}
       <label class="campo">${n.tipo === 'travel' ? 'Happens as' : 'On the world map as'} <select id="n_marcador">${marcadoresDe(n).map(([v, t]) => `<option value="${v}" ${n.marcador === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <label class="chk"><input type="checkbox" id="n_auto" ${n.auto !== false ? 'checked' : ''}> Appears on the world map on its own when unlocked</label>
       ${(() => { const q = quemDesbloqueia(n); return q.length ? `<p class="ajuda">🔒 Locked until unlocked by ${q.map(x => '<b>' + esc(x) + '</b>').join(', ')} (“Unlock a campaign map”).</p>` : ''; })()}
       ${n.tipo !== 'travel' ? `<div class="sub">Rewards on completion</div>
       <div class="duas"><label class="campo">Gold <input id="n_ouro" type="number" min="0" value="${n.recompensas?.gold || 0}" style="width:80px"></label>
       <label class="campo">Crafting materials <input id="n_mat" type="number" min="0" value="${n.recompensas?.materials || 0}" style="width:80px"></label></div>
-      <label class="campo">Items <select id="n_item"><option value="">+ add an item…</option>${ITENS_B().map(i => `<option value="${esc(i.id)}">${esc(i.nome)}</option>`).join('')}</select>${ITENS_B().length ? '' : '<small class="ajuda">Only workshop items can be given: import or create them in the Workshop (rooms screen).</small>'}</label>
+      <label class="campo">Items <select id="n_item"><option value="">+ add an item…</option>${ITENS_B().map(i => `<option value="${esc(i.id)}">${esc(i.nome)}</option>`).join('')}</select>${ITENS_B().length ? '' : '<small class="ajuda">Only Workshop items can be given. Import them from the game or create your own in the Workshop (rooms screen).</small>'}</label>
       <div>${(n.recompensas?.items || []).map(it => `<span class="tag">${esc(nomeItem(it))} <a href="#" data-delitem="${esc(it)}">✕</a></span>`).join('')}</div>` : ''}
       <p class="ajuda">World map position: ${n.coords[0]}, ${n.coords[1]}.</p>`}
-    <div class="linha acoes"><button class="sm perigo" id="n_apagar">Delete this ${NOME_TIPO[n.tipo].toLowerCase()}</button></div></div>`;
-  const se = $('#n_seesc'); if (se) se.onchange = e => { lerSeEscolha(n, e.target.value); renderDirC(); renderEsqC(); desenharC(); };
+    <div class="linha acoes">${m && (n.tipo === 'map' || n.tipo === 'side') ? `<button class="sm" id="n_duplicar" title="${esc(tr('Makes a copy of this map, rooms and all, placed after the same cards. Change the copy to make a variation'))}">⧉ ${esc(tr(n.tipo === 'side' ? 'Duplicate this side quest' : 'Duplicate this map'))}</button>` : ''}<button class="sm perigo" id="n_apagar">Delete this ${NOME_TIPO[n.tipo].toLowerCase()}</button></div></div>`;
+  ligarCondicao(el, 'n_seesc', () => n.seEscolha, c => { if (c) n.seEscolha = c; else delete n.seEscolha; }, leve => { if (leve) return desenharC(); renderDirC(); renderEsqC(); desenharC(); });
   $('#n_nome').oninput = e => { if (m) m.meta.name = e.target.value; else n.nome = e.target.value; renderEsqC(); desenharC(); };
   const nd = $('#n_desc'); if (nd) nd.oninput = e => { n.descricao = e.target.value; if (m) m.meta.description = e.target.value; };
   const bs = $('#n_salas'); if (bs) bs.onclick = () => { trocarMissao(n.missao); fecharCampanha(); };
@@ -320,24 +325,146 @@ function renderDirC() {
   const ni = $('#n_item'); if (ni) ni.onchange = e => { if (!e.target.value) return; if (!n.recompensas.items.includes(e.target.value)) n.recompensas.items.push(e.target.value); renderDirC(); };
   el.querySelectorAll('[data-delitem]').forEach(a => a.onclick = ev => { ev.preventDefault(); n.recompensas.items = n.recompensas.items.filter(i => i !== a.dataset.delitem); renderDirC(); });
   $('#n_apagar').onclick = () => { apagarNo(n.id); renderC(); renderCabecalho(); };
+  const dp = $('#n_duplicar'); if (dp) dp.onclick = () => duplicarNo(n);
 }
-const ACOES_CAIXA = [['unlockNode', 'Unlock a map or waypoint'], ['giveItem', 'Give an item'], ['giveMaterials', 'Give crafting materials'], ['completeNode', 'Mark a map or waypoint as completed'], ['remember', 'Remember a choice']];
-/* choices the campaign remembers (a short phrase): an answer ticked “Remember this answer”, or a “Remember a choice” action.
-   Cards, scenes and map triggers can then happen only if the party made (or did not make) that choice. */
+/* v377: a Crossroads card: the story goes on by the first exit whose condition holds, from the top (none: “In any other case”).
+   Each exit leads to one card, the card linked after it: n.saidas [{cond, para}], n.outros (a card id). The cards linked after
+   the Crossroads by an arrow and in no exit join it (the other case first, then a new exit). */
+function sincronizarRamo(n) {
+  n.saidas = n.saidas || []; n.outros = n.outros || '';
+  const alvos = campanha.nos.filter(m => (m.depois || []).includes(n.id)).map(m => m.id);
+  n.saidas.forEach(x => { if (x.para && !alvos.includes(x.para)) x.para = ''; }); if (n.outros && !alvos.includes(n.outros)) n.outros = '';
+  const usados = new Set([n.outros, ...n.saidas.map(x => x.para)].filter(Boolean)); const vistos = new Set();
+  n.saidas.forEach(x => { if (x.para && vistos.has(x.para)) x.para = ''; else if (x.para) vistos.add(x.para); });
+  alvos.forEach(id => { if (usados.has(id)) return; usados.add(id); if (!n.outros) n.outros = id; else n.saidas.push({ cond: null, para: id }); });
+}
+/* the card an exit leads to: it now comes only after the Crossroads; the card it led to before goes back after what comes
+   before the Crossroads (so it does not end up open from the start) */
+function ligarSaida(n, k, id) {
+  const atual = k === 'outros' ? n.outros : n.saidas[k].para;
+  if (atual && atual !== id) { const m = noPorId(atual); if (m) { desligar(n, m); if (!(m.depois || []).length) m.depois = (n.depois || []).slice(); } }
+  if (id) { const m = noPorId(id); if (m) { m.depois = [n.id]; m.fluxo = null; }
+    n.saidas.forEach(x => { if (x.para === id) x.para = ''; }); if (n.outros === id) n.outros = ''; }
+  if (k === 'outros') n.outros = id; else n.saidas[k].para = id;
+  arrumarFluxo(false);
+}
+function antecessores(n, r = new Set()) { (n.depois || []).forEach(id => { if (r.has(id)) return; r.add(id); const a = noPorId(id); if (a) antecessores(a, r); }); return r; }
+function renderRamo(el, n) {
+  sincronizarRamo(n);
+  const antes = antecessores(n); const alvos = campanha.nos.filter(m => m !== n && !antes.has(m.id));
+  const nomeDe = m => rotuloDoNo(m) + (nomeDoNo(m) !== rotuloDoNo(m) ? ' · ' + nomeDoNo(m) : '');
+  const opcoes = id => `<option value="">${esc(tr('— nothing —'))}</option>${alvos.map(m => `<option value="${esc(m.id)}" ${id === m.id ? 'selected' : ''}>${esc(nomeDe(m))}</option>`).join('')}`;
+  el.innerHTML = `<div class="bloco"><h2><span class="ponto branch"></span>${esc(rotuloDoNo(n))}</h2>
+    <label class="campo">Name <input id="n_nome" value="${esc(n.nome || '')}" placeholder="${esc(rotuloDoNo(n))}"></label>
+    <p class="ajuda">${esc(tr('The story goes on by the first exit whose condition holds, checked from the top. When none holds, it goes on by “In any other case”. Once a card after it has played, the way taken stays for the rest of the campaign.'))}</p>
+    ${n.saidas.map((x, k) => `<div class="cartao saidaRamo"><div class="sub">${esc(tr('Exit ' + (k + 1)))} <span class="sep"></span><button class="sm" data-rsobe="${k}" title="${esc(tr('Move up'))}" ${k ? '' : 'disabled'}>↑</button><button class="sm" data-rdesce="${k}" title="${esc(tr('Move down'))}" ${k < n.saidas.length - 1 ? '' : 'disabled'}>↓</button><button class="sm" data-rtira="${k}" title="${esc(tr('Remove this exit'))}">✕</button></div>
+      ${htmlCondicao(x.cond, 'rc' + k, 'Only if', true)}${condValida(x.cond) ? '' : `<p class="ajuda aviso">${esc(tr('Pick a condition: without one, this exit never happens.'))}</p>`}
+      <label class="campo">${esc(tr('Goes to'))} <select data-rpara="${k}">${opcoes(x.para)}</select></label></div>`).join('')}
+    <button class="sm" id="r_mais">${esc(tr('+ Exit'))}</button>
+    <div class="cartao saidaRamo"><div class="sub">${esc(tr('In any other case'))}</div><label class="campo">${esc(tr('Goes to'))} <select data-rpara="outros">${opcoes(n.outros)}</select></label></div>
+    <p class="ajuda">${esc(tr('An exit can also be linked on the canvas: drag from the ● of the Crossroads onto a card.'))}</p>
+    <div class="linha acoes"><button class="sm perigo" id="n_apagar">Delete this ${esc(NOME_TIPO.branch.toLowerCase())}</button></div></div>`;
+  const tudoC = () => { renderC(); };
+  $('#n_nome').oninput = e => { n.nome = e.target.value; renderEsqC(); desenharC(); };
+  n.saidas.forEach((x, k) => ligarCondicao(el, 'rc' + k, () => x.cond, c => { x.cond = c; }, leve => { if (!leve) renderDirC(); desenharC(); }));
+  el.querySelectorAll('[data-rpara]').forEach(sl => sl.onchange = () => { const k = sl.dataset.rpara; ligarSaida(n, k === 'outros' ? 'outros' : +k, sl.value); tudoC(); });
+  el.querySelectorAll('[data-rsobe]').forEach(b => b.onclick = () => { const k = +b.dataset.rsobe; [n.saidas[k - 1], n.saidas[k]] = [n.saidas[k], n.saidas[k - 1]]; renderDirC(); });
+  el.querySelectorAll('[data-rdesce]').forEach(b => b.onclick = () => { const k = +b.dataset.rdesce; [n.saidas[k + 1], n.saidas[k]] = [n.saidas[k], n.saidas[k + 1]]; renderDirC(); });
+  el.querySelectorAll('[data-rtira]').forEach(b => b.onclick = () => { const k = +b.dataset.rtira; const x = n.saidas[k]; if (x.para) ligarSaida(n, k, ''); n.saidas.splice(k, 1); tudoC(); });
+  $('#r_mais').onclick = () => { n.saidas.push({ cond: null, para: '' }); renderDirC(); };
+  $('#n_apagar').onclick = () => { apagarNo(n.id); renderC(); renderCabecalho(); };
+}
+const ACOES_CAIXA = [['unlockNode', 'Unlock a map or waypoint'], ['giveItem', 'Give an item'], ['giveMaterials', 'Give crafting materials'], ['completeNode', 'Mark a map or waypoint as completed'], ['remember', 'Remember a choice'], ['variavel', 'Change a number variable']];
+/* the variables of the campaign (Story variables): a choice the party made, yes or no (an answer ticked “Remember this
+   answer”, or a “Remember a choice” action: it counts as 1), or, v377, a number (Honour, Fear, Villagers saved…) that
+   answers, boxes and map triggers add to or take from, never below 0 nor above its maximum. Cards, scenes, Crossroads and map
+   triggers can then happen only if the party made (or did not make) a choice, or if a number is at least, at most… */
 const varEscolha = nome => 'choice:' + slug(nome || '');
+const variavelDe = nome => (campanha?.escolhas || []).find(x => x.nome === nome);
+const ehNumero = nome => !!variavelDe(nome)?.numero;
 function escolhasDaCampanha() {
   if (!campanha) return []; const r = new Set((campanha.escolhas || []).map(x => x.nome));
-  (campanha.dialogos || []).forEach(d => { (d.acoes || []).forEach(a => { if (a.action === 'remember' && a.nome) r.add(a.nome); }); (d.options || []).forEach(o => { if (o.lembrar && (o.lembrarNome || o.text)) r.add(o.lembrarNome || o.text); (o.acoes || []).forEach(a => { if (a.action === 'remember' && a.nome) r.add(a.nome); }); }); });
+  const acao = a => { if ((a.action === 'remember' || a.action === 'variavel') && a.nome) r.add(a.nome); };
+  (campanha.dialogos || []).forEach(d => { (d.acoes || []).forEach(acao); (d.options || []).forEach(o => { if (o.lembrar && (o.lembrarNome || o.text)) r.add(o.lembrarNome || o.text); (o.acoes || []).forEach(acao); }); });
   return [...r].sort();
 }
-/* the “Only if” select of a card: always / the party chose X / the party did not choose X */
-function htmlSeEscolha(x, id) {
-  const es = escolhasDaCampanha(); const v = x.seEscolha ? (x.seEscolha.sim === false ? 'nao:' : 'sim:') + x.seEscolha.nome : '';
-  if (!es.length && !v) return `<label class="campo">Only if <select disabled><option>Always</option></select></label><p class="ajuda">No remembered choice yet: in a question box, tick “Remember this answer”.</p>`;
-  const nomes = es.includes(x.seEscolha?.nome) || !x.seEscolha ? es : [...es, x.seEscolha.nome];
-  return `<label class="campo">Only if <select id="${id}"><option value="">Always</option>${nomes.map(n => `<option value="sim:${esc(n)}" ${v === 'sim:' + n ? 'selected' : ''}>The party chose “${esc(n)}”</option><option value="nao:${esc(n)}" ${v === 'nao:' + n ? 'selected' : ''}>The party did not choose “${esc(n)}”</option>`).join('')}</select></label>`;
+const variaveisNumero = () => escolhasDaCampanha().filter(ehNumero);
+/* a condition on the variables: {nome, sim} for a yes/no one; {nome, op: ge|le|eq|gt|max, n, outra, entre[]} for a number */
+const OPS_CONDICAO = [['ge', 'is at least'], ['le', 'is at most'], ['eq', 'is exactly'], ['gt', 'is more than'], ['max', 'is the highest of']];
+function condValida(c) { if (!c || !c.nome) return false; if (!c.op) return true; if (c.op === 'gt') return !!c.outra; if (c.op === 'max') return (c.entre || []).length > 0; return true; }
+function textoCondicao(c) {
+  if (!c || !c.nome) return tr('(no condition yet)');
+  if (!c.op) return tr(c.sim === false ? 'The party did not choose “' + c.nome + '”' : 'The party chose “' + c.nome + '”');
+  if (c.op === 'gt') return tr('“' + c.nome + '” is more than “' + (c.outra || '?') + '”');
+  if (c.op === 'max') return tr('“' + c.nome + '” is the highest of the variables ticked');
+  return tr('“' + c.nome + '” ' + OPS_CONDICAO.find(o => o[0] === c.op)[1] + ' ' + (+c.n || 0));
 }
-function lerSeEscolha(x, valor) { if (!valor) delete x.seEscolha; else x.seEscolha = { nome: valor.slice(4), sim: valor.startsWith('sim:') }; }
+/* the values the variables start with (a map played on its own: its conditions read them) */
+const iniciosDasVariaveis = () => Object.fromEntries((campanha?.escolhas || []).filter(x => x.numero && +x.inicial > 0).map(x => [varEscolha(x.nome), +x.inicial]));
+function condExportada(c) {
+  if (!condValida(c)) return { var: '', op: 'never' };
+  if (!c.op) return { var: varEscolha(c.nome), value: c.sim === false ? 0 : 1 };
+  if (c.op === 'gt') return { var: varEscolha(c.nome), op: 'gt', other: varEscolha(c.outra) };
+  if (c.op === 'max') return { var: varEscolha(c.nome), op: 'max', among: c.entre.map(varEscolha) };
+  return { var: varEscolha(c.nome), op: c.op, value: Math.max(0, +c.n || 0) };
+}
+/* the select of a condition (and, for a number, its operator and number, or the other variables): “Only if” of a card,
+   an exit of a Crossroads, the requirement “A choice in the campaign” of a map trigger. semSempre: no “Always” */
+function htmlCondicao(c, id, rotulo = 'Only if', semSempre = false) {
+  const es = escolhasDaCampanha(); const nomes = c && c.nome && !es.includes(c.nome) ? [...es, c.nome] : es;
+  const v = !c || !c.nome ? '' : c.op ? 'num:' + c.nome : (c.sim === false ? 'nao:' : 'sim:') + c.nome;
+  if (!nomes.length) return `<label class="campo">${esc(tr(rotulo))} <select disabled><option>${esc(tr(semSempre ? '— pick —' : 'Always'))}</option></select></label><p class="ajuda">${esc(tr('No story variable yet: in a question box, tick “Remember this answer”, or create one with the Story variables button.'))}</p>`;
+  const ops = nomes.map(n => ehNumero(n) ? `<option value="num:${esc(n)}" ${v === 'num:' + n ? 'selected' : ''}>${esc(tr('“' + n + '” is…'))}</option>`
+    : `<option value="sim:${esc(n)}" ${v === 'sim:' + n ? 'selected' : ''}>${esc(tr('The party chose “' + n + '”'))}</option><option value="nao:${esc(n)}" ${v === 'nao:' + n ? 'selected' : ''}>${esc(tr('The party did not choose “' + n + '”'))}</option>`).join('');
+  let mais = '';
+  if (c && c.op) {
+    const outras = variaveisNumero().filter(n => n !== c.nome);
+    mais = `<div class="linha condNum"><select data-cop="${id}">${OPS_CONDICAO.filter(([k]) => (k !== 'gt' && k !== 'max') || outras.length).map(([k, t]) => `<option value="${k}" ${c.op === k ? 'selected' : ''}>${esc(tr(t))}</option>`).join('')}</select>`
+      + (c.op === 'gt' ? `<select data-coutra="${id}"><option value="">${esc(tr('— pick —'))}</option>${outras.map(n => `<option value="${esc(n)}" ${c.outra === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`
+        : c.op === 'max' ? '' : `<input data-cn="${id}" type="number" min="0" value="${Math.max(0, +c.n || 0)}" style="width:64px">`) + '</div>'
+      + (c.op === 'max' ? `<div class="condEntre">${outras.map(n => `<label class="chk"><input type="checkbox" data-centre="${id}" value="${esc(n)}" ${(c.entre || []).includes(n) ? 'checked' : ''}> ${esc(n)}</label>`).join('')}</div><p class="ajuda">${esc(tr('A tie counts as the highest: in a Crossroads, the first exit that holds wins.'))}</p>` : '');
+  }
+  return `<label class="campo">${esc(tr(rotulo))} <select id="${id}"><option value="">${esc(tr(semSempre ? '— pick —' : 'Always'))}</option>${ops}</select></label>${mais}`;
+}
+/* reads the controls of htmlCondicao back: pega() the condition now (or null), poe(c) keeps it (null: none) */
+function ligarCondicao(raiz, id, pega, poe, depois) {
+  const sel = raiz.querySelector('#' + id); if (!sel) return;
+  sel.onchange = () => { const v = sel.value; if (!v) poe(null); else { const nome = v.slice(4); poe(v.startsWith('num:') ? { nome, op: 'ge', n: 1 } : { nome, sim: v.startsWith('sim:') }); } depois(); };
+  const c = pega(); if (!c) return;
+  const op = raiz.querySelector(`[data-cop="${id}"]`); if (op) op.onchange = () => { c.op = op.value; if (c.op === 'max' && !c.entre) c.entre = []; poe(c); depois(); };
+  const n = raiz.querySelector(`[data-cn="${id}"]`); if (n) n.onchange = () => { c.n = Math.max(0, +n.value || 0); poe(c); depois(true); };
+  const ou = raiz.querySelector(`[data-coutra="${id}"]`); if (ou) ou.onchange = () => { c.outra = ou.value; poe(c); depois(true); };
+  raiz.querySelectorAll(`[data-centre="${id}"]`).forEach(ch => ch.onchange = () => { c.entre = [...raiz.querySelectorAll(`[data-centre="${id}"]:checked`)].map(x => x.value); poe(c); depois(true); });
+}
+/* every condition on the variables in the campaign (cards, Crossroads exits, map triggers), with a way to drop it */
+function condicoesDaCampanha() {
+  const r = [];
+  campanha.nos.forEach(n => { if (n.seEscolha) r.push({ c: n.seEscolha, tipo: 'no', n, tirar: () => delete n.seEscolha });
+    if (n.tipo === 'branch') (n.saidas || []).forEach((s, k) => { if (s.cond) r.push({ c: s.cond, tipo: 'ramo', n, k, tirar: () => { s.cond = null; } }); }); });
+  donosDaCampanha().forEach(({ mi, si, o, chave }) => todosGatilhos(o).forEach(g => { const gi = (o.gatilhos || []).indexOf(g); (g.requisitos || []).forEach(q => {
+    if (q.tipo === 'choice') r.push({ c: q, tipo: 'mapa', mi, si, chave, o, g, gi, tirar: () => { g.requisitos = g.requisitos.filter(x => x !== q); } }); }); }));
+  return r;
+}
+/* the actions on the variables: box actions and answers (remember, change), map triggers “Add / subtract / use a campaign variable”,
+   the counters that bring their count to the campaign */
+function acoesDasVariaveis() {
+  const r = [];
+  campanha.dialogos.forEach(d => { const n = noPorId(d.cena); if (!n) return;
+    (d.acoes || []).forEach(a => { if (a.action === 'remember' || a.action === 'variavel') r.push({ a, tipo: 'caixa', n, d, onde: rotuloDoNo(n) + ' · ' + tr('when a box is shown'), tirar: () => { d.acoes = d.acoes.filter(x => x !== a); } }); });
+    (d.options || []).forEach(o => {
+      if (o.lembrar && (o.lembrarNome || o.text)) r.push({ a: { action: 'remember', nome: o.lembrarNome || o.text }, resposta: o, tipo: 'caixa', n, d, onde: rotuloDoNo(n) + ' · ' + tr('answer “' + (o.text || '?') + '”'), tirar: () => { o.lembrar = false; delete o.lembrarNome; } });
+      (o.acoes || []).forEach(a => { if (a.action === 'remember' || a.action === 'variavel') r.push({ a, tipo: 'caixa', n, d, onde: rotuloDoNo(n) + ' · ' + tr('answer “' + (o.text || '?') + '”'), tirar: () => { o.acoes = o.acoes.filter(x => x !== a); } }); });
+    });
+  });
+  donosDaCampanha().forEach(({ mi, si, o, chave }) => todosGatilhos(o).forEach(g => { if (g.tipo === 'campaign_var') r.push({ a: g, tipo: 'mapa', mi, si, chave, o, gi: (o.gatilhos || []).indexOf(g), onde: nomeDoMapa(mi) + ' · ' + rotulo(o), tirar: () => { g.nome = ''; } }); }));
+  (campanha.missoes || []).forEach((m, mi) => (m.contadores || []).forEach(c => { if (c.campanha && c.campanha.nome) r.push({ a: c.campanha, tipo: 'contador', mi, c, onde: nomeDoMapa(mi) + ' · ' + tr('counter “' + c.nome + '” when the map is won'), tirar: () => { delete c.campanha; } }); }));
+  return r;
+}
+/* the marks {Name} in the texts of the boxes: the value of the variable when the box is shown */
+const RE_MARCA_VAR = /\{([^{}]+)\}/g;
+const ehMarcaDoJogo = s => /^(hero[1-4]|actor)$/i.test(s);
+function marcasDoTexto(t) { const r = []; String(t || '').replace(RE_MARCA_VAR, (m, n) => { if (!ehMarcaDoJogo(n) && !r.includes(n)) r.push(n); return m; }); return r; }
+function textoComValores(t) { const es = new Set(escolhasDaCampanha()); return String(t || '').replace(RE_MARCA_VAR, (m, n) => es.has(n) ? '{var:' + varEscolha(n) + '}' : m); }
 
 // ------------------------------------------------------------ Story variables (the choices the campaign remembers)
 /* every holder of triggers in the maps of the campaign (objects, monsters, counters), with where it is */
@@ -350,35 +477,45 @@ function donosDaCampanha() {
   return r;
 }
 const nomeDoMapa = mi => { const n = campanha.nos.find(x => x.missao === mi); return n ? rotuloDoNo(n) + (nomeDoNo(n) !== rotuloDoNo(n) ? ' · ' + nomeDoNo(n) : '') : 'Map ' + (mi + 1); };
-/* what sets a choice (answers, actions of boxes) and what depends on it (cards, map triggers) */
+/* what sets or changes a variable (answers, actions of boxes, map triggers, counters) and what depends on it (cards,
+   Crossroads exits, map triggers, other conditions, the texts that show its value) */
+const usaVariavel = (c, nome) => c && (c.nome === nome || c.outra === nome || (c.entre || []).includes(nome));
 function usosDaEscolha(nome) {
   const define = [], usa = [];
-  campanha.dialogos.forEach(d => { const n = noPorId(d.cena); if (!n) return;
-    (d.acoes || []).forEach(a => { if (a.action === 'remember' && a.nome === nome) define.push({ tipo: 'caixa', n, d, texto: rotuloDoNo(n) + ' · when a box is shown' }); });
-    (d.options || []).forEach(o => {
-      if (o.lembrar && (o.lembrarNome || o.text) === nome) define.push({ tipo: 'caixa', n, d, texto: rotuloDoNo(n) + ' · answer “' + (o.text || '?') + '”' });
-      (o.acoes || []).forEach(a => { if (a.action === 'remember' && a.nome === nome) define.push({ tipo: 'caixa', n, d, texto: rotuloDoNo(n) + ' · answer “' + (o.text || '?') + '”' }); });
-    });
-  });
-  campanha.nos.forEach(n => { if (n.seEscolha && n.seEscolha.nome === nome) usa.push({ tipo: 'no', n, texto: rotuloDoNo(n) + ' · only if ' + (n.seEscolha.sim === false ? 'not chosen' : 'chosen') }); });
-  donosDaCampanha().forEach(({ mi, si, o, chave }) => (o.gatilhos || []).forEach((g, gi) => (g.requisitos || []).forEach(r => {
-    if (r.tipo === 'choice' && r.nome === nome) usa.push({ tipo: 'mapa', mi, si, chave, o, gi, texto: nomeDoMapa(mi) + ' · ' + rotulo(o) + ' · ' + (GATILHO[g.tipo]?.nome || g.tipo) + (r.sim === false ? ' (if not chosen)' : ' (if chosen)') });
-  })));
+  acoesDasVariaveis().forEach(u => { if (u.a.nome === nome || u.a.outra === nome) define.push({ ...u, texto: u.onde + (u.a.action === 'remember' ? '' : ' (' + resumoMudanca(u.a) + ')') }); });
+  condicoesDaCampanha().forEach(u => { if (!usaVariavel(u.c, nome)) return;
+    const t = textoCondicao(u.c);
+    usa.push({ ...u, texto: u.tipo === 'mapa' ? nomeDoMapa(u.mi) + ' · ' + rotulo(u.o) + ' · ' + tr(GATILHO[u.g.tipo]?.nome || u.g.tipo) + ' (' + t + ')' : u.tipo === 'ramo' ? rotuloDoNo(u.n) + ' · ' + tr('exit ' + (u.k + 1)) + ' (' + t + ')' : rotuloDoNo(u.n) + ' · ' + tr('only if') + ' ' + t }); });
+  campanha.dialogos.forEach(d => { const n = noPorId(d.cena); if (n && [d.text, d.title, ...(d.options || []).map(o => o.text)].some(t => marcasDoTexto(t).includes(nome))) usa.push({ tipo: 'caixa', n, d, texto: rotuloDoNo(n) + ' · ' + tr('shows its value') }); });
   return { define, usa };
 }
+/* “+ 2”, “− 1”, “= 0”, “+ Honour” (a change of a number variable), “yes”/“no” for a yes/no one */
+function resumoMudanca(a) {
+  const op = a.op || a.acao || 'add';
+  if (!ehNumero(a.nome) && a.action !== 'variavel') return op === 'set' && !+a.n ? tr('no') : tr('yes');
+  return op === 'addvar' ? '+ ' + (a.outra || '?') : (op === 'sub' ? '− ' : op === 'set' ? '= ' : '+ ') + Math.max(0, +(a.n ?? 1) || 0);
+}
 function renomearEscolha(velho, novo) {
-  const troca = a => { if (a.action === 'remember' && a.nome === velho) a.nome = novo; };
-  campanha.dialogos.forEach(d => { (d.acoes || []).forEach(troca); (d.options || []).forEach(o => { if (o.lembrar && (o.lembrarNome || o.text) === velho) { if (novo) o.lembrarNome = novo; else { o.lembrar = false; delete o.lembrarNome; } } (o.acoes || []).forEach(troca); }); });
-  campanha.nos.forEach(n => { if (n.seEscolha && n.seEscolha.nome === velho) { if (novo) n.seEscolha.nome = novo; else delete n.seEscolha; } });
-  donosDaCampanha().forEach(({ o }) => (o.gatilhos || []).forEach(g => { if (!g.requisitos) return; if (novo) g.requisitos.forEach(r => { if (r.tipo === 'choice' && r.nome === velho) r.nome = novo; }); else g.requisitos = g.requisitos.filter(r => !(r.tipo === 'choice' && r.nome === velho)); }));
-  if (!novo) campanha.dialogos.forEach(d => { d.acoes = (d.acoes || []).filter(a => !(a.action === 'remember' && a.nome === velho)); (d.options || []).forEach(o => { o.acoes = (o.acoes || []).filter(a => !(a.action === 'remember' && a.nome === velho)); }); });
+  acoesDasVariaveis().forEach(u => {
+    if (u.a.nome === velho) { if (novo) { if (u.resposta) u.resposta.lembrarNome = novo; else u.a.nome = novo; } else u.tirar(); }
+    else if (u.a.outra === velho) { if (novo) u.a.outra = novo; else u.tirar(); }
+  });
+  condicoesDaCampanha().forEach(u => { const c = u.c;
+    if (c.nome === velho) { if (novo) c.nome = novo; else u.tirar(); return; }
+    if (c.outra === velho) { if (novo) c.outra = novo; else u.tirar(); return; }
+    if ((c.entre || []).includes(velho)) c.entre = novo ? c.entre.map(x => x === velho ? novo : x) : c.entre.filter(x => x !== velho);
+  });
+  // (the texts that show its value follow the new name; deleted, the mark stays and the box warns about it)
+  if (novo) { const tro = t => String(t || '').split('{' + velho + '}').join('{' + novo + '}');
+    campanha.dialogos.forEach(d => { if (d.text) d.text = tro(d.text); if (d.title) d.title = tro(d.title); (d.options || []).forEach(o => { if (o.text) o.text = tro(o.text); }); }); }
   const c = campanha.escolhas.find(x => x.nome === velho); if (c) { if (novo) c.nome = novo; else campanha.escolhas = campanha.escolhas.filter(x => x !== c); }
 }
 function irParaUsoDaEscolha(u, fechar) {
   fechar();
   if (u.tipo === 'caixa') { abrirCaixas(u.n); caixaSel = u.d.id; renderC(); return; }
-  if (u.tipo === 'no') { mudarAba('fluxo'); noSel = u.n.id; renderC(); return; }
+  if (u.tipo === 'no' || u.tipo === 'ramo') { mudarAba('fluxo'); noSel = u.n.id; renderC(); return; }
   trocarMissao(u.mi); fecharCampanha();
+  if (u.tipo === 'contador') { abrirContadores(); return; }
   if (typeof u.chave === 'string' && u.chave.startsWith('C:')) { abrirConsequencia(u.o, u.gi); return; }
   irParaDono(u.si, u.chave); gatAberto = 'gatilhos' + u.gi; renderPropriedades();
 }
@@ -390,16 +527,32 @@ function abrirVariaveis() {
   const usos = campanha.escolhas.map(x => usosDaEscolha(x.nome));
   const chip = (u, i, k, lado) => `<button class="sm usoCont" data-v="${i}" data-lado="${lado}" data-k="${k}" title="Open it">${esc(u.texto)}</button>`;
   const linhas = campanha.escolhas.map((x, i) => { const { define, usa } = usos[i];
-    return `<div class="contador"><div class="linha"><input data-vn="${i}" value="${esc(x.nome)}" title="Rename: every answer, card and map trigger that uses it follows"><button class="sm" data-vx="${i}" title="Delete">✕</button></div>
+    return `<div class="contador"><div class="linha"><input data-vn="${i}" value="${esc(x.nome)}" title="Rename: every answer, card and map trigger that uses it follows"><select data-vtipo="${i}" title="${esc(tr('Yes or no: a choice the party made. Number: a score that answers, boxes and map triggers add to or take from.'))}"><option value="">${esc(tr('Yes or no'))}</option><option value="num" ${x.numero ? 'selected' : ''}>${esc(tr('Number'))}</option></select><button class="sm" data-vx="${i}" title="Delete">✕</button></div>
+      ${x.numero ? `<div class="linha"><label class="campo" style="margin:0">${esc(tr('Starts at'))} <input data-vini="${i}" type="number" min="0" value="${Math.max(0, +x.inicial || 0)}" style="width:64px"></label><label class="campo" style="margin:0" title="${esc(tr('The number never goes above this. Empty: no limit. It never goes below 0.'))}">${esc(tr('Maximum'))} <input data-vmax="${i}" type="number" min="0" value="${+x.maximo || ''}" placeholder="${esc(tr('none'))}" style="width:64px"></label></div>` : ''}
       <input data-vnota="${i}" value="${esc(x.nota || '')}" placeholder="What it means (a note for you)" style="margin-top:6px">
-      <div class="usos"><span class="rotuloTx">Set by</span> ${define.map((u, k) => chip(u, i, k, 'define')).join('') || '<span class="ajuda aviso">nothing sets it yet: tick “Remember this answer” in a question box and give it this name. Until then “chose” is never true.</span>'}</div>
+      <div class="usos"><span class="rotuloTx">Set by</span> ${define.map((u, k) => chip(u, i, k, 'define')).join('') || (x.numero ? `<span class="ajuda aviso">${esc(tr('nothing changes it yet: in a box or an answer, add “Change a number variable”; in a map, the trigger “Add / subtract / use a campaign variable”, or a counter brought to the campaign.'))}</span>` : '<span class="ajuda aviso">nothing sets it yet: tick “Remember this answer” in a question box and give it this name. Until then “chose” is never true.</span>')}</div>
       <div class="usos"><span class="rotuloTx">Used by</span> ${usa.map((u, k) => chip(u, i, k, 'usa')).join('') || '<span class="ajuda">nothing depends on it yet: pick it in “Only if” of a card, or as the requirement “A choice in the campaign” of a map trigger.</span>'}</div></div>`; }).join('');
-  janelaFlutuante('janelaVariaveis', 'Story variables', `<p class="ajuda">The choices the campaign remembers from one map to the next: spared the bandit, sided with the rebels, took the cursed ring… A choice is set when the party picks an answer ticked “Remember this answer” (or by a “Remember a choice” action) and stays for the rest of the campaign. Cards of the story flow and triggers of the maps can then happen only if the party made it, or did not.</p>
+  janelaFlutuante('janelaVariaveis', 'Story variables', `<div class="explicaVars">
+    <p class="ajuda">${esc(tr('Story variables keep what happened in the campaign, from one map to the next. They stay hidden from the players and let the story change with what the party did.'))}</p>
+    <ul class="ajuda">
+      <li>${esc(tr('Yes or no: a choice of the party, such as “Spared the bandit”. It becomes “yes” when the party picks an answer ticked “Remember this answer”.'))}</li>
+      <li>${esc(tr('Number: a score, such as Honour or Villagers saved. Answers, boxes and map triggers add points to it or take them away. The lowest it goes is 0.'))}</li>
+    </ul>
+    <p class="ajuda">${esc(tr('To use one, pick it in “Only if” of a card, in an exit of a Crossroads or in the requirement of a map trigger. Example: the map “Tower” appears only if Honour is at least 3.'))}</p>
+    <p class="ajuda">${esc(tr('To show its value to the players, use “Insert a variable” in the text of a box.'))}</p></div>
     ${linhas || '<p class="ajuda">No variable yet.</p>'}
     <div class="linha" style="margin-top:10px"><input id="vn_novo" placeholder="New variable (Spared the bandit, Sided with the rebels…)"><button class="sm primario" id="vn_mais">+ New variable</button></div>`, (el, fechar) => {
     const volta = () => { abrirVariaveis(); renderC(); };
     el.querySelectorAll('[data-vn]').forEach(inp => inp.onchange = () => { const x = campanha.escolhas[+inp.dataset.vn]; const novo = inp.value.trim(); if (!novo) { inp.value = x.nome; return; } if (novo !== x.nome && campanha.escolhas.some(y => y.nome === novo)) { aviso('There is already a variable called ' + novo + '.'); inp.value = x.nome; return; } renomearEscolha(x.nome, novo); volta(); });
     el.querySelectorAll('[data-vnota]').forEach(inp => inp.oninput = () => { campanha.escolhas[+inp.dataset.vnota].nota = inp.value; });
+    el.querySelectorAll('[data-vtipo]').forEach(sl => sl.onchange = () => { const x = campanha.escolhas[+sl.dataset.vtipo];
+      if (sl.value) { x.numero = true; x.inicial = x.inicial || 0; }
+      else { const us = usosDaEscolha(x.nome); const contas = us.define.filter(u => u.a.action === 'variavel' || u.a.tipo === 'campaign_var' || u.tipo === 'contador').length + us.usa.filter(u => u.c && (u.c.op || u.c.outra === x.nome || (u.c.entre || []).includes(x.nome))).length;
+        if (contas && !confirm(tr('Make “' + x.nome + '” a yes/no variable? ' + contas + ' change(s) or condition(s) with numbers stop working until you fix them.'))) { sl.value = 'num'; return; }
+        delete x.numero; delete x.inicial; delete x.maximo; condicoesDaCampanha().forEach(u => { if (u.c.nome === x.nome && u.c.op) { delete u.c.op; delete u.c.n; delete u.c.outra; delete u.c.entre; u.c.sim = true; } }); }
+      volta(); });
+    el.querySelectorAll('[data-vini]').forEach(inp => inp.onchange = () => { const x = campanha.escolhas[+inp.dataset.vini]; x.inicial = Math.max(0, +inp.value || 0); if (+x.maximo && x.inicial > x.maximo) x.inicial = x.maximo; volta(); });
+    el.querySelectorAll('[data-vmax]').forEach(inp => inp.onchange = () => { const x = campanha.escolhas[+inp.dataset.vmax]; const m = Math.max(0, +inp.value || 0); if (m) x.maximo = m; else delete x.maximo; if (m && +x.inicial > m) x.inicial = m; volta(); });
     el.querySelectorAll('[data-vx]').forEach(b => b.onclick = () => { const x = campanha.escolhas[+b.dataset.vx]; const { define, usa } = usos[+b.dataset.vx];
       if ((define.length || usa.length) && !confirm('Delete “' + x.nome + '”? ' + (define.length ? define.length + ' answer(s) or action(s) stop remembering it. ' : '') + (usa.length ? usa.length + ' card(s) or trigger requirement(s) lose this condition.' : ''))) return;
       renomearEscolha(x.nome, ''); volta(); });
@@ -408,19 +561,35 @@ function abrirVariaveis() {
     $('#vn_mais').onclick = novo; $('#vn_novo').onkeydown = e => { if (e.key === 'Enter') novo(); };
   }, true);
 }
+/* v377: the avisos of the variables (shown in the check of the campaign): a condition that can never hold, a number nothing
+   changes, a mark in a text that is no variable */
+function avisosDasVariaveis() {
+  if (!campanha) return [];
+  const p = [], es = new Set(escolhasDaCampanha());
+  (campanha.escolhas || []).forEach(x => { const us = usosDaEscolha(x.nome);
+    if (x.numero && !us.define.length && us.usa.length) p.push(tr('Story variable “' + x.nome + '”: nothing changes it, so it stays at ' + (+x.inicial || 0)));
+    us.usa.forEach(u => { const c = u.c; if (!c || c.nome !== x.nome || !c.op) return;
+      if (+x.maximo && (c.op === 'ge' || c.op === 'eq') && +c.n > +x.maximo) p.push(tr('Story variable “' + x.nome + '”: a condition asks for more than its maximum (' + x.maximo + ')')); }); });
+  campanha.nos.filter(n => n.tipo === 'branch').forEach(n => (n.saidas || []).forEach((s, k) => { if (!condValida(s.cond)) p.push(tr(rotuloDoNo(n) + ': exit ' + (k + 1) + ' has no condition, so it never happens')); }));
+  campanha.dialogos.forEach(d => { const n = noPorId(d.cena); if (!n) return; [d.text, d.title, ...(d.options || []).map(o => o.text)].forEach(t => marcasDoTexto(t).forEach(m => { if (!es.has(m)) p.push(tr(rotuloDoNo(n) + ': “{' + m + '}” in a text is no story variable')); })); });
+  return [...new Set(p)];
+}
 function renderCaixaProps(el, d) {
   if (!d) { el.innerHTML = '<div class="bloco"><h2>Box</h2><p class="ajuda">Pick a box on the left, or add one.</p></div>'; return; }
   const n = noPorId(d.cena); const outras = caixasDaCena(n).filter(x => x.id !== d.id);
-  const acoesHtml = (lista, chave) => `<div id="${chave}">${lista.map((a, i) => `<div class="linha acaoCx"><span>${esc(ACOES_CAIXA.find(x => x[0] === a.action)?.[1] || a.action)}: <b>${esc(a.action === 'unlockNode' || a.action === 'completeNode' ? (noPorId(a.node) ? rotuloDoNo(noPorId(a.node)) + (nomeDoNo(noPorId(a.node)) !== rotuloDoNo(noPorId(a.node)) ? ' · ' + nomeDoNo(noPorId(a.node)) : '') : '?') : a.action === 'giveItem' ? nomeItem(a.item) : a.action === 'giveMaterials' ? a.n + ' material(s)' : a.action === 'remember' ? '“' + a.nome + '”' : a.var + ' = ' + a.value)}</b></span><button class="sm" data-acx="${chave}:${i}">✕</button></div>`).join('')}<div class="linha"><select data-acadd="${chave}"><option value="">+ what happens…</option>${ACOES_CAIXA.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select></div></div>`;
+  const linhaVar = (a, chave, i) => { const outras = variaveisNumero().filter(x => x !== a.nome); const op = a.op || 'add';
+    return `<div class="linha acaoCx acaoVar"><span>${esc(tr('Change a number variable'))}: <b>“${esc(a.nome || '?')}”</b></span><select data-avop="${chave}:${i}"><option value="add" ${op === 'add' ? 'selected' : ''}>${esc(tr('Add'))}</option><option value="sub" ${op === 'sub' ? 'selected' : ''}>${esc(tr('Take away'))}</option><option value="set" ${op === 'set' ? 'selected' : ''}>${esc(tr('Set to'))}</option>${outras.length || op === 'addvar' ? `<option value="addvar" ${op === 'addvar' ? 'selected' : ''}>${esc(tr('Add another variable'))}</option>` : ''}</select>${op === 'addvar' ? `<select data-avoutra="${chave}:${i}"><option value="">${esc(tr('— pick —'))}</option>${outras.map(x => `<option value="${esc(x)}" ${a.outra === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>` : `<input data-avn="${chave}:${i}" type="number" min="0" value="${Math.max(0, +(a.n ?? 1) || 0)}" style="width:56px">`}<button class="sm" data-acx="${chave}:${i}">✕</button></div>`; };
+  const acoesHtml = (lista, chave) => `<div id="${chave}">${lista.map((a, i) => a.action === 'variavel' ? linhaVar(a, chave, i) : `<div class="linha acaoCx"><span>${esc(ACOES_CAIXA.find(x => x[0] === a.action)?.[1] || a.action)}: <b>${esc(a.action === 'unlockNode' || a.action === 'completeNode' ? (noPorId(a.node) ? rotuloDoNo(noPorId(a.node)) + (nomeDoNo(noPorId(a.node)) !== rotuloDoNo(noPorId(a.node)) ? ' · ' + nomeDoNo(noPorId(a.node)) : '') : '?') : a.action === 'giveItem' ? nomeItem(a.item) : a.action === 'giveMaterials' ? a.n + ' material(s)' : a.action === 'remember' ? '“' + a.nome + '”' : a.var + ' = ' + a.value)}</b></span><button class="sm" data-acx="${chave}:${i}">✕</button></div>`).join('')}<div class="linha"><select data-acadd="${chave}"><option value="">+ what happens…</option>${ACOES_CAIXA.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select></div></div>`;
   const video = d.type === 'video';
   el.innerHTML = `<div class="bloco"><h2>Box${d.id === n.dialogo ? ' (first)' : ''}</h2>
     <label class="campo">Kind <select id="d_tipo"><option value="normal" ${d.type === 'normal' || !d.type ? 'selected' : ''}>Plain box</option><option value="choice" ${d.type === 'choice' ? 'selected' : ''}>Question (the players choose an answer)</option><option value="video" ${video ? 'selected' : ''}>Video (your own film)</option></select></label>
     ${video ? `<div id="d_video"></div><p class="ajuda">The scene goes on with the next box when the film ends.</p>` : `
-    <label class="campo">Speaker <select id="d_speaker"><option value="">Narrator (no portrait)</option><optgroup label="${esc(tr('Heroes of the party'))}">${HEROIS_DA_CAMPANHA.map(x => `<option value="${x.id}" ${d.speaker === x.id ? 'selected' : ''}>${esc(tr(x.nome))}</option>`).join('')}</optgroup>${PERSONAGENS_B().map(p => `<option value="${esc(p.id)}" ${d.speaker === p.id ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</select>${PERSONAGENS_B().length ? '' : '<small class="ajuda">No NPCs yet: import or create them in the NPCs tab of the Workshop (top bar of the rooms screen).</small>'}</label>
+    <label class="campo">Speaker <select id="d_speaker"><option value="">Narrator (no portrait)</option><optgroup label="${esc(tr('Heroes of the party'))}">${HEROIS_DA_CAMPANHA.map(x => `<option value="${x.id}" ${d.speaker === x.id ? 'selected' : ''}>${esc(tr(x.nome))}</option>`).join('')}</optgroup>${PERSONAGENS_B().map(p => `<option value="${esc(p.id)}" ${d.speaker === p.id ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</select>${PERSONAGENS_B().length ? '' : '<small class="ajuda">No NPCs yet. Import or create them in the “NPCs” tab of the Workshop (top bar of the rooms screen).</small>'}</label>
     <label class="campo">Title (optional) <input id="d_title" value="${esc(d.title || '')}"></label>
     <label class="campo">Text <textarea id="d_texto" rows="5">${esc(d.text || '')}</textarea></label>
+    ${escolhasDaCampanha().length ? `<div class="barraTx"><span>${esc(tr('Insert a variable:'))}</span>${escolhasDaCampanha().map(v => `<button class="sm fichaTx" data-insvar="${esc(v)}" title="${esc(tr('In the game, the text shows its value here'))}">${esc(v)}</button>`).join('')}</div>` : ''}<div class="marcasTx ajuda" id="d_marcas"></div>
     <label class="campo">Others in the scene <select id="d_cast"><option value="">+ add…</option>${HEROIS_DA_CAMPANHA.filter(x => x.id !== d.speaker && !d.cast.includes(x.id)).map(x => `<option value="${x.id}">${esc(tr(x.nome))}</option>`).join('')}${PERSONAGENS_B().filter(p => p.id !== d.speaker && !d.cast.includes(p.id)).map(p => `<option value="${esc(p.id)}">${esc(p.nome)}</option>`).join('')}</select></label>
-    ${/^@hero/.test(d.speaker || '') || (d.cast || []).some(x => /^@hero/.test(x)) ? `<p class="ajuda">${esc(tr('Hero 1 is the first hero of the party, hero 2 the second, and so on. With fewer heroes, hero 3 speaks as hero 1 and hero 4 as hero 2. {hero1} to {hero4} in the text become their names.'))}</p>` : ''}
+    ${/^@hero/.test(d.speaker || '') || (d.cast || []).some(x => /^@hero/.test(x)) ? `<p class="ajuda">${esc(tr('Hero 1 is the first hero of the party, hero 2 the second, and so on. With fewer heroes, hero 3 speaks as hero 1 and hero 4 as hero 2. In the text, {hero1} to {hero4} become the heroes’ names.'))}</p>` : ''}
     <div>${d.cast.map(id => `<span class="tag">${esc(nomePersonagem(id))} <a href="#" data-delcast="${esc(id)}">✕</a></span>`).join('')}</div>
     <label class="campo">Background <select id="d_bg">${FUNDOS.map(f => `<option value="${f.id}" ${(d.background ?? FUNDO_PADRAO) === f.id ? 'selected' : ''}>${esc(f.name_en)}</option>`).join('')}</select></label>`}
     ${d.type === 'choice' ? '<div class="sub">Answers <button class="sm" id="d_addop">+ Answer</button></div><div id="d_ops"></div>' : ''}
@@ -430,22 +599,37 @@ function renderCaixaProps(el, d) {
   else {
   $('#d_speaker').onchange = e => { d.speaker = e.target.value; d.cast = d.cast.filter(c => c !== d.speaker); renderC(); };
   $('#d_title').oninput = e => { d.title = e.target.value; renderEsqC(); desenharC(); };
-  $('#d_texto').oninput = e => { d.text = e.target.value; desenharC(); };
+  const es = new Set(escolhasDaCampanha());
+  const pintarMarcas = () => { const ms = marcasDoTexto(d.text); $('#d_marcas').innerHTML = ms.map(m => es.has(m) ? `<span class="ok">✓ <b data-sem-traducao>{${esc(m)}}</b> ${esc(tr('shows its value'))}</span>` : `<span class="ruim">⚠ <b data-sem-traducao>{${esc(m)}}</b> ${esc(tr('is no story variable'))}</span>`).join(' · '); };
+  $('#d_texto').oninput = e => { d.text = e.target.value; desenharC(); pintarMarcas(); }; pintarMarcas();
+  el.querySelectorAll('[data-insvar]').forEach(b => b.onclick = () => { const t = $('#d_texto'); const a = t.selectionStart ?? t.value.length, z = t.selectionEnd ?? a; const m = '{' + b.dataset.insvar + '}';
+    t.value = t.value.slice(0, a) + m + t.value.slice(z); d.text = t.value; t.focus(); t.selectionStart = t.selectionEnd = a + m.length; desenharC(); pintarMarcas(); });
   $('#d_cast').onchange = e => { if (e.target.value) d.cast.push(e.target.value); renderC(); };
   el.querySelectorAll('[data-delcast]').forEach(a => a.onclick = ev => { ev.preventDefault(); d.cast = d.cast.filter(c => c !== a.dataset.delcast); renderC(); });
   $('#d_bg').onchange = e => { d.background = +e.target.value; };
   }
   $('#d_tipo').onchange = e => { d.type = e.target.value; if (d.type === 'choice') { const seg = campanha.dialogos.find(x => (x.depois || []).includes(d.id)); if (!d.options.length) d.options = [{ text: '', next: seg ? seg.id : '', acoes: [] }, { text: '', next: '', acoes: [] }]; if (seg) seg.depois = seg.depois.filter(x => x !== d.id); } else { d.options.forEach(o => { if (o.next && caixaPorId(o.next) && !campanha.dialogos.some(x => (x.depois || []).includes(d.id))) { caixaPorId(o.next).depois.push(d.id); } }); } renderC(); };
-  const ligarAcoes = () => el.querySelectorAll('[data-acadd]').forEach(s => s.onchange = () => { const v = s.value; if (!v) return; const [chave, idx] = s.dataset.acadd.split(':'); const lista = chave === 'acoes' ? d.acoes : d.options[+idx].acoes;
+  const ligarAcoes = () => el.querySelectorAll('[data-acadd]').forEach(s => s.onchange = () => { const v = s.value; if (!v) return; const ref = s.dataset.acadd; const chave = ref === 'acoes' ? 'acoes' : 'op', idx = ref === 'acoes' ? undefined : ref.split('-')[1]; const lista = chave === 'acoes' ? d.acoes : d.options[+idx].acoes;
     if (v === 'unlockNode' || v === 'completeNode') { const alvos = campanha.nos.filter(ehAncora); if (!alvos.length) return aviso('No map or waypoint to unlock.'); escolherOpcao(v === 'unlockNode' ? 'Unlock which one?' : 'Complete which one?', alvos.map(a => ({ id: a.id, titulo: rotuloDoNo(a) + (nomeDoNo(a) !== rotuloDoNo(a) ? ' · ' + nomeDoNo(a) : ''), sub: MARCADORES.find(m => m[0] === a.marcador)?.[1] })), id => { lista.push({ action: v, node: id }); renderDirC(); }); }
     else if (v === 'giveItem') { const its = ITENS_B().map(i => ({ id: i.id, titulo: i.nome, sub: 'workshop item' })); if (!its.length) return aviso('Only workshop items can be given: import or create them in the Workshop first.'); escolherOpcao('Give which item?', its, id => { lista.push({ action: 'giveItem', item: id, qty: 1 }); renderDirC(); }); }
     else if (v === 'giveMaterials') { const nn = +prompt('How many crafting materials?', '1') || 1; lista.push({ action: 'giveMaterials', n: nn }); renderDirC(); }
+    else if (v === 'variavel') { const nums = variaveisNumero();
+      const poe = nome => { lista.push({ action: 'variavel', nome, op: 'add', n: 1 }); renderDirC(); };
+      escolherOpcao(tr('Change which variable?'), [...nums.map(x => ({ id: x, titulo: x, sub: variavelDe(x)?.nota || tr('a number of the campaign') })), { id: '', titulo: tr('+ New number variable…'), sub: tr('Honour, Fear, Villagers saved…') }], id => {
+        if (id) return poe(id);
+        const nome = (prompt(tr('The name of the new number variable (Honour, Fear, Villagers saved…):')) || '').trim(); if (!nome) return;
+        if (campanha.escolhas.some(x => x.nome === nome) && !ehNumero(nome)) return aviso(tr('There is already a yes/no variable called “' + nome + '”: change its kind in Story variables, or pick another name.'));
+        if (!campanha.escolhas.some(x => x.nome === nome)) campanha.escolhas.push({ nome, nota: '', numero: true, inicial: 0 }); poe(nome); }); }
     else if (v === 'remember') { const nome = (prompt('What does the campaign remember? A short phrase, like “Spared the bandit”.' + (escolhasDaCampanha().length ? '\nStory variables: ' + escolhasDaCampanha().join(' · ') : ''), chave === 'acoes' ? '' : (d.options[+idx].text || '')) || '').trim(); if (!nome) return; lista.push({ action: 'remember', nome }); renderDirC(); }
     s.value = ''; });
-  const ligarRemocoes = () => el.querySelectorAll('[data-acx]').forEach(b => b.onclick = () => { const [chave, i] = b.dataset.acx.split(':'); const [k, idx] = chave.split('-'); (k === 'acoes' ? d.acoes : d.options[+idx].acoes).splice(+i, 1); renderDirC(); });
+  const acaoDe = ref => { const [chave, i] = ref.split(':'); const [k, idx] = chave.split('-'); return (k === 'acoes' ? d.acoes : d.options[+idx].acoes)[+i]; };
+  const ligarRemocoes = () => { el.querySelectorAll('[data-acx]').forEach(b => b.onclick = () => { const [chave, i] = b.dataset.acx.split(':'); const [k, idx] = chave.split('-'); (k === 'acoes' ? d.acoes : d.options[+idx].acoes).splice(+i, 1); renderDirC(); });
+    el.querySelectorAll('[data-avop]').forEach(sl => sl.onchange = () => { const a = acaoDe(sl.dataset.avop); a.op = sl.value; if (a.op !== 'addvar') delete a.outra; renderDirC(); });
+    el.querySelectorAll('[data-avn]').forEach(inp => inp.onchange = () => { acaoDe(inp.dataset.avn).n = Math.max(0, +inp.value || 0); });
+    el.querySelectorAll('[data-avoutra]').forEach(sl => sl.onchange = () => { acaoDe(sl.dataset.avoutra).outra = sl.value; }); };
   const ops = $('#d_ops'); if (ops) {
     const pinta = () => { ops.innerHTML = ''; d.options.forEach((op, i) => { const dv = document.createElement('div'); dv.className = 'cartao';
-      dv.innerHTML = `<div class="linha"><input data-op="text" value="${esc(op.text || '')}" placeholder="Answer ${i + 1}"><button class="sm" data-rm="${i}">✕</button></div><p class="ajuda">Then: <b>${op.next && caixaPorId(op.next) ? esc(caixaPorId(op.next).title || (caixaPorId(op.next).text || '').slice(0, 24) || 'a box') : 'end of the scene'}</b> (drag from the answer’s ● on the canvas)</p><label class="chk"><input type="checkbox" data-lembra ${op.lembrar ? 'checked' : ''}> Remember this answer</label>${op.lembrar ? `<input data-lembranome list="dl_escolhas" value="${esc(op.lembrarNome || '')}" placeholder="${esc(op.text || 'Answer ' + (i + 1))}" title="How the campaign calls this choice (empty: the answer’s text). Pick one of the Story variables or write a new name."><datalist id="dl_escolhas">${escolhasDaCampanha().map(n => `<option value="${esc(n)}">`).join('')}</datalist><p class="ajuda">Later, cards, scenes and map triggers can happen only if the party chose it (“Only if”).</p>` : ''}${acoesHtml(op.acoes, 'op-' + i)}`;
+      dv.innerHTML = `<div class="linha"><input data-op="text" value="${esc(op.text || '')}" placeholder="Answer ${i + 1}"><button class="sm" data-rm="${i}">✕</button></div><p class="ajuda">Then: <b>${op.next && caixaPorId(op.next) ? esc(caixaPorId(op.next).title || (caixaPorId(op.next).text || '').slice(0, 24) || 'a box') : 'end of the scene'}</b> (drag from the answer’s ● on the canvas)</p><label class="chk"><input type="checkbox" data-lembra ${op.lembrar ? 'checked' : ''}> Remember this answer</label>${op.lembrar ? `<input data-lembranome list="dl_escolhas" value="${esc(op.lembrarNome || '')}" placeholder="${esc(op.text || 'Answer ' + (i + 1))}" title="The name the campaign gives this choice. Left empty, it uses the answer’s text. Pick one of the “Story variables” or write a new name."><datalist id="dl_escolhas">${escolhasDaCampanha().map(n => `<option value="${esc(n)}">`).join('')}</datalist><p class="ajuda">Later, cards, scenes and map triggers can happen only if the party chose it (“Only if”).</p>` : ''}${acoesHtml(op.acoes, 'op-' + i)}`;
       dv.querySelector('[data-op="text"]').oninput = e => { op.text = e.target.value; desenharC(); };
       dv.querySelector('[data-rm]').onclick = () => { d.options.splice(i, 1); renderC(); };
       dv.querySelector('[data-lembra]').onchange = e => { op.lembrar = e.target.checked; renderDirC(); };
@@ -496,7 +680,7 @@ function abrirPopupLigacoes(n, cx, cy, modo = 'saida') {
   const r = $('#centroC').getBoundingClientRect();
   p.style.left = Math.min(r.width - 300, Math.max(8, cx - r.left + 12)) + 'px'; p.style.top = Math.min(r.height - 60, Math.max(40, cy - r.top - 10)) + 'px';
   p.innerHTML = `<b>${esc(nome(n))}</b><div class="subtitulo">${modo === 'saida' ? 'Leads to' : 'Comes after (arrows into it)'}</div>${linhas.map((l, k) => `<div class="linha setaLinha" data-k="${k}"><span>${esc(l.rot)}</span><button class="sm" data-del="${k}" title="Remove this arrow">✕</button></div>`).join('') || (modo === 'saida' ? '<p class="ajuda">nothing yet: drag from the ● onto another card</p>' : '<p class="ajuda">nothing: available from the start</p>')}
-    <p class="ajuda" style="margin-top:6px">${modo === 'saida' ? 'Point at a line to light its arrow. To see what comes into a card, click the tip of an arrow.' : 'Point at a line to light its arrow. To see where a card leads, click its ●.'}</p>
+    <p class="ajuda" style="margin-top:6px">${modo === 'saida' ? 'Point at a line to light up its arrow. Click the tip of an arrow to see what comes into a card.' : 'Point at a line to light its arrow. To see where a card leads, click its ●.'}</p>
     <div style="text-align:right;margin-top:6px"><button class="sm" id="popFechar">Close</button></div>`;
   $('#centroC').appendChild(p);
   const acender = l => { setaDestacada = l ? { de: l.de, para: l.para, op: l.op } : (linhas.length === 1 ? { de: linhas[0].de, para: linhas[0].para, op: linhas[0].op } : null); desenharC(); };
@@ -568,7 +752,7 @@ function desenharFluxo() {
     ctxC.fillStyle = '#23262d'; ctxC.strokeStyle = selecionado ? '#fff' : cor; ctxC.lineWidth = (selecionado ? 3 : 2) / vistaC.zoom;
     ctxC.beginPath(); ctxC.roundRect(x, y, CARTAO[0], CARTAO[1], 8); ctxC.fill(); ctxC.stroke();
     ctxC.fillStyle = cor; ctxC.beginPath(); ctxC.roundRect(x, y, 8, CARTAO[1], [8, 0, 0, 8]); ctxC.fill();
-    if (simples) { ctxC.fillStyle = '#eef0f4'; ctxC.font = `bold ${22 / vistaC.zoom > 40 ? 40 : 22}px system-ui`; ctxC.textAlign = 'center'; ctxC.fillText(rotuloDoNo(n), x + CARTAO[0] / 2 + 4, y + CARTAO[1] / 2 + 8); ctxC.textAlign = 'left'; }
+    if (simples) { ctxC.fillStyle = '#eef0f4'; let fs = 22 / vistaC.zoom > 40 ? 40 : 22; ctxC.font = `bold ${fs}px system-ui`; const lw = ctxC.measureText(tr(rotuloDoNo(n))).width; if (lw > CARTAO[0] - 18) { fs = Math.max(10, Math.floor(fs * (CARTAO[0] - 18) / lw)); ctxC.font = `bold ${fs}px system-ui`; } ctxC.textAlign = 'center'; ctxC.fillText(rotuloDoNo(n), x + CARTAO[0] / 2 + 4, y + CARTAO[1] / 2 + 8); ctxC.textAlign = 'left'; }
     else {
       let tx = x + 14;
       const cab = ehDialogo(n) ? caixaPorId(n.dialogo) : null; const face = cab && cab.speaker ? retratoImg('rosto:' + cab.speaker, rostoDe(cab.speaker)) : null;
@@ -577,7 +761,7 @@ function desenharFluxo() {
       ctxC.fillStyle = '#eef0f4'; ctxC.font = `bold 13px system-ui`; ctxC.fillText((nomeDoNo(n) === rotuloDoNo(n) ? '' : nomeDoNo(n)).slice(0, face ? 17 : 22), tx, y + 34);
       ctxC.fillStyle = COR.texto; ctxC.font = `10px system-ui`;
       const m = n.missao !== null && n.missao !== undefined ? campanha.missoes[n.missao] : null;
-      const linha3 = m ? (n.missao === missaoAtual ? '▸ ' : '') + m.salas.length + (m.salas.length === 1 ? L2(' room', ' sala') : L2(' rooms', ' salas')) + L2(' · progression ', ' · progressão ') + progressoDoMapa(m) : n.tipo === 'travel' ? L2('world map: ', 'mapa-múndi: ') + n.coords[0] + ', ' + n.coords[1] : caixasDaCena(n).length + L2(' box(es)', ' caixa(s)') + (cab && cab.speaker ? ' · ' + nomePersonagem(cab.speaker) : '');
+      const linha3 = m ? (n.missao === missaoAtual ? '▸ ' : '') + m.salas.length + (m.salas.length === 1 ? L2(' room', ' sala') : L2(' rooms', ' salas')) + L2(' · progression ', ' · progressão ') + progressoDoMapa(m) : n.tipo === 'travel' ? L2('world map: ', 'mapa-múndi: ') + n.coords[0] + ', ' + n.coords[1] : n.tipo === 'branch' ? tr((n.saidas || []).length + 1 + ' exits') : caixasDaCena(n).length + L2(' box(es)', ' caixa(s)') + (cab && cab.speaker ? ' · ' + nomePersonagem(cab.speaker) : '');
       ctxC.fillText(linha3.slice(0, face ? 20 : 26), tx, y + 52);
     }
     ctxC.fillStyle = COR.cobreClaro; ctxC.beginPath(); ctxC.arc(x + CARTAO[0], y + CARTAO[1] / 2, 7, 0, Math.PI * 2); ctxC.fill(); ctxC.strokeStyle = '#1b1d22'; ctxC.lineWidth = 1.5 / vistaC.zoom; ctxC.stroke();
@@ -620,10 +804,10 @@ function campoMapaProprio(el) {
   el.innerHTML = `<div class="sub">World map</div>${linha('Use my own world map…', mp, 'mapa')}
     ${mp ? `<label class="chk"><input type="checkbox" data-op="nuvens" ${m.nuvens !== false ? 'checked' : ''}> The game's clouds and birds over it</label>
     <label class="chk"><input type="checkbox" data-op="nevoa" ${m.nevoa ? 'checked' : ''}> The game's mist over it</label>` : ''}
-    <p class="ajuda">PNG or JPG, 16:9 (1820×1024 fits exactly). It covers the whole frame the game shows; the game's water, burnt land, place names and roads are hidden. The mist covers a fixed region of the game's own map (the Mistlands).</p>
+    <p class="ajuda">PNG or JPG, 16:9 (1820×1024 fits exactly). It covers the whole frame the game shows; it hides the game’s water, burnt land, place names and roads. The mist covers a fixed region of the game’s own map (the Mistlands).</p>
     ${mp ? camposDasEstradas() : ''}
     <div class="sub">City</div>${linha('Use my own city picture…', ci, 'cidade')}
-    <p class="ajuda">The background of the city screen (shops, armory, crafting stay where they are).</p>`;
+    <p class="ajuda">The background picture of the city screen. The shops, the armory and crafting stay in their places on top of it.</p>`;
   el.querySelectorAll('[data-img]').forEach(inp => inp.onchange = async e => {
     const f = e.target.files[0]; if (!f) return; const ext = (f.name.match(/\.(png|jpe?g)$/i) || [])[1]; if (!ext) return aviso('Use a PNG or JPG picture.');
     const qual = inp.dataset.img; const nome = (qual === 'mapa' ? 'worldmap-' : 'city-') + uid().slice(-6) + '.' + ext.toLowerCase().replace('jpeg', 'jpg');
@@ -645,7 +829,7 @@ function camposDasEstradas() {
   return `<div class="sub">Roads</div>
     <div class="linha"><button class="sm${estradaNova ? ' primario' : ''}" id="cEstrada">${estradaNova ? '✓ Finish this road' : '✎ Draw a road'}</button>${estradaNova ? '<button class="sm" id="cEstradaCancela">Cancel</button>' : ''}${es.length && !estradaNova ? '<button class="sm" id="cEstradasApagar">Delete all</button>' : ''}</div>
     <div class="listaEstradas">${es.map((e, i) => `<div class="linhaEstrada" data-estrada="${i}"><span>Road ${i + 1}</span><small>${e.length} points · ${compEstrada(e)} units</small><button class="sm" data-tira-estrada="${i}" title="Delete this road">✕</button></div>`).join('')}</div>
-    <p class="ajuda">${estradaNova ? 'Click along the road on the map. Double-click or Enter ends it, Backspace takes back the last point, Esc cancels.' : 'Click along a road on the map. Points snap to the places, to the city and to the other roads, so crossings join.'} The party travels along the roads; between places that no road joins, it goes in a straight line. With no roads at all, every trip is a straight line.</p>
+    <p class="ajuda">${estradaNova ? 'Click along the road on the map, point by point. To end it, double-click or press Enter. Backspace takes back the last point; Esc cancels.' : 'Click along a road on the map, point by point. The points snap to the places, to the city and to the other roads, so the crossings join.'} The party travels along the roads; between places that no road joins, it goes in a straight line. With no roads at all, every trip is a straight line.</p>
     <div class="sub">Where the city is</div>
     <div class="linha"><button class="sm${colocandoCidade ? ' primario' : ''}" id="cCidadeLugar">${colocandoCidade ? 'Click the map…' : 'Place the city…'}</button>${m.posCidade ? `<small>${m.posCidade.join(', ')}</small> <button class="sm" id="cCidadeVolta" title="Back to the game's spot">✕</button>` : `<small>${CIDADE_DO_JOGO ? "the game's spot" : "the game's spot (open the world map once in the game to see it here)"}</small>`}</div>
     <p class="ajuda">The city marker can also be dragged on the map.</p>`;
@@ -770,7 +954,7 @@ window.addEventListener('mouseup', ev => {
       if (abaC === 'caixas') {
         if (de.op !== null) { de.n.options[de.op].next = alvo.id; aviso('Answer ' + (de.op + 1) + ' leads to that box.'); }
         else if (de.n.type === 'choice') aviso('A question links through its answers: drag from an answer’s ●.');
-        else if (campanha.dialogos.some(x => x !== alvo && (x.depois || []).includes(de.n.id))) aviso('A plain box leads to one box only. Remove the existing link first (click its ●), or turn the box into a question to branch.');
+        else if (campanha.dialogos.some(x => x !== alvo && (x.depois || []).includes(de.n.id))) aviso('A plain box leads to one box only. To change where it leads, first remove its link (click its ●). To branch, turn the box into a question: each answer can lead to its own box.');
         else if (ligar(de.n, alvo)) aviso('Linked.');
       } else if (ligar(de.n, alvo)) aviso('“' + rotuloDoNo(alvo) + '” comes after “' + rotuloDoNo(de.n) + '”.');
     }
@@ -792,7 +976,16 @@ function copiarC(n) {
   areaC = { tipo: 'no', n: clone(n), caixas: ehDialogo(n) ? clone(caixasDaCena(n)) : [], missao: (n.tipo === 'map' || n.tipo === 'side') && campanha.missoes[n.missao] ? clone(campanha.missoes[n.missao]) : null };
   aviso(tr('Card copied: Ctrl+V pastes a copy (unlinked).'));
 }
-function colarC() {
+/* v372: duplicate a map or side quest of the campaign (the rooms and all): the copy comes after the same cards as the original
+   and keeps its condition, so it can be changed into a variation (and linked elsewhere). Ctrl+C / Ctrl+V gives an unlinked copy. */
+function duplicarNo(n) {
+  if (!n || !(n.tipo === 'map' || n.tipo === 'side') || !campanha.missoes[n.missao]) return;
+  const guarda = areaC;
+  areaC = { tipo: 'no', n: clone(n), caixas: [], missao: clone(campanha.missoes[n.missao]) };
+  colarC(true);
+  areaC = guarda;
+}
+function colarC(duplicar) {
   if (!areaC) return aviso(tr('Nothing copied yet (Ctrl+C on a card or a box).'));
   if (areaC.tipo === 'caixa') {
     if (abaC !== 'caixas' || !cenaAberta) return aviso(tr('A box is pasted into a scene: open the scene’s boxes.'));
@@ -803,8 +996,9 @@ function colarC() {
   }
   if (abaC === 'caixas') return aviso(tr('A card is pasted in the story flow.'));
   const o = areaC.n; const n = clone(o); const tipo = n.tipo;
-  n.id = idUnico(tipo + '-' + proximoNum(tipo), campanha.nos.map(x => x.id)); n.num = proximoNum(tipo); n.depois = [];
+  n.id = idUnico(tipo + '-' + proximoNum(tipo), campanha.nos.map(x => x.id)); n.num = proximoNum(tipo); n.depois = duplicar ? (o.depois || []).filter(noPorId) : [];
   if (n.nome) n.nome = n.nome + ' ' + tr('(copy)');
+  if (n.tipo === 'branch') { (n.saidas || []).forEach(x => { x.para = ''; }); n.outros = ''; }
   n.fluxo = n.fluxo ? [n.fluxo[0] + 40, n.fluxo[1] + 40] : null; n.coords = [(n.coords || [0, 0])[0] + 40, (n.coords || [0, 0])[1] - 40];
   areaC.n.fluxo = n.fluxo && n.fluxo.slice(); areaC.n.coords = n.coords.slice();
   if (areaC.missao) { const p = clone(areaC.missao); if (p.meta && p.meta.name) p.meta.name = p.meta.name + ' ' + tr('(copy)'); campanha.missoes.push(p); n.missao = campanha.missoes.length - 1; }
@@ -815,7 +1009,8 @@ function colarC() {
     areaC.caixas.forEach(d0 => { const d = clone(d0); d.id = novos.get(d0.id); d.cena = n.id; d.depois = (d.depois || []).map(x => novos.get(x)).filter(Boolean); (d.options || []).forEach(op => { op.next = novos.get(op.next) || ''; }); campanha.dialogos.push(d); });
     n.dialogo = novos.get(o.dialogo) || (caixasDaCena(n)[0] || {}).id || null; if (!n.dialogo) { const d = novaCaixa(n); n.dialogo = d.id; }
   }
-  noSel = n.id; renderC(); renderCabecalho(); aviso(tr('Card pasted (unlinked: link it in the flow).'));
+  noSel = n.id; if (duplicar) { n.fluxo = null; arrumarFluxo(false); } renderC(); renderCabecalho();   // (the copy gets a free place in the flow, beside the original)
+  aviso(tr(duplicar ? 'Map duplicated. The copy comes after the same cards as the original. To change it, open it with “Build the rooms”.' : 'Card pasted (unlinked: link it in the flow).'));
 }
 window.addEventListener('keydown', ev => {
   if ($('#telaCampanha').hidden || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || $('.modal')) return;
@@ -911,10 +1106,10 @@ function abrirInventario() {
       ${pilha ? `<span class="invQtd"><button class="sm" data-menos>−</button><input type="number" min="0" max="9999" value="${tem ? Math.max(1, +tem.qtd || 1) : 0}" data-qtd><button class="sm" data-mais>+</button></span>` : `<input type="checkbox" ${tem ? 'checked' : ''} data-marca>`}</div>`; };
   const skills = HEROIS_IDS.map(h => ({ h, nome: nomeDoHeroi(h), img: retratoDoHeroi(h), l: periciasParaPremio(h) })).filter(x => x.l.length);
   const total = () => `${v.itens.length} ${tr('items')} · ${v.pericias.length} ${tr('skills')} · ${v.ouro} ${tr('gold')}`;
-  janelaFlutuante('janelaInventario', 'Starting inventory', `<p class="ajuda">For a party of veterans: what it already holds when the campaign starts, won in earlier battles. The party receives it when the campaign begins. Tick the items it has; type how many of the materials. The item pools of the generated maps leave out the unique items the party already has, and the game never gives an item twice.</p>
+  janelaFlutuante('janelaInventario', 'Starting inventory', `<p class="ajuda">For a party of veterans: what it already holds when the campaign starts, won in earlier battles. The party receives all of it when the campaign begins. Tick the items it has and type how many of each material. The item pools of the generated maps leave out the unique items the party already has, and the game never gives the same item twice.</p>
     <div class="invTopo">
       <label class="invOuro"><span class="moeda">●</span> <span>Starting gold</span> <input type="number" min="0" id="inv_ouro" value="${v.ouro}"></label>
-      <label class="sm botaoArquivo" title="The game keeps its saves in Legends of the Dark_Data/SavedGames/&lt;slot&gt;/ (the newest .sav file of a slot)">📂 Import a save of the game (.sav)<input type="file" accept=".sav,.backup,.json,application/json" id="inv_sav" hidden></label>
+      <label class="sm botaoArquivo" title="Fills the starting inventory with the gold, items and materials of a save. The game keeps its saves in Legends of the Dark_Data/SavedGames/&lt;slot&gt;/: pick the newest .sav file of the slot.">📂 Import a save of the game (.sav)<input type="file" accept=".sav,.backup,.json,application/json" id="inv_sav" hidden></label>
       <button class="sm" id="inv_limpar">Clear all</button>
       <input type="search" id="inv_busca" placeholder="${esc(tr('Search an item…'))}" value="${esc(filtroInventario.texto)}">
       <label class="chk"><input type="checkbox" id="inv_so" ${filtroInventario.soTem ? 'checked' : ''}> Only what the party has</label>

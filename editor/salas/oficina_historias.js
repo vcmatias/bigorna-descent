@@ -98,7 +98,7 @@ function renderHistoriasOficina() {
     <div class="botoes"><button class="sm" id="hs_rel">Gaps report</button><button class="sm" id="hs_gram">Grammar</button></div>
     <div class="botoes"><button class="sm" id="hi_exp">Export the stories (JSON)</button><button class="sm" id="hi_imp">Import stories…</button></div>
     <div class="botoes"><button class="sm" id="hs_esq" ${mudancas ? '' : 'disabled'}>Forget my changes</button></div>
-    <p class="ajuda">Changes are kept in this browser and used by the map generator at once. Export writes the whole file (with your changes) to replace editor/historias/bigorna-historias.json.</p></div>`;
+    <p class="ajuda">Your changes stay saved in this browser, and the map generator uses them right away. Export writes the whole file, with your changes, so you can replace editor/historias/bigorna-historias.json with it.</p></div>`;
   const l = $('#hs_lista');
   if (semId) l.innerHTML = `<p class="ajuda">${esc(tr('A list with no names: edited as a whole, on the right.'))}</p>`;
   lista.forEach(e => { const est = estadoHist(histCaminho, e); const np = ((e.narrativa || {}).pontes_intercategoriais || []).length;
@@ -119,7 +119,7 @@ function renderHistoriasOficina() {
   if (histSel === '#gramatica') return gramaticaHist(c);
   if (semId) return listaInteiraHist(c);
   const el = todos.find(x => x.id === histSel);
-  if (!el) { c.innerHTML = `<div class="vazio"><h2>Stories</h2><p>${esc(tr('The stories of the map generator: pick an element on the left. Every text, tag and narrative link of the generator is here.'))}</p></div>`; return; }
+  if (!el) { c.innerHTML = `<div class="vazio"><h2>Stories</h2><p>${esc(tr('Here are the stories of the map generator: every text, tag and narrative link it uses. Pick an element on the left to see and edit it.'))}</p></div>`; return; }
   fichaHist(c, el);
 }
 /* a new element: a copy of the one on screen (or of the first of the list), with its own id */
@@ -169,7 +169,7 @@ function pontesHist(el) {
       <td><select data-hpi="${i}" data-sem-traducao>${opcoes(p.categoria).replace(`value="${esc(p.id)}"`, `value="${esc(p.id)}" selected`)}${elementoHistoria(p.categoria, p.id) ? '' : `<option value="${esc(p.id)}" selected>⚠ ${esc(p.id)}</option>`}</select></td>
       <td><input type="number" min="0" max="99" data-hpn="${i}" value="${p.forca || 0}" style="width:4em"></td><td><button class="sm" data-hpir="${i}" title="${esc(tr('Go to it'))}">→</button><button class="sm" data-hpdel="${i}" title="${esc(tr('Remove'))}">✕</button></td></tr>`;
   return `<div class="sub">${tr('Links to other families')} <span class="etq">${ps.length}</span></div>
-    <p class="ajuda">${esc(tr('Candidate causes and consequences for the generator: the stronger the link, the likelier the two meet in a map.'))}</p>
+    <p class="ajuda">${esc(tr('The causes and consequences the generator may pick. The stronger a link, the likelier the two meet in the same map.'))}</p>
     <table class="tabela tabHist"><tr><th>${tr('Family')}</th><th>${tr('Element')}</th><th>${tr('Strength')}</th><th></th></tr>${ps.map(linha).join('')}</table>
     <div class="botoes"><button class="sm" id="hs_padd">+ ${tr('Link')}</button></div>
     ${vem.length ? `<div class="sub">${tr('Links that come to it')} <span class="etq">${vem.length}</span></div><div class="chipsHist" data-sem-traducao>${vem.map(v => `<button class="sm" data-hvem="${esc(v.caminho + ':' + v.id)}">${esc(nomeElHist(elementoHistoria(v.caminho, v.id)))} <small>${esc(tr(NOME_FAMILIA_HIST[v.caminho] || v.caminho))} · ${v.forca}</small></button>`).join('')}</div>` : ''}`;
@@ -252,7 +252,7 @@ function relatorioHist(c) {
 function gramaticaHist(c) {
   const g = gramaticaNarrativa(); const mudou = !!(historiasImportadas() || {}).narrativa;
   c.innerHTML = `<div class="cabF"><h2>${tr('Narrative grammar')} <span class="etq ${mudou ? 'custom' : ''}">${esc(tr(mudou ? 'changed' : 'from the file'))}</span></h2><div class="botoes">${mudou ? '<button class="sm" id="hs_rest">Restore the file’s</button>' : ''}</div></div>
-    <p class="ajuda">${esc(tr('Arcs, events, environment transitions, pacing rules and playbooks: the rules the generator follows to compose a story. Change them as JSON.'))}</p>
+    <p class="ajuda">${esc(tr('These are the rules the generator follows to compose a story: arcs, events, environment transitions, pacing rules and playbooks. You edit them as JSON.'))}</p>
     <div class="folha"><div class="col" data-sem-traducao>${(g.arcos || []).map(a => `<p><b>${esc(a.id)}</b>: ${esc((a.padrao || []).join(' → '))}</p>`).join('')}
       ${g.regras_ritmo ? `<p><b>regras_ritmo</b>: ${esc(JSON.stringify(g.regras_ritmo))}</p>` : ''}</div>
     <div class="col"><textarea id="hs_gjson" rows="24" spellcheck="false">${esc(JSON.stringify(g, null, 1))}</textarea><div class="botoes"><button class="sm" id="hs_gok">${tr('Apply the JSON')}</button></div></div></div>`;

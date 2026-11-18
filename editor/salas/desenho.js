@@ -423,7 +423,7 @@ function pilarCabe(vx, vy) {
   const k = vx + ',' + vy;
   if (s.pecas.some(p => ehCaixa(p.tile) && cantosDaPeca(p).has(vx + ',' + vy))) return { ok: false, motivo: 'The platform is a box standing on the floor: it needs no pillars.' };
   let peca = null, canto = false; s.pecas.forEach(p => { if (ehAlfombra(p.tile) || ehCaixa(p.tile) || (p.level || 0) !== nivel) return; if (encaixesDaPeca(p).has(k)) peca = p; else if (cantosDaPeca(p).has(k)) canto = true; });
-  if (!peca) return { ok: false, motivo: canto ? 'No socket there: pillars fit only between two squares on a straight edge of the tile (never at its corners or inside it). The dots show the sockets.' : 'Pillars go in the sockets of an elevated tile of this room at level ' + nivel + ' (the dots on its edges).' };
+  if (!peca) return { ok: false, motivo: canto ? 'No socket there. A pillar fits only between two squares on a straight edge of a tile, away from its corners and its inside. The dots show the sockets.' : 'Pillars go in the sockets of an elevated tile of this room at level ' + nivel + ' (the dots on its edges).' };
   if (!pilaresPermitidos(peca.level).includes(pilarEscolhido)) return { ok: false, motivo: SUPORTES[pilarEscolhido].nome + ' is too short for a level ' + peca.level + ' tile: it takes ' + pilaresPermitidos(peca.level).map(x => SUPORTES[x].nome.toLowerCase()).join(' or ') + '.' };
   return { ok: true, peca };
 }
@@ -477,7 +477,7 @@ tela.addEventListener('mousedown', ev => {
   // mode, the room is dragged from anywhere on it; a click elsewhere ends the mode (and the outline)
   if (!escolha) {
     const mv = modoMoverSala;
-    if (destaqueSala != null && mv == null && naBordaDaSala(ev, destaqueSala)) { modoMoverSala = destaqueSala; salaAtual = destaqueSala; sel = null; ferramenta = null; arrastoSala = { si: modoMoverSala, de: [x, y], total: [0, 0] }; tudo(); aviso(tr('Moving the room: drag it where you want it. Esc or a click outside it ends the moving.')); return; }
+    if (destaqueSala != null && mv == null && naBordaDaSala(ev, destaqueSala)) { modoMoverSala = destaqueSala; salaAtual = destaqueSala; sel = null; ferramenta = null; arrastoSala = { si: modoMoverSala, de: [x, y], total: [0, 0] }; tudo(); aviso(tr('Moving the room: drag it where you want it. Press Esc or click outside it to stop.')); return; }
     if (mv != null) { if (naBordaDaSala(ev, mv) || chaoDaSala(mv).has(x + ',' + y)) { arrastoSala = { si: mv, de: [x, y], total: [0, 0] }; return; } modoMoverSala = null; destaqueSala = null; desenhar(); }
     else if (destaqueSala != null) { destaqueSala = null; desenhar(); }
   }
@@ -517,7 +517,7 @@ tela.addEventListener('mousedown', ev => {
     if (colide(p, salaAtual, original)) return aviso(alfombra ? 'It overlaps another underlay.' : 'It overlaps another tile of the same level.');
     if (original >= 0) { avisarMovimento(salaAtual, original, p); return; }
     const reuso = !alfombra && pecaReutilizada(numeroDaPeca(p.tile), salaAtual);
-    const por = () => { s.pecas.push(p); sel = { tipo: 'peca', sala: salaAtual, i: s.pecas.length - 1 }; ferramenta = null; if (caixa) { if (nivel !== p.level) nivel = p.level; tudo(); avisoLongo(nomePeca(p.tile) + ' is a box with its top at level ' + p.level + ': it needs no pillars. The ribbon went to level ' + p.level + ' to work on top of it.'); return; } if (p.tile === 'vault' && p.level > 0) { if (nivel !== p.level) nivel = p.level; tudo(); avisoLongo(tr('The vault stands on the game box, with its floor at level 3: it needs no pillars. The ribbon went to level 3.')); return; } tudo(); if (p.level > 0) avisoLongo('Elevated tile (level ' + p.level + '): give it pillars in its sockets (between two squares on a straight edge) with the Pillar tool (' + pilaresPermitidos(p.level).map(k => SUPORTES[k].nome.toLowerCase()).join(', ') + ').'); };
+    const por = () => { s.pecas.push(p); sel = { tipo: 'peca', sala: salaAtual, i: s.pecas.length - 1 }; ferramenta = null; if (caixa) { if (nivel !== p.level) nivel = p.level; tudo(); avisoLongo(nomePeca(p.tile) + ' is a box with its top at level ' + p.level + ': it needs no pillars. The ribbon went to level ' + p.level + ' to work on top of it.'); return; } if (p.tile === 'vault' && p.level > 0) { if (nivel !== p.level) nivel = p.level; tudo(); avisoLongo(tr('The vault stands on the game box, with its floor at level 3, so it needs no pillars. The ribbon moved to level 3.')); return; } tudo(); if (p.level > 0) avisoLongo('Elevated tile (level ' + p.level + '): give it pillars in its sockets (between two squares on a straight edge) with the Pillar tool (' + pilaresPermitidos(p.level).map(k => SUPORTES[k].nome.toLowerCase()).join(', ') + ').'); };
     if (reuso) { avisarReuso(reuso, salaAtual, por); return; }
     por(); return;
   }
@@ -569,7 +569,7 @@ tela.addEventListener('mousedown', ev => {
     return;
   }
   if (ferramenta === 'inimigo') {
-    if (!inimigoEscolhido || (!ehPool(inimigoEscolhido) && !monstro(inimigoEscolhido))) return aviso('Pick a monster in the palette first. No monsters yet? Open the Workshop and import or create one.');
+    if (!inimigoEscolhido || (!ehPool(inimigoEscolhido) && !monstro(inimigoEscolhido))) return aviso('Pick a monster in the palette first. The palette is still empty? Open the Workshop and import a monster from the game or create your own.');
     if (salaNoNivel(x, y, nivel) !== salaAtual) return aviso('Put the enemy on a tile of this room at level ' + nivel + ' (the ribbon level).');
     if (inimigosDaSala(s).some(({ e }) => e.pos[0] === x && e.pos[1] === y)) return aviso('There is already an enemy on that space.');
     s.inimigos.push(ehPool(inimigoEscolhido) ? { enemy: POOL_ID, pos: [x, y], level: nivel } : { enemy: inimigoEscolhido, pos: [x, y], tier: (monstro(inimigoEscolhido)?.tiers || [{ tier: 1 }])[0].tier, level: nivel }); sel = { tipo: 'inimigo', sala: salaAtual, i: s.inimigos.length - 1 }; tudo(); return;

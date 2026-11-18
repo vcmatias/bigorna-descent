@@ -105,7 +105,7 @@ function copiaSemPacotes(o, mapaDeCampanha) {
   if (mapaDeCampanha) delete raso.bestiario;
   return clone(raso);
 }
-const VERSAO_DMAP = 3, VERSAO_DCAMP = 2;
+const VERSAO_DMAP = 3, VERSAO_DCAMP = 3;
 function montarDmap(p = projeto) { return comProjeto(p, () => { const d = montarDmapDe(p); podarCustom(d.custom, [d]); podarBestiario(d.bigornaSalas && d.bigornaSalas.bestiario, d.custom); separarPacotes(d); manterRequires(d, p.meta); return d; }); }
 /* v294: without the Pacotes folder the editor cannot work out "requires": the one the file came with stays */
 const separaPacotes = () => !_semSepararPacotes && typeof Arquivos !== 'undefined' && Arquivos.ativo && (PACOTES_DA_PASTA || []).length > 0;
@@ -270,6 +270,24 @@ function montarDmapDe(p) {
           acoes.push({ id: 'showMessage', params: { text: LE2('New objective: ', 'Novo objetivo: ') + texto } }); acoes.push({ id: 'announceMission', params: { mission: g.uid } });
           break; }
         case 'unlock_map': { const n = noDoDesbloqueio(g); if (n) acoes.push({ id: 'setCampaignVar', params: { var: varDesbloqueio(n.id), value: 1 } }); break; }
+        // v377: a variable of the campaign, changed from the map (it stays for the next maps)
+        case 'campaign_var': { if (!g.nome || !campanha || !variavelDe(g.nome)) break; const num = ehNumero(g.nome);
+          if (g.acao === 'use') {
+            // like «Use» of a count: the triggers inside run once, when the variable gets to the number (the mod reads the campaign
+            // variable as "campaign:<var>" and says when it changes); from the start of the map, also at the start, if it already is
+            const dentro = acoesDe(s, si, o, 'conta:' + g.uid, extras); if (!dentro.length) break;
+            const v = varDaCampanhaNoMapa(g.nome), n = num ? Math.max(1, +g.n || 1) : 1, chegou = [{ id: 'varAbove', params: { var: v, value: n - 1 } }], nome = 'Campaign ' + g.nome + ' at ' + n + ': ' + rotulo(o);
+            const feito = 'done-' + g.uid, livre = { id: 'varEquals', params: { var: feito, value: 0 } }, faz = [{ id: 'setVariable', params: { var: feito, value: 1 } }, ...dentro];
+            if (g.desde === 'uso') { const arma = 'armed-' + g.uid, guarda = [{ id: 'varAbove', params: { var: arma, value: 0 } }, livre, ...chegou];
+              acoes.push({ id: 'setVariable', params: { var: arma, value: 1 } });
+              extras.push({ id: 'campaign-at-' + g.uid, name: nome, once: false, event: { id: 'varChanged', params: { var: v } }, conditions: guarda, actions: faz });
+              extras.push({ id: 'campaign-at-' + g.uid + '-armed', name: nome + ' (armed)', once: false, event: { id: 'varChanged', params: { var: arma } }, conditions: guarda, actions: faz });
+            } else { extras.push({ id: 'campaign-at-' + g.uid, name: nome, once: false, event: { id: 'varChanged', params: { var: v } }, conditions: [livre, ...chegou], actions: faz });
+              extras.push({ id: 'campaign-at-' + g.uid + '-start', name: nome + ' (start)', once: true, event: { id: 'mapStart', params: {} }, conditions: [livre, ...chegou], actions: faz }); }
+            break; }
+          const op = num ? (['add', 'sub', 'set', 'addvar'].includes(g.acao) ? g.acao : 'add') : 'set';
+          acoes.push({ id: 'changeCampaignVar', params: { var: varEscolha(g.nome), op, value: num ? Math.max(0, +(g.n ?? 1) || 0) : (+(g.n ?? 1) ? 1 : 0), ...(op === 'addvar' && g.outra ? { other: varEscolha(g.outra) } : {}) } });
+          if (g.texto) acoes.push({ id: 'showMessage', params: { text: textoVarParaJogo(g) } }); break; }
         case 'text': if (g.text) acoes.push({ id: 'showMessage', params: { text: g.text } }); break;
         case 'counter': { const v = varDoContador(g.contador);
           if (g.acao === 'use') { const dentro = acoesDe(s, si, o, 'conta:' + g.uid, extras); if (!dentro.length || !g.contador) break;
@@ -387,7 +405,7 @@ function montarDmapDe(p) {
       case 'room_open': return r.sala > 0 ? { id: 'varEquals', params: { var: 'room-' + (r.sala + 1) + '-open', value: 1 } } : null;   // the starting room is always open
       case 'enemies_defeated': return { id: 'groupsDefeated', params: { groups: gruposDaSalaDe(p, r.sala || 0) } };
       case 'object_used': { const alvo = p.salas[r.sala]?.objetos[r.objeto]; return alvo ? { id: 'varEquals', params: { var: 'used-' + indiceDe.get(alvo), value: 1 } } : null; }
-      case 'choice': return r.nome ? { id: 'campaignVar', params: { var: varEscolha(r.nome), value: r.sim === false ? 0 : 1 } } : null;
+      case 'choice': return !r.nome ? null : r.op ? { id: 'campaignCond', params: { cond: { ...condExportada(r), starts: iniciosDasVariaveis() } } } : { id: 'campaignVar', params: { var: varEscolha(r.nome), value: r.sim === false ? 0 : 1 } };
       case 'gold': return { id: 'goldAtLeast', params: { amount: r.amount || 1 } };
       case 'counter': return r.contador ? { id: 'varAbove', params: { var: varDoContador(r.contador), value: (r.meta || 3) - 1 } } : null;
       default: return null;
@@ -501,6 +519,8 @@ function montarDmapDe(p) {
     spawns: { heroStart: (p.salas[0]?.herois || []).map(h => [h[0], h[1], h[2] || 0]), enemies, interactables, reserve: [...new Set([...(p.reserva || []).filter(x => !(r0.remove || []).includes(x)), ...(r0.add || [])])].map(idExportado), itemPool: (p.itensPool || []).map(idItemExportado), ...(enemies.some(e => e.enemy === POOL_ID) ? { balance: (r => ({ minTier: r.min, maxTier: r.max, progression: r.progresso }))(regraDoBalanceio(p)) } : {}) },
     objectives: { primary: antes.concat([primary]), optional, failConditions },
     triggers,
+    // v377: the counters that bring their count to the campaign when the map is won
+    ...(campanha && (p.contadores || []).some(c => c.campanha && c.campanha.nome && variavelDe(c.campanha.nome)) ? { toCampaign: p.contadores.filter(c => c.campanha && c.campanha.nome && variavelDe(c.campanha.nome)).map(c => ({ counter: varDoContador(c.nome), var: varEscolha(c.campanha.nome), op: c.campanha.op === 'set' ? 'set' : 'add' })) } : {}),
     custom: conteudoCustom(),
     bigornaSalas: copiaSemPacotes(p, !!campanha)
   };
@@ -530,30 +550,67 @@ function montarDcamp(reusar) {
   const cid = slug(campanha.meta.name || 'campaign');
   const ids = {}; const usados = [];
   campanha.nos.filter(ehAncora).forEach(n => { ids[n.id] = idUnico(slug(nomeDoNo(n) === rotuloDoNo(n) ? rotuloDoNo(n) : nomeDoNo(n)), usados); usados.push(ids[n.id]); });
-  const acaoExp = a => a.action === 'remember' ? { action: 'setVar', var: varEscolha(a.nome), value: 1 } : a.action === 'unlockNode' || a.action === 'completeNode' ? { action: a.action, node: ids[a.node] || a.node } : a.action === 'giveItem' ? { action: 'giveItem', item: idItemExportado(a.item), qty: a.qty || 1 } : { ...a };
-  const dialogues = campanha.dialogos.map(d => { const seg = campanha.dialogos.find(x => (x.depois || []).includes(d.id)); return { id: d.id, type: d.type || 'normal', speaker: d.speaker ? idPersonagemExportado(d.speaker) : '', title: d.title || '', text: d.text || '', cast: (d.cast || []).map(idPersonagemExportado), background: d.background ?? FUNDO_PADRAO,
-    options: d.type === 'choice' ? (d.options || []).filter(o => o.text).map(o => ({ text: o.text, then: [...(o.lembrar && (o.lembrarNome || o.text) ? [{ action: 'setVar', var: varEscolha(o.lembrarNome || o.text), value: 1 }] : []), ...(o.acoes || []).map(acaoExp), ...(o.next ? [{ action: 'showDialogue', dialogue: o.next }] : [])] })) : [], next: d.type === 'choice' ? '' : (seg ? seg.id : ''), actions: (d.acoes || []).map(acaoExp), ...(d.type === 'video' ? { video: d.video?.arquivo || '' } : {}) }; });
+  const acaoExp = a => a.action === 'remember' ? { action: 'setVar', var: varEscolha(a.nome), value: 1 } : a.action === 'variavel' ? { action: 'changeVar', var: varEscolha(a.nome), op: ['add', 'sub', 'set', 'addvar'].includes(a.op) ? a.op : 'add', value: Math.max(0, +(a.n ?? 1) || 0), ...(a.op === 'addvar' && a.outra ? { other: varEscolha(a.outra) } : {}) } : a.action === 'unlockNode' || a.action === 'completeNode' ? { action: a.action, node: ids[a.node] || a.node } : a.action === 'giveItem' ? { action: 'giveItem', item: idItemExportado(a.item), qty: a.qty || 1 } : { ...a };
+  const dialogues = campanha.dialogos.map(d => { const seg = campanha.dialogos.find(x => (x.depois || []).includes(d.id)); return { id: d.id, type: d.type || 'normal', speaker: d.speaker ? idPersonagemExportado(d.speaker) : '', title: textoComValores(d.title || ''), text: textoComValores(d.text || ''), cast: (d.cast || []).map(idPersonagemExportado), background: d.background ?? FUNDO_PADRAO,
+    options: d.type === 'choice' ? (d.options || []).filter(o => o.text).map(o => ({ text: textoComValores(o.text), then: [...(o.lembrar && (o.lembrarNome || o.text) ? [{ action: 'setVar', var: varEscolha(o.lembrarNome || o.text), value: 1 }] : []), ...(o.acoes || []).map(acaoExp), ...(o.next ? [{ action: 'showDialogue', dialogue: o.next }] : [])] })) : [], next: d.type === 'choice' ? '' : (seg ? seg.id : ''), actions: (d.acoes || []).map(acaoExp), ...(d.type === 'video' ? { video: d.video?.arquivo || '' } : {}) }; });
   const copia = Object.fromEntries(dialogues.map(d => [d.id, d]));
   const cauda = id => { let d = copia[id]; const vistos = new Set(); while (d && d.next && copia[d.next] && !vistos.has(d.next)) { vistos.add(d.next); d = copia[d.next]; } return d; };
   const ganchos = {}; let abertura = ''; const visitas = [];
-  const inicioDeCadeia = campanha.nos.filter(n => ehDialogo(n) && !(n.depois || []).map(noPorId).some(a => a && ehDialogo(a))).sort((a, b) => ((a.fluxo || [0, 0])[0] - (b.fluxo || [0, 0])[0]) || ((a.fluxo || [0, 0])[1] - (b.fluxo || [0, 0])[1]));
-  inicioDeCadeia.forEach(n => {
-    const ancora = (n.depois || []).map(noPorId).find(a => a && ehAncora(a));
-    const cadeiaToda = []; let atual = n; const vistos = new Set();
-    while (atual && ehDialogo(atual) && !vistos.has(atual.id)) { vistos.add(atual.id); if (copia[atual.dialogo]) cadeiaToda.push({ cab: atual.dialogo, no: atual }); atual = campanha.nos.find(m => ehDialogo(m) && (m.depois || []).includes(atual.id)); }
-    // a scene marked "City visit" (and the scenes after it) waits for the next visit to the city: a stop of its own, off the world map
-    const k = cadeiaToda.findIndex(x => x.no.marcador === 'city');
-    if (k >= 0) visitas.push({ no: cadeiaToda[k].no, cabs: cadeiaToda.slice(k).map(x => x.cab), ancora });
-    const cadeia = cadeiaToda.slice(0, k >= 0 ? k : cadeiaToda.length).map(x => x.cab);
-    if (!cadeia.length) return;
-    // the last box of a scene leads to the next scene (after a question: once the answer and its boxes are done)
-    for (let i = 0; i + 1 < cadeia.length; i++) { const t = cauda(cadeia[i]); if (t && !t.next) t.next = cadeia[i + 1]; }
-    // a scene with "Only if": its first box checks the choice and, when it fails, jumps to the next scene of the chain
-    cadeia.forEach((cab, i) => { const no = campanha.nos.find(m => ehDialogo(m) && m.dialogo === cab); if (no && no.seEscolha && copia[cab]) { copia[cab].onlyIf = { var: varEscolha(no.seEscolha.nome), value: no.seEscolha.sim === false ? 0 : 1 }; copia[cab].skipTo = cadeia[i + 1] || ''; } });
+  /* v377: the condition a card is played under: its own “Only if” and, after a Crossroads, the exit that leads to it (the
+     first exit whose condition holds; the way taken stays once a card after it played) */
+  const antesReais = (n, vistos = new Set()) => { const r = []; (n.depois || []).map(noPorId).filter(Boolean).forEach(a => { if (vistos.has(a.id)) return; vistos.add(a.id); if (a.tipo === 'branch') r.push(...antesReais(a, vistos)); else r.push(a); }); return r; };
+  const ramoDoNo = n => (n.depois || []).map(noPorId).find(a => a && a.tipo === 'branch');
+  const condRamo = n => { const b = ramoDoNo(n); if (!b) return null; sincronizarRamo(b);
+    const k = b.outros === n.id ? b.saidas.length : b.saidas.findIndex(x => x.para === n.id); if (k < 0) return null;
+    return { branch: b.id, exit: k, exits: b.saidas.map(x => condExportada(x.cond)), starts: iniciosDasVariaveis() }; };
+  const condDoNo = n => { const cs = [n.seEscolha ? condExportada(n.seEscolha) : null, condRamo(n)].filter(Boolean); return cs.length > 1 ? { all: cs } : cs[0] || null; };
+  /* the scenes in the order they play after a card (a map, a waypoint, the start): each scene and the ones after it; after a
+     Crossroads, its scene exits one after the other, each skipped (to the next exit) unless it is the way taken, and each
+     exit ending after the last one. Items: {no, cab, cond, pulo (where its skip goes), } with seq.alt: start of an exit → end */
+  const vistosC = new Set();
+  const sucessoras = X => campanha.nos.filter(m => ehDialogo(m) && !vistosC.has(m.id) && antesReais(m).includes(X));
+  const andar = (m, seq) => { if (vistosC.has(m.id) || !copia[m.dialogo]) return; vistosC.add(m.id); seq.push({ no: m, cab: m.dialogo, cond: condDoNo(m) }); continuar(m, seq); };
+  const continuar = (X, seq) => { const suc = sucessoras(X); const simples = suc.filter(m => !ramoDoNo(m)); if (simples[0]) andar(simples[0], seq);
+    [...new Set(suc.filter(m => ramoDoNo(m)).map(ramoDoNo))].forEach(b => grupo(b, suc, seq)); };
+  const grupo = (b, cands, seq) => { sincronizarRamo(b);
+    const alvos = [...b.saidas.map(x => x.para), b.outros].map(id => id && noPorId(id)).filter(m => m && cands.includes(m));
+    const segs = []; alvos.forEach(m => { const ini = seq.length; andar(m, seq); if (seq.length > ini) segs.push(ini); });
+    const fim = seq.length; segs.forEach((ini, k) => { seq[ini].pulo = k + 1 < segs.length ? segs[k + 1] : fim; if (k) seq.alt.set(ini, fim); }); };
+  const novaSeq = () => { const q = []; q.alt = new Map(); return q; };
+  const proximo = (seq, i) => { let j = i + 1; const vistos = new Set(); while (seq.alt.has(j) && !vistos.has(j)) { vistos.add(j); j = seq.alt.get(j); } return j; };
+  /* a sequence laid into the boxes: the last box of each scene leads to the next scene (after a question: once the answer and
+     its boxes are done); a scene with a condition checks it in its first box and, when it fails, jumps on */
+  const ligarSeq = itens => {
+    itens.forEach((x, i) => { const cab = k => k < itens.length ? itens[k].cab : ''; x.caudaBox = cauda(x.cab); x.para = cab(x.prox); x.pulaPara = cab(x.pulo ?? x.prox); });
+    itens.forEach(x => { if (x.caudaBox && !x.caudaBox.next && x.para) x.caudaBox.next = x.para; if (x.cond && copia[x.cab]) { copia[x.cab].onlyIf = x.cond; copia[x.cab].skipTo = x.pulaPara; } });
+  };
+  /* the pieces of a sequence (absolute pointers): prox (the next scene) and pulo (where a skip goes), cut where a scene marked
+     “City visit” begins: from there on, the scenes wait for the next visit to the city */
+  const partes = seq => { const it = seq.map((x, i) => ({ ...x, prox: proximo(seq, i) }));
+    const kc = it.findIndex(x => x.no.marcador === 'city'); if (kc < 0) return { main: it, visita: null };
+    const corta = (lista, ini, fim) => lista.slice(ini, fim).map(x => ({ ...x, prox: Math.min(x.prox, fim) - ini, pulo: x.pulo === undefined ? undefined : Math.min(x.pulo, fim) - ini }));
+    return { main: corta(it, 0, kc), visita: corta(it, kc, it.length) }; };
+  const ehInicio = m => ehDialogo(m) && !antesReais(m).some(a => ehDialogo(a));
+  const ancoraDe = m => antesReais(m).find(a => ehAncora(a)) || null;
+  const pos = n => n.fluxo || [0, 0];
+  const porAncora = new Map();
+  campanha.nos.filter(ehInicio).forEach(m => { const a = ancoraDe(m); const k = a ? a.id : ''; if (!porAncora.has(k)) porAncora.set(k, { a, inicios: [] }); porAncora.get(k).inicios.push(m); });
+  porAncora.forEach(({ a: ancora, inicios }) => {
+    // the units after the card: each scene that starts a chain, and each Crossroads with scene exits (left to right on the flow)
+    const unidades = []; const ramos = new Map();
+    inicios.forEach(m => { const b = ramoDoNo(m); if (!b) unidades.push({ m, p: pos(m) }); else { if (!ramos.has(b.id)) { const u = { b, alvos: [], p: pos(b) }; ramos.set(b.id, u); unidades.push(u); } ramos.get(b.id).alvos.push(m); } });
+    unidades.sort((x, y) => (x.p[0] - y.p[0]) || (x.p[1] - y.p[1]));
+    const main = [];
+    unidades.forEach(u => { const seq = novaSeq(); if (u.m) andar(u.m, seq); else grupo(u.b, u.alvos, seq); if (!seq.length) return;
+      const { main: mp, visita } = partes(seq); const off = main.length;
+      mp.forEach(x => main.push({ ...x, prox: x.prox + off, pulo: x.pulo === undefined ? undefined : x.pulo + off }));
+      if (visita && visita.length) visitas.push({ no: visita[0].no, itens: visita, ancora }); });
+    if (!main.length) return;
+    ligarSeq(main);
     // several scenes with nothing before them: they all open the campaign, one after the other (left to right on the flow)
-    if (!ancora) { if (!abertura) abertura = cadeia[0]; else { const t = cauda(abertura); if (t && !t.next) t.next = cadeia[0]; } return; }
+    if (!ancora) { abertura = main[0].cab; return; }
     const g = ganchos[ancora.id] || (ganchos[ancora.id] = {}); const chave = ancora.tipo === 'travel' ? 'onArrive' : 'onComplete';
-    if (!g[chave]) g[chave] = cadeia[0]; else { const t = cauda(g[chave]); if (t && !t.next) t.next = cadeia[0]; }
+    g[chave] = main[0].cab;
   });
   // maps an "Unlock a campaign map" trigger points to: locked until the trigger runs (a campaign variable)
   const bloqueados = new Set(); campanha.missoes.forEach(mp => (mp.salas || []).forEach(ss => donosDaSala(ss).forEach(({ o }) => todosGatilhos(o).forEach(g => { if (g.tipo === 'unlock_map') { const ant = projeto; projeto = mp; try { const nn = noDoDesbloqueio(g); if (nn) bloqueados.add(nn.id); } finally { projeto = ant; } } }))));
@@ -561,20 +618,21 @@ function montarDcamp(reusar) {
   const nodes = campanha.nos.filter(ehAncora).map(n => ({ id: ids[n.id], num: n.num, name: nomeDoNo(n), description: n.descricao || '', coords: [n.coords[0], n.coords[1]],
     marker: n.marcador || (n.tipo === 'side' ? 'side' : n.tipo === 'travel' ? 'narrative' : 'main'), kind: n.tipo === 'travel' ? 'dialogue' : 'scenario', map: n.tipo === 'travel' ? '' : ids[n.id] + EXT_MAPA,
     onArrive: ganchos[n.id]?.onArrive || '', onTravel: '', onComplete: n.tipo === 'travel' ? '' : (ganchos[n.id]?.onComplete || ''),
-    spawn: { auto: n.auto !== false, afterNodes: ancorasAntes(n).map(a => ids[a.id]).filter(Boolean), afterQuests: [], questsThisAct: 0, ...(bloqueados.has(n.id) ? { unlockVar: varDesbloqueio(n.id) } : {}), ...(n.seEscolha ? { choice: { var: varEscolha(n.seEscolha.nome), value: n.seEscolha.sim === false ? 0 : 1 } } : {}) },
+    spawn: { auto: n.auto !== false, afterNodes: ancorasAntes(n).map(a => ids[a.id]).filter(Boolean), afterQuests: [], questsThisAct: 0, ...(bloqueados.has(n.id) ? { unlockVar: varDesbloqueio(n.id) } : {}), ...(condDoNo(n) ? { choice: condDoNo(n) } : {}) },
     rewards: { items: (n.recompensas?.items || []).map(idItemExportado), materials: n.recompensas?.materials || 0, gold: n.recompensas?.gold || 0 } }));
   visitas.forEach(v => {
-    for (let i = 0; i + 1 < v.cabs.length; i++) { const t = cauda(v.cabs[i]); if (t && !t.next) t.next = v.cabs[i + 1]; }
+    ligarSeq(v.itens);
     const id = idUnico('city-' + slug(nomeDoNo(v.no)), usados); usados.push(id);
-    nodes.push({ id, num: v.no.num, name: nomeDoNo(v.no), description: '', coords: [0, 0], marker: 'city', kind: 'dialogue', map: '', onArrive: v.cabs[0], onTravel: '', onComplete: '',
-      spawn: { auto: true, afterNodes: v.ancora ? [ids[v.ancora.id]] : [], afterQuests: [], questsThisAct: 0, ...(v.no.seEscolha ? { choice: { var: varEscolha(v.no.seEscolha.nome), value: v.no.seEscolha.sim === false ? 0 : 1 } } : {}) },
+    // (the visit comes once its first scene's condition holds, as the cards of the world map)
+    nodes.push({ id, num: v.no.num, name: nomeDoNo(v.no), description: '', coords: [0, 0], marker: 'city', kind: 'dialogue', map: '', onArrive: v.itens[0].cab, onTravel: '', onComplete: '',
+      spawn: { auto: true, afterNodes: v.ancora ? [ids[v.ancora.id]] : [], afterQuests: [], questsThisAct: 0, ...(v.itens[0].cond ? { choice: v.itens[0].cond } : {}) },
       rewards: { items: [], materials: 0 } });
   });
   let intro = abertura;
   if (campanha.intro) { dialogues.unshift({ id: 'd-opening', type: 'normal', speaker: '', title: campanha.meta.name || 'Campaign', text: campanha.intro, cast: [], background: FUNDO_PADRAO, options: [], next: abertura || '', actions: [] }); intro = 'd-opening'; }
   const dcamp = { format: 'dcamp', version: VERSAO_DCAMP,
     meta: { id: cid, name: campanha.meta.name || 'Campaign', author: campanha.meta.author || autorGuardado() || '', description: campanha.meta.description || '', language: campanha.meta.lingua || IDIOMA, act: 'I', requiresAct: campanha.missoes.some(m => m && atoNecessario(m) > 1) ? 'II' : 'I', ...(campanha.meta.mapaProprio ? { worldMap: { file: campanha.meta.mapaProprio.arquivo, clouds: campanha.meta.nuvens !== false, mist: !!campanha.meta.nevoa, ...estradasExportadas() } } : {}), ...(campanha.meta.cidade ? { city: { file: campanha.meta.cidade.arquivo } } : {}), heroCount: [2, 4], requiresAct2: false, created: new Date().toISOString().slice(0, 10), editor: 'bigorna-rooms' },
-    nodes, dialogues, shop: { replace: false, items: [] }, intro, custom: conteudoCustom(), ...(inventarioExportado() ? { start: inventarioExportado() } : {}),
+    nodes, dialogues, ...(escolhasDaCampanha().length ? { variables: escolhasDaCampanha().map(nome => { const x = variavelDe(nome); return { var: varEscolha(nome), start: x?.numero ? Math.max(0, +x.inicial || 0) : 0, max: x?.numero ? Math.max(0, +x.maximo || 0) : 1 }; }) } : {}), shop: { replace: false, items: [] }, intro, custom: conteudoCustom(), ...(inventarioExportado() ? { start: inventarioExportado() } : {}),
     bigornaSalas: { campanha: copiaSemPacotes(campanha) } };
   const contexto = reusar ? impressaoDaObra([Object.keys(campanha).filter(k => k !== 'missoes' && k !== 'bestiario').map(k => campanha[k]), ids]) + '|' + (_impressaoDaOficina || impressao(oficinaPropria())) + '|' + (PACOTES_DA_PASTA || []).map(p => p.id + ':' + p.edicao).join(',') + '|' + IDIOMA + '|' + (typeof LINGUA_EDICAO !== 'undefined' ? LINGUA_EDICAO : '') + '|' + Object.keys(TOPOS).length : '';
   const mapa = (mp, id) => { if (!reusar || !mp) { const d = montarDmap(mp); d.meta.id = id; return d; }
@@ -688,17 +746,17 @@ async function abrirArquivo() {
   await extrairImagens(que.campanha || que.projeto);   // (v240: the pictures into the store; the work keeps their references)
   await recolherImagens(que.campanha || que.projeto);
   if (que.campanha) { aplicarEstado({ campanha: que.campanha, missaoAtual: 0, salaAtual: 0 }); } else { aplicarEstado({ projeto: que.projeto, salaAtual: 0 }); }
-  carregarAudios(); camposDaMissao(); tudo(); enquadrar(); setTimeout(avisarPacotesNovos, 3200); que.novo ? avisoLongo('This file was made with a newer version of the editor: it opened, but what this version does not know was left out. Update Bigorna before saving it again.') : antigo ? avisoLongo(que.campanha ? 'Campaign opened. It is in the old format (.dcamp): when saved, it becomes a .bcamp with its maps as .bmap, and the old files stay as they are.' : 'Map opened. It is in the old format (.dmap): when saved, it becomes a .bmap, and the old file stays as it is.') : aviso((que.campanha ? 'Campaign' : 'Map') + ' opened.');
+  carregarAudios(); camposDaMissao(); tudo(); enquadrar(); setTimeout(avisarPacotesNovos, 3200); que.novo ? avisoLongo('This file was made with a newer version of the editor. It opened, but this version left out the parts it does not know. Update Bigorna before you save it again, so you keep those parts.') : antigo ? avisoLongo(que.campanha ? 'Campaign opened. It is in the old format (.dcamp). When you save it, it becomes a .bcamp, and its maps become .bmap files. The old files stay as they are.' : 'Map opened. It is in the old format (.dmap). When you save it, it becomes a .bmap. The old file stays as it is.') : aviso((que.campanha ? 'Campaign' : 'Map') + ' opened.');
   return 'fechar';
 }
 async function importarSalas() {
   const texto = await escolherArquivo(['.bmap', '.dmap']); if (!texto) return;
   let d; try { d = JSON.parse(texto); } catch { return aviso('That file is not readable JSON.'); }
   { const faltam = await pacotesQueFaltam(d.requires); if (faltam.length) return avisarPacotesQueFaltam(faltam, 'mapa'); }
-  if (d.format !== 'dmap' || !d.bigornaSalas?.salas) return aviso('That map was not made with Bigorna Rooms: its room logic is not readable, so nothing was imported.');
+  if (d.format !== 'dmap' || !d.bigornaSalas?.salas) return aviso('That map was made outside Bigorna Rooms, so its room logic is unreadable here and nothing was imported. You can bring rooms only from maps made in Bigorna Rooms.');
   const fonte = normalizar(clone(d.bigornaSalas)); await extrairImagens(fonte); await recolherImagens(fonte); const outro = fonte.bestiario || { monstros: [], personagens: [], itens: [] };
   if (!fonte.salas.length) return aviso('That map has no rooms.');
-  modal('Import rooms from “' + (fonte.meta.name || 'map') + '”', `<p class="ajuda">Tick the rooms to bring in. Each comes with its tiles, pillars, objects, monsters and triggers; triggers that point at rooms left behind are dropped. The map you are working on is kept.</p>
+  modal('Import rooms from “' + (fonte.meta.name || 'map') + '”', `<p class="ajuda">Tick the rooms you want to bring into your map. Each one comes with its tiles, pillars, objects, monsters and triggers. A trigger that points at a room you left behind is dropped. The map you are working on stays as it is, and the rooms are added to it.</p>
     <div>${fonte.salas.map((s, i) => `<label class="chk"><input type="checkbox" data-s="${i}" checked> ${i + 1} · ${esc(s.nome)} <small>(${s.pecas.length} tiles · ${s.objetos.length} objects · ${inimigosDaSalaDe(s).length} monsters)</small></label>`).join('')}</div>
     <div class="rodape"><button data-o="cancel">Cancel</button><button class="primario" data-o="ok">Import</button></div>`, (el, fechar) => {
     el.querySelector('[data-o="cancel"]').onclick = fechar;
@@ -816,14 +874,14 @@ const EXTRAS_CONFIG = [
   { rotulo: '⇩ Import rooms from a .bmap…', acao: importarSalas, ajuda: 'Brings chosen rooms of another Bigorna map into this one, without replacing it.' },
   { rotulo: '💾 Quick save (F5)', acao: salvarRapido, ajuda: 'Quick save keeps a copy in this browser; quick load brings it back.' },
   { rotulo: '↩ Quick load (F8)', acao: () => carregarRapido() },
-  { rotulo: '🐞 Report a problem (F9)', acao: () => { abrirRelato(); return 'fechar'; }, ajuda: 'Write what went wrong: the package carries your text, the editor\'s log of errors, the log of what was done and the work on screen, and goes to the author only when you click Send.' },
-  { secao: 'Workshop packages', rotulo: '📦 Export a package…', acao: () => { exportarPacote(); return 'fechar'; }, ajuda: 'A .bigorna file with what you made in the Workshop (monsters, NPCs, items, weapons, recipes, feats, skills with their cards, heroes, tiles, objects): the parts you pick, or everything at once.' },
+  { rotulo: '🐞 Report a problem (F9)', acao: () => { abrirRelato(); return 'fechar'; }, ajuda: 'Sends the author a report of what went wrong. You write what happened. The package also carries the editor’s error log, the log of what you did and the work on screen. It goes only when you click “Send”.' },
+  { secao: 'Workshop packages', rotulo: '📦 Export a package…', acao: () => { exportarPacote(); return 'fechar'; }, ajuda: 'Saves a .bigorna file with what you made in the Workshop (monsters, NPCs, items, weapons, recipes, feats, skills with their cards, heroes, tiles, objects). You pick the parts, or take everything at once.' },
   { secao: 'Workshop packages', rotulo: '📥 Import a package…', acao: () => { importarPacote(); return 'fechar'; }, ajuda: 'Brings a package into the Workshop (one Workshop for every map and campaign).' },
-  { secao: 'Workshop packages', rotulo: '📚 My packages…', acao: () => { abrirBibliotecaDePacotes(); return 'fechar'; }, ajuda: Arquivos.ativo ? 'Your Workshop and the packages of the Pacotes folder: save a file to share, or remove one.' : 'The packages of this browser: add one to the work on screen, update it to a newer edition, or save its file to share.' },
-  { secao: 'Other settings', rotulo: '🧱 Pieces in your boxes…', acao: () => abrirTerrenoDasCaixas(), ajuda: 'How many of each piece your boxes hold (3D objects, tokens, pillars, tiles, your own pieces): the generators use only these, and the object buttons show how many are on the table.' },
-  { secao: 'Other settings', rotulo: '🧹 Pictures no longer used…', acao: async () => { await limparDeposito(true); return 'fechar'; }, ajuda: 'The pictures are kept apart, once each (the work keeps only their names): this removes from the store those that nothing of the editor uses any more. A map keeps its own in its “imagens” folder.' },
-  { secao: 'Other settings', rotulo: '🎓 Repeat the tutorial', acao: () => { Tutorial.iniciar(); return 'fechar'; }, ajuda: 'The guided tutorial again, on an empty map: the work on screen goes into the quick save first (↩ Quick load brings it back).' },
-  { secao: 'Other settings', rotulo: '↺ Show tips and warnings again', acao: () => { limparVistos(); renderConferencia(); aviso('Hints, first-visit explanations and warnings will show again.'); }, ajuda: 'Brings back the hints of Rooms, the explanations shown the first time a tab opens and the warnings you chose not to see again.' },
+  { secao: 'Workshop packages', rotulo: '📚 My packages…', acao: () => { abrirBibliotecaDePacotes(); return 'fechar'; }, ajuda: Arquivos.ativo ? 'Opens your Workshop and the packages of the Pacotes folder. There you save a file to share or remove a package.' : 'The packages kept in this browser. You can add one to the work on screen, update it to a newer edition, or save its file to share.' },
+  { secao: 'Other settings', rotulo: '🧱 Pieces in your boxes…', acao: () => abrirTerrenoDasCaixas(), ajuda: 'How many of each piece your boxes hold: 3D objects, tokens, pillars, tiles and your own pieces. The generators use only these. The object buttons show how many are already on the table.' },
+  { secao: 'Other settings', rotulo: '🧹 Pictures no longer used…', acao: async () => { await limparDeposito(true); return 'fechar'; }, ajuda: 'The editor keeps each picture once, apart from the work; the work keeps only its name. This removes from the store the pictures nothing in the editor uses any more. A map still keeps its own pictures in its “imagens” folder.' },
+  { secao: 'Other settings', rotulo: '🎓 Repeat the tutorial', acao: () => { Tutorial.iniciar(); return 'fechar'; }, ajuda: 'Starts the guided tutorial again, on an empty map. Your work on screen goes into the quick save first, and ↩ Quick load brings it back.' },
+  { secao: 'Other settings', rotulo: '↺ Show tips and warnings again', acao: () => { limparVistos(); renderConferencia(); aviso('Hints, first-visit explanations and warnings will show again.'); }, ajuda: 'Brings back the hints of Rooms, the explanations shown the first time a tab opens and the warnings you chose to hide.' },
   { secao: 'Other settings', rotulo: '⟲ Reset everything…', acao: resetarConfiguracoes, ajuda: 'Reset everything: the work on screen, the Workshop and the packages, the pictures kept, the quick save, archetypes, tips and warnings, window positions and sizes, author, export folder and autosave. The language stays.' },
 ];
 /* the 3D terrain the user owns: the estimate for the chosen boxes, or the user's own counts */
@@ -846,7 +904,7 @@ function abrirTerrenoDasCaixas() {
   // the Workshop's own pieces (made by hand, or reproduced)
   const b = bestiario() || {}; const doUsuario = (b.objetos || []).filter(o => !o.clone).map(o => campo(o.id, o.nome || tr('Workshop object'), null)).concat((b.pecas || []).map(q => campo('peca:' + q.id, q.nome || tr('Workshop tile'), Math.max(1, +q.copias || 1)))).join('');
   const secao = (t, corpo, aberta) => `<details ${aberta ? 'open' : ''} class="secaoTerreno"><summary><b>${esc(t)}</b></summary><div class="terrenoCaixas">${corpo}</div></details>`;
-  modal(tr('Pieces in your boxes'), `<p class="ajuda">${tr('How many of each piece you have: the generators use only these, and the object buttons show how many are on the table while a room is open. A blank field keeps the count of the boxes chosen (shown faded); ∞ means no limit. Players who put boxes together (two Act I boxes…) or made pieces by hand raise the numbers here.')} (${tr('Boxes')}: ${atos === 1 ? tr('Act I') : tr('Acts I and II')})</p>
+  modal(tr('Pieces in your boxes'), `<p class="ajuda">${tr('How many of each piece you have. The generators use only these. While a room is open, the object buttons show how many are on the table. A blank field keeps the count of the chosen boxes (shown faded), and ∞ means no limit. Raise the numbers here if you put boxes together (two Act I boxes…) or made pieces by hand.')} (${tr('Boxes')}: ${atos === 1 ? tr('Act I') : tr('Acts I and II')})</p>
     ${secao(tr('3D objects and tokens'), objetos, true)}${secao(tr('Pillars that hold tiles'), pilares)}${secao(tr('Underlay cards'), alfombras)}${secao(tr('Map tiles'), pecas)}${doUsuario ? secao(tr('Workshop pieces'), doUsuario) : ''}
     <div class="rodape"><button data-o="est">${tr('Use the counts of the boxes')}</button><button data-o="nao">${tr('Cancel')}</button><button class="primario" data-o="ok">${tr('Save')}</button></div>`, (el, fechar) => {
     el.querySelector('[data-o="nao"]').onclick = fechar;
@@ -863,7 +921,7 @@ function abrirTerrenoDasCaixas() {
 let REDEFININDO = false;
 function resetarConfiguracoes() {
   const temTrabalho = !!(campanha || projeto.salas.length || projeto.meta.name || oficinaComTrabalho(bestiario()));   // (v294)
-  modal(tr('Reset everything?'), `<p>${tr('This erases everything the editor keeps: the map or campaign on screen, the Workshop (monsters, items, materials, objects, imported or made), the packages (in the app: the Pacotes folder, every package in it), the pictures kept by the editor, the quick save, your archetypes, the hints and warnings, window positions and sizes, the author, the export folder and the autosave.')}</p><p class="ajuda">${tr('The language of the editor stays. Maps and campaigns already exported stay in their folder (those that require packages ask for them again).')}</p>
+  modal(tr('Reset everything?'), `<p>${tr('This erases everything the editor keeps: the map or campaign on screen, the Workshop (monsters, items, materials, objects, imported or made), the packages (in the app: the Pacotes folder, every package in it), the pictures kept by the editor, the quick save, your archetypes, the hints and warnings, window positions and sizes, the author, the export folder and the autosave.')}</p><p class="ajuda">${tr('The language of the editor stays as it is. Maps and campaigns you already exported stay in their folder. Those that require packages will ask for them again.')}</p>
     ${temTrabalho ? `<button class="op destaque" data-o="exp"><b>${tr('Export, then reset')}</b><small>${tr('Writes the work on screen first.')}</small></button>` : ''}
     <button class="op perigo" data-o="ja"><b>${tr('Reset everything')}</b><small>${tr('Everything not exported is lost.')}</small></button>
     <div class="rodape"><button data-o="nao">${tr('Cancel')}</button></div>`, (el, fechar) => {

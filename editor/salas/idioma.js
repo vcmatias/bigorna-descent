@@ -10,19 +10,23 @@
    What the user wrote (names of maps, rooms, objects, monsters; texts of the scenes) is never translated: elements
    marked data-sem-traducao are skipped, the value and text of text fields too, and any text that is exactly one of the
    strings of the work in progress (projeto / campanha) is left as it is.
-   In English nothing of this is installed. The choice lives in localStorage['bigorna-idioma'] ('en' | 'pt'); without it,
+   In English nothing of this is installed. The choice lives in localStorage['bigorna-idioma'] (a code of IDIOMAS); without it,
    the language picked in the installer or in the mod's panel (window.BIGORNA_IDIOMA, from bigorna-idioma.js, written by
    the mod next to the editor) decides, and without that the language of the game (`lang` at the root of the game data). */
 
-const IDIOMAS = [['en', 'English'], ['pt', 'Português (Brasil)']];
+const IDIOMAS = [['en', 'English'], ['pt', 'Português (Brasil)'], ['es', 'Español'], ['fr', 'Français'], ['de', 'Deutsch'], ['it', 'Italiano'], ['pl', 'Polski'], ['hu', 'Magyar'], ['cs', 'Čeština'], ['ru', 'Русский'], ['ko', '한국어'], ['zh-cn', '简体中文'], ['zh-tw', '繁體中文']];
+const IDIOMAS_COD = IDIOMAS.map(x => x[0]);
 const IDIOMA = (() => {
   // (v258, v259: the mod's one-shot generator says the language of the game, ?lingua=<code>: the interface is in Portuguese for
   //  pt and in English for the others; the texts of the map follow LINGUA_TEXTOS)
-  try { const m = /[?&]lingua=([a-z]{2}(?:-[a-z]{2})?)(&|$)/.exec(location.search || ''); if (m) return m[1] === 'pt' ? 'pt' : 'en'; } catch { }
-  try { const v = localStorage.getItem('bigorna-idioma'); if (v === 'en' || v === 'pt') return v; } catch { }
-  if (window.BIGORNA_IDIOMA === 'pt' || window.BIGORNA_IDIOMA === 'en') return window.BIGORNA_IDIOMA;   // picked in the installer or in the mod's panel
+  // (v373: the editor in Spanish too; the one-shot generator page keeps pt / en for its interface, its texts follow LINGUA_TEXTOS)
+  try { const s = location.search || ''; const m = /[?&]lingua=([a-z]{2}(?:-[a-z]{2})?)(&|$)/.exec(s);
+    if (m) return /[?&]gerador=1(&|$)/.test(s) ? (m[1] === 'pt' ? 'pt' : 'en') : (IDIOMAS_COD.includes(m[1]) ? m[1] : 'en'); } catch { }
+  try { const v = localStorage.getItem('bigorna-idioma'); if (IDIOMAS_COD.includes(v)) return v; } catch { }
+  if (IDIOMAS_COD.includes(window.BIGORNA_IDIOMA)) return window.BIGORNA_IDIOMA;   // picked in the installer or in the mod's panel
   const l = (window.BIGORNA_JOGO || {}).lang;
-  return typeof l === 'string' && /^pt/i.test(l) ? 'pt' : 'en';
+  const c0 = typeof l === 'string' ? l.trim().toLowerCase().replace('_', '-') : ''; const c = c0.startsWith('zh') ? (/tw|hk|hant/.test(c0) ? 'zh-tw' : 'zh-cn') : c0.slice(0, 2);
+  return IDIOMAS_COD.includes(c) ? c : 'en';
 })();
 /* v259: the language of the texts a map is written in (the generator): the editor's own (pt or en) or, in the mod's one-shot
    generator, any language of the game (?gerador=1&lingua=<code>). For a language other than pt and en, a text is its English
@@ -172,10 +176,15 @@ const TXT = o => { if (typeof o === 'string') return o; if (OUTRA_LINGUA && o &&
 const tr = (() => {
   if (IDIOMA === 'en') return s => s;
 
-  // ------------------------------------------------------------ the dictionary (compiled on first use: idioma_pt.js comes after this file)
+  // ------------------------------------------------------------ the dictionary (compiled on first use: idioma_<code>.js come after this file)
   let DIC = null;
   function compilar() {
-    let fonte = null; try { fonte = TR_PT; } catch { }
+    // (v374: one dictionary per language, idioma_<code>.js, each a const TR_<CODE>)
+    // (v375: Portuguese inside the app; each other language in its own block of the page, <script type=text/plain
+    //  id=bigorna-idioma-<code>>, parsed only here, when the editor is in it)
+    let fonte = null;
+    try { if (IDIOMA === 'pt') fonte = TR_PT;
+      else { const el = document.getElementById('bigorna-idioma-' + IDIOMA); if (el) fonte = new Function(el.textContent + '\nreturn TR_' + IDIOMA.toUpperCase().replace('-', '_') + ';')(); } } catch (e) { console.error('dicionário ' + IDIOMA + ': ' + e); }
     fonte = fonte || { exact: {}, patterns: [] };
     const exato = new Map(), modelos = new Map();
     for (const [k, v] of Object.entries(fonte.exact || {})) {
@@ -197,7 +206,8 @@ const tr = (() => {
     'retrato', 'imagem', 'icone', 'textura', 'textureTab', 'rostoBase', 'imagemBase', 'modelo', 'efeitoBase', 'comportamento', 'heroi', 'heroiBase', 'speaker', 'slot',
     'lado', 'kind', 'rangeType', 'alcance', 'condition', 'condicao', 'momento', 'mode', 'mec', 'tema', 'papel', 'tipoMaterial', 'classe', 'classes', 'arteModo',
     'somModo', 'quando', 'conta', 'acao', 'traits', 'music', 'musica', 'background', 'scene', 'tamanho', 'anchor', 'lang', 'video', 'som', 'cena', 'fundo', 'raridade',
-    'habilidade', 'weapon', 'arma', 'mat', 'item', 'monstro', 'missao', 'no', 'de', 'para', 'depois', 'ramo', 'cells', 'pos', 'marcador', 'desde', 'grupo']);
+    'habilidade', 'weapon', 'arma', 'mat', 'item', 'monstro', 'missao', 'no', 'de', 'para', 'depois', 'ramo', 'cells', 'pos', 'marcador', 'desde', 'grupo',
+    'dano', 'imune', 'mec']);   // (v376: a damage type, a condition, a trait of a monster: the game's names, shown translated)
   const ehIdentificador = v => /^[a-z]+(?:[_-][a-z0-9]+)+$/.test(v) || /^[a-z]+[A-Z][A-Za-z0-9]*$/.test(v) || /^(?:B_|g[0-9a-z]{6,})/.test(v) || /^[A-Z0-9_]+$/.test(v);
   let usuario = new Set(), usuarioQuando = 0;
   function coletar() {
@@ -273,9 +283,17 @@ const tr = (() => {
     for (const [re, rep] of DIC.padroes) { const m = re.exec(c); if (m) return aplicar(rep, m, prof); }
     if (prof < 4) for (const sep of SEPARADORES) {
       if (!sep.test(c)) continue;
-      const partes = c.split(sep); let mudou = false;
-      for (let i = 0; i < partes.length; i += 2) { const t = trParte(partes[i], prof + 1); if (t !== partes[i]) { partes[i] = t; mudou = true; } }
-      return mudou ? partes.join('') : c;
+      const partes = c.split(sep); let mudou = false; const fora = [];
+      // (v374: a run of pieces that is a whole entry of the dictionary goes in one piece: an entry of two sentences joined
+      //  to others in the same text)
+      for (let i = 0; i < partes.length; i += 2) {
+        let feito = false;
+        for (let j = partes.length - 1; j > i + 1 && !feito; j -= 2) { const junto = partes.slice(i, j + 1).join(''); const v = DIC.exato.get(junto.trim());
+          if (v !== undefined && !ehDoUsuario(junto.trim())) { fora.push(v); i = j; feito = mudou = true; if (i + 1 < partes.length) fora.push(partes[i + 1]); } }
+        if (feito) continue;
+        const t = trParte(partes[i], prof + 1); if (t !== partes[i]) mudou = true; fora.push(t); if (i + 1 < partes.length) fora.push(partes[i + 1]);
+      }
+      return mudou ? fora.join('') : c;
     }
     return c;
   }

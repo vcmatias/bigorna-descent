@@ -297,6 +297,15 @@ namespace Bigorna.Formato
         [JsonProperty("spawns")] public Conteudo Spawns = new Conteudo();
         [JsonProperty("objectives")] public Objetivos Roteiro = new Objetivos();
         [JsonProperty("triggers")] public List<Gatilho> Gatilhos = new List<Gatilho>();
+        /// <summary>v377: os contadores que levam o resultado do mapa a campanha quando o mapa e vencido: "counter" (a variavel do
+        /// mapa), "var" (a da campanha), "op" add (somar) ou set (definir).</summary>
+        [JsonProperty("toCampaign")] public List<Ponte> ParaCampanha = new List<Ponte>();
+        public class Ponte
+        {
+            [JsonProperty("counter")] public string Contador;
+            [JsonProperty("var")] public string Var;
+            [JsonProperty("op")] public string Op;
+        }
         /// <summary>Extensao Bigorna v3: monstros, itens e personagens proprios do mapa (fichas completas).</summary>
         [JsonProperty("custom")] public Personalizado Custom = new Personalizado();
         /// <summary>Os pacotes do acervo que o mapa exige ("requires"; ja juntados ao Custom na leitura).</summary>

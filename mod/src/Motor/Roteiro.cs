@@ -570,7 +570,10 @@ namespace Bigorna.Motor
             return herois.Count == 0 ? 100 : (int)herois.Average(Saude);
         }
 
-        public static int Var(string nome) => !string.IsNullOrEmpty(nome) && Vars.TryGetValue(nome, out var v) ? v : 0;
+        public static int Var(string nome) => string.IsNullOrEmpty(nome) ? 0 : nome.StartsWith("campaign:", StringComparison.Ordinal) ? VarDaCampanha(nome.Substring(9)) : Vars.TryGetValue(nome, out var v) ? v : 0;
+        /// <summary>v377: "campaign:<var>" e uma variavel da campanha (o gatilho «usar uma variavel da campanha» e o seu valor nas
+        /// mensagens); fora de uma campanha, o valor de saida dela (0 quando nao se sabe).</summary>
+        static int VarDaCampanha(string v) => Bigorna.Campanha.Campanha.NoMapa && Bigorna.Campanha.Campanha.Estado != null ? Bigorna.Campanha.Campanha.Estado.Var(v) : 0;
 
         // ------------------------------------------------------------------ objetivos
 
@@ -769,10 +772,23 @@ namespace Bigorna.Motor
             EmMarcha = false;
             Log.Info(vitoria ? "VITÓRIA: o roteiro termina" : "DERROTA: o roteiro termina");
             RegistrarNaEquipe(vitoria);
+            if (vitoria) LevarParaACampanha();
             Lancador.Resultado = vitoria;
             Tabuleiro.Desmontado();
             _fecharCom = vitoria; Resultado = vitoria;
             _fecharDesde = Time.unscaledTime;
+        }
+
+        /// <summary>v377: o mapa da campanha foi vencido: os contadores com ponte somam (ou definem) a variavel da campanha.</summary>
+        static void LevarParaACampanha()
+        {
+            try
+            {
+                var est = Bigorna.Campanha.Campanha.Estado; var pontes = Mapa?.ParaCampanha;
+                if (est == null || !Bigorna.Campanha.Campanha.NoMapa || pontes == null) return;
+                foreach (var x in pontes) if (x != null && !string.IsNullOrEmpty(x.Var)) est.Mudar(x.Var, x.Op == "set" ? "set" : "add", Var(x.Contador), null);
+            }
+            catch (Exception ex) { Log.Erro("contadores para a campanha", ex); }
         }
 
         /// <summary>v319: o mapa oneshot terminou: o registro da equipe (Formato.Equipes), para o Perigo do proximo mapa.</summary>

@@ -107,7 +107,7 @@ The mod compiles against the game's own assemblies, which are not in this reposi
 `Legends of the Dark_Data\Managed` folder into a `refs/` folder at the repository root, then run `bash mod/build.sh`
 (needs the .NET SDK and Python 3). The DLL embeds the editor page built by `editor/salas/montar_salas.py --publico`.
 
-The mod and the editor speak English and Portuguese: pick the language in the installer, and switch it any time in the game's **Community maps** panel or in the editor's settings.
+The mod and the editor speak the game's 13 languages and follow the game's language. To switch, change the language in the game's options; the editor also has its own choice in its settings.
 
 ## License
 

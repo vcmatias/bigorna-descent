@@ -17,11 +17,13 @@ namespace Bigorna.Formato
         [JsonIgnore] public bool DoBigorna;
         [JsonProperty("version")] public int Versao;
         /// <summary>A versao do formato que este mod conhece (como Dmap.VersaoAtual).</summary>
-        public const int VersaoAtual = 2;
+        public const int VersaoAtual = 3;
         [JsonProperty("meta")] public Meta Metadados = new Meta();
         [JsonProperty("nodes")] public List<No> Nos = new List<No>();
         [JsonProperty("dialogues")] public List<Dialogo> Dialogos = new List<Dialogo>();
         [JsonProperty("intro")] public string Intro;
+        /// <summary>v377: as variaveis com numero (as de sim/nao valem 0 ou 1 e nao precisam estar aqui).</summary>
+        [JsonProperty("variables")] public List<Variavel> Variaveis = new List<Variavel>();
         [JsonProperty("custom")] public Dmap.Personalizado Custom = new Dmap.Personalizado();
         [JsonIgnore] public List<Acervo.Requisito> Requer = new List<Acervo.Requisito>();
         [JsonIgnore] public List<Acervo.Requisito> PacotesFaltando = new List<Acervo.Requisito>();
@@ -110,11 +112,31 @@ namespace Bigorna.Formato
             [JsonProperty("choice")] public Escolha Escolha;
         }
 
-        /// <summary>Uma escolha lembrada pela campanha: a variavel "choice:..." vale 1 quando o grupo fez a escolha.</summary>
+        /// <summary>Uma escolha lembrada pela campanha: a variavel "choice:..." vale 1 quando o grupo fez a escolha.
+        /// v377: uma condicao sobre as variaveis da campanha (numeros): "op" eq (igual, o de antes), ge (pelo menos), le (no maximo),
+        /// gt (maior que "other"), max (a maior entre "among"), never (nunca); "all": todas valem; "branch"/"exit": a saida de uma
+        /// Encruzilhada ("exits": as condicoes das saidas em ordem; a ultima saida, "nos outros casos", nao tem condicao);
+        /// "starts": os valores iniciais, para um mapa jogado fora da campanha.</summary>
         public class Escolha
         {
             [JsonProperty("var")] public string Var;
             [JsonProperty("value")] public int Valor = 1;
+            [JsonProperty("op", NullValueHandling = NullValueHandling.Ignore)] public string Op;
+            [JsonProperty("other", NullValueHandling = NullValueHandling.Ignore)] public string Outra;
+            [JsonProperty("among", NullValueHandling = NullValueHandling.Ignore)] public List<string> Entre;
+            [JsonProperty("all", NullValueHandling = NullValueHandling.Ignore)] public List<Escolha> Todas;
+            [JsonProperty("branch", NullValueHandling = NullValueHandling.Ignore)] public string Ramo;
+            [JsonProperty("exit", NullValueHandling = NullValueHandling.Ignore)] public int Saida;
+            [JsonProperty("exits", NullValueHandling = NullValueHandling.Ignore)] public List<Escolha> Saidas;
+            [JsonProperty("starts", NullValueHandling = NullValueHandling.Ignore)] public Dictionary<string, int> Inicios;
+        }
+
+        /// <summary>v377: uma variavel da campanha com numero: o valor de saida e o maximo (0: sem limite). Nunca abaixo de 0.</summary>
+        public class Variavel
+        {
+            [JsonProperty("var")] public string Var;
+            [JsonProperty("start")] public int Inicio;
+            [JsonProperty("max")] public int Maximo;
         }
 
         public class Recompensa
@@ -186,7 +208,7 @@ namespace Bigorna.Formato
             d.DoBigorna = Dmap.EhDoBigorna(d.App, null, texto, caminho);
             if (d.Versao > VersaoAtual) Log.Info("«" + Path.GetFileName(caminho) + "» foi feita num editor mais novo (formato v" + d.Versao + "; este mod lê até v" + VersaoAtual + "): o que ele não conhece fica de fora. Atualize o Bigorna.");
             d.Caminho = caminho;
-            d.Nos = d.Nos ?? new List<No>(); d.Dialogos = d.Dialogos ?? new List<Dialogo>();
+            d.Nos = d.Nos ?? new List<No>(); d.Dialogos = d.Dialogos ?? new List<Dialogo>(); d.Variaveis = d.Variaveis ?? new List<Variavel>();
             foreach (var n in d.Nos) { n.Aparece = n.Aparece ?? new Aparicao(); n.Aparece.DepoisDosNos = n.Aparece.DepoisDosNos ?? new List<string>(); n.Aparece.DepoisDasMissoes = n.Aparece.DepoisDasMissoes ?? new List<string>(); n.Premios = n.Premios ?? new Recompensa(); n.Premios.Itens = n.Premios.Itens ?? new List<string>(); }
             foreach (var g in d.Dialogos) { g.Elenco = g.Elenco ?? new List<string>(); g.Opcoes = g.Opcoes ?? new List<Opcao>(); g.Acoes = g.Acoes ?? new List<JObject>(); foreach (var o in g.Opcoes) o.Entao = o.Entao ?? new List<JObject>(); }
             if (d.Custom == null) d.Custom = new Dmap.Personalizado();

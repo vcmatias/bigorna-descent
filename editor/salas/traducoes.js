@@ -13,7 +13,7 @@
 const CHAVES_TEXTO = new Set(['name', 'nome', 'plural', 'text', 'texto', 'textClick', 'textUse', 'textGasto', 'textoDepois', 'intro', 'description', 'descricao', 'desc',
   'regra', 'conclusao', 'vazio', 'fechado', 'response', 'title', 'titulo', 'contador', 'hint', 'defesa']);
 /* what never is a text to translate (the generator's notes, the editor's own copy, ids, files, pictures, the tables themselves) */
-const FORA_TEXTO = new Set(['gerado', 'bigornaSalas', 'traducoes', 'linguas', 'traducoesRever', 'escolhas', 'nomeJogo', 'imagemBase', 'logic', 'textureTab', 'speaker', 'cast', 'som', 'video',
+const FORA_TEXTO = new Set(['gerado', 'bigornaSalas', 'traducoes', 'linguas', 'traducoesRever', 'escolhas', 'seEscolha', 'nomeJogo', 'imagemBase', 'logic', 'textureTab', 'speaker', 'cast', 'som', 'video',
   'audio', 'lembrarNome', 'img', 'imagem', 'retrato', 'modelo', 'arquivo', 'acaoExtra', 'musica', 'music', 'fundo', 'background']);
 const ROTULO_CAMPO = { name: 'name', nome: 'name', plural: 'plural', text: 'text', texto: 'text', textClick: 'text when looked at', textUse: 'text when used', textGasto: 'text once used up',
   textoDepois: 'text afterwards', intro: 'introduction', description: 'description', descricao: 'description', desc: 'description', regra: 'special rule', conclusao: 'conclusion',
@@ -42,9 +42,13 @@ function camposDeTexto(cb, ob = obraDaLingua()) {
     if (!x || typeof x !== 'object') return;
     if (vistos.has(x)) return; vistos.add(x);
     const sala = Array.isArray(x.pecas) && Array.isArray(x.objetos);   // (the name of a room is the editor's, not the players')
+    // (v377: the name of a story variable is a key, never a text: in a remembered answer's action, a requirement, a map trigger,
+    //  a card's condition, the exits of a Crossroads and a counter brought to the campaign)
+    const variavel = (x.tipo === 'choice' && !Array.isArray(x.options)) || x.tipo === 'campaign_var' || x.action === 'remember' || x.action === 'variavel';
     for (const k of Object.keys(x)) {
       if (FORA_TEXTO.has(k) || (pular && pular.has(k))) continue; const v = x[k];
-      if (typeof v === 'string') { if (CHAVES_TEXTO.has(k) && v.trim() && !(sala && k === 'nome')) cb(x, k, onde); }
+      if ((x.tipo === 'branch' && k === 'saidas') || (x.ehContador && k === 'campanha')) continue;
+      if (typeof v === 'string') { if (CHAVES_TEXTO.has(k) && v.trim() && !(sala && k === 'nome') && !(variavel && k === 'nome')) cb(x, k, onde); }
       else if (Array.isArray(v)) v.forEach((item, i) => anda(item, ondeDe(onde, k, item, i)));
       else if (v && typeof v === 'object') anda(v, ondeDe(onde, k, v, -1));
     }
@@ -196,12 +200,12 @@ function htmlLinguasDaObra(curto) {
   return `<div class="linguasObra"><span class="rotulo">${esc(tr('Also in'))}</span>${ex.map(l => `<span class="linguaExtra" data-sem-traducao>${imgBandeira(l, 15)} ${esc(LINGUA_DE[l].nome)} <button class="sm" data-tiralingua="${l}" title="${esc(tr('Take this language out (its translations go too)'))}">✕</button></span>`).join('')}
     <select data-poelingua data-sem-traducao><option value="">${esc(tr('+ language…'))}</option>${resto.map(x => `<option value="${x.cod}">${esc(x.nome)}${x.nome !== x.pt && IDIOMA === 'pt' ? ' · ' + esc(x.pt) : ''}</option>`).join('')}</select>
     ${ex.length ? `<button class="sm" data-traducoes>🌐 ${esc(tr('Translations…'))}</button>` : ''}</div>
-    ${curto ? '' : `<p class="ajuda">${esc(ex.length ? tr('The players get the map in the language of their game when the map has it, or pick one on the card of the map; without it, the original.') : tr('One language is enough. Add another to translate the texts of the work (the original stays as it is).'))}</p>`}`;
+    ${curto ? '' : `<p class="ajuda">${esc(ex.length ? tr('Each player sees the map in the language of their game, when the map has that language. They can also pick one on the card of the map. Otherwise they see the original.') : tr('One language is enough. Add another to translate the texts of the work. The original stays as it is.'))}</p>`}`;
 }
 function ligarLinguasDaObra(el, depois) {
   if (!el) return;
   el.querySelectorAll('[data-tiralingua]').forEach(b => b.onclick = () => { const l = b.dataset.tiralingua; const n = Object.keys(tabelaDe(l, false)).length; if (n && !confirm(tr('Take out the language and its translations?') + ' (' + LINGUA_DE[l].nome + ': ' + n + ')')) return; tirarLingua(l); depois(); tudo(); });
-  const s = el.querySelector('[data-poelingua]'); if (s) s.onchange = () => { if (!s.value) return; acrescentarLingua(s.value); aviso(tr('Language added: translate the texts in the Translations window, or switch the editor to it with its flag in the top bar.')); depois(); tudo(); };
+  const s = el.querySelector('[data-poelingua]'); if (s) s.onchange = () => { if (!s.value) return; acrescentarLingua(s.value); aviso(tr('Language added. Translate the texts in the Translations window, or switch the editor to it with its flag in the top bar.')); depois(); tudo(); };
   const t = el.querySelector('[data-traducoes]'); if (t) t.onclick = () => abrirTraducoes();
 }
 
@@ -222,7 +226,7 @@ function ligarLinguasDaObra(el, depois) {
     faixa.hidden = !LINGUA_EDICAO;
     if (LINGUA_EDICAO) {
       const tab = tabelaDe(LINGUA_EDICAO, false, _obraSombra); const unicos = new Set(_sombra.map(s => s.orig)); const feitos = [...unicos].filter(o => tab[o] && tab[o].trim()).length;
-      faixa.innerHTML = `${imgBandeira(LINGUA_EDICAO, 16)} <b>${esc(tr('Editing the texts in'))} ${esc(LINGUA_DE[LINGUA_EDICAO].nome)}</b> · ${feitos} ${esc(tr('of'))} ${unicos.size} ${esc(tr('translated'))} · <span>${esc(tr('Texts not translated yet show the original. What you add now (rooms, objects, triggers) takes its texts as originals: add new things in the original language.'))}</span> <button class="sm" data-voltalingua>${imgBandeira(linguaOriginal(), 14)} ${esc(tr('Back to the original'))}</button> <button class="sm" data-traducoes>🌐 ${esc(tr('Translations…'))}</button>`;
+      faixa.innerHTML = `${imgBandeira(LINGUA_EDICAO, 16)} <b>${esc(tr('Editing the texts in'))} ${esc(LINGUA_DE[LINGUA_EDICAO].nome)}</b> · ${feitos} ${esc(tr('of'))} ${unicos.size} ${esc(tr('translated'))} · <span>${esc(tr('A text without a translation shows the original. Anything you add now (rooms, objects, triggers) takes its texts as originals. So add new things in the original language.'))}</span> <button class="sm" data-voltalingua>${imgBandeira(linguaOriginal(), 14)} ${esc(tr('Back to the original'))}</button> <button class="sm" data-traducoes>🌐 ${esc(tr('Translations…'))}</button>`;
       faixa.querySelector('[data-voltalingua]').onclick = () => trocarLinguaDeEdicao(linguaOriginal());
       faixa.querySelector('[data-traducoes]').onclick = () => abrirTraducoes(LINGUA_EDICAO);
     }
@@ -259,7 +263,7 @@ function abrirTraducoes(lingua) {
   const { fundo } = modal(tr('Translations'), `<div class="linha trCab"><label>${esc(tr('Language'))} <select id="tr_lingua" data-sem-traducao>${ls.map(x => `<option value="${x}">${esc(LINGUA_DE[x].nome)}</option>`).join('')}</select></label>
       <label class="chk"><input type="checkbox" id="tr_faltam"> ${esc(tr('Only the texts not translated yet'))}</label><span id="tr_conta" class="etq"></span>
       <button class="sm" id="tr_csv" title="${esc(tr('A file for a translator: one line per text, the original and the translation'))}">⇩ CSV</button><label class="sm botaoArquivo">⇧ CSV<input type="file" id="tr_ler" accept=".csv,text/csv" hidden></label></div>
-    <p class="ajuda">${esc(tr('The original on the left, its translation on the right. A text left empty shows the original in the game. The same text in several places is translated once.'))}</p>
+    <p class="ajuda">${esc(tr('The original is on the left, and you write its translation on the right. If you leave a text empty, the game shows the original. A text used in several places is translated once.'))}</p>
     <div id="tr_lista" data-sem-traducao></div>`, (el, fechar) => {
     const lista = el.querySelector('#tr_lista');
     const conta = () => { const tab = tabelaDe(l, false); const n = textos.filter(x => (tab[x.texto] || '').trim()).length; el.querySelector('#tr_conta').textContent = n + ' ' + tr('of') + ' ' + textos.length + ' ' + tr('translated'); };

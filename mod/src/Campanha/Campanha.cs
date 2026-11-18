@@ -34,7 +34,7 @@ namespace Bigorna.Campanha
         /// <summary>Partida nova (ou continuada pelo progresso da pasta) no mapa-mundi do jogo.</summary>
         /// <param name="grupo">"Continuar herois": a partida gravada de onde vem o grupo (null: grupo novo, ou, ao continuar uma
         /// campanha comecada, o grupo de onde ela veio).</param>
-        public static string Comecar(Dcamp c, bool recomecar, Encontro.GrupoDoSave.Save grupo = null)
+        public static string Comecar(Dcamp c, bool recomecar, Encontro.GrupoDoSave.Save grupo = null, DifficultySetting? nivel = null)
         {
             // (v263: a lista guarda as campanhas lidas; a partida segue com uma cópia lida agora)
             if (c != null && !string.IsNullOrEmpty(c.Caminho) && File.Exists(c.Caminho)) try { c = Dcamp.Carregar(c.Caminho); } catch (Exception ex) { Log.Info("relendo a campanha para jogar: " + ex.Message); }
@@ -52,6 +52,9 @@ namespace Bigorna.Campanha
                 var partida = new SerializedGame(modelo.Id);
                 partida.Initialize();
                 partida.PartyName = c.NomeVisivel;
+                // (v372: o nível do jogo escolhido ao começar fica no progresso; ao continuar, a partida volta nele)
+                if (nivel.HasValue) Estado.PorNivel(nivel.Value.ToString());
+                if (Enum.TryParse(Estado.Nivel ?? "", out DifficultySetting nv)) partida.GameDifficulty = nv;
                 try { partida.UnavailableHeroes?.Clear(); } catch { }
                 if (origem != null)
                 {
@@ -253,6 +256,7 @@ namespace Bigorna.Campanha
 
         static void Completar(Dcamp.No n)
         {
+            Estado.Fixar(n.Aparece?.Escolha);   // (v377: depois de uma Encruzilhada, a saida fica decidida)
             Estado.Completar(n.Id);
             try { Jogo.Partida?.CompletedDestinationIds?.AddUniqueItem(n.Id); Jogo.Partida?.ActiveDestinationIds?.Remove(n.Id); Jogo.Sujo(); } catch { }
             Recompensar(n);
@@ -262,6 +266,8 @@ namespace Bigorna.Campanha
             if (d != null) Conversa.Tocar(Aberta, d, Sincronizar); else Sincronizar();
         }
 
+        /// <summary>v377: um mapa da campanha esta sendo jogado (as pontes dos contadores levam o resultado dele a campanha).</summary>
+        public static bool NoMapa => Aberta != null && _emCurso != null;
         public static void CompletarPorAcao(string id) { var n = Aberta?.NoPorId(id); if (n != null && !Estado.Completado(n.Id)) Completar(n); }
         public static void Liberar(string id) { if (Aberta == null) return; Estado.Liberar(id); Sincronizar(); }
 

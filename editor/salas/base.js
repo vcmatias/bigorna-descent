@@ -723,7 +723,7 @@ function novaSala(abertaPor) {
   projeto.salas.push({ nome: tr(n === 1 ? 'Starting room' : 'Room ' + n), texto: '', pecas: [], objetos: [], inimigos: [], herois: [], objetivos: [], reserva: { add: [], remove: [] }, abertaPor: abertaPor ? [abertaPor] : [] });
   salaAtual = n - 1; sel = null; ferramenta = 'peca'; gatAberto = -1;
   tudo();
-  aviso(n === 1 ? 'Lay the tiles of the starting room, then hero spaces and at least one object. Other rooms open through object triggers.' : 'Lay the tiles of room ' + n + '. They stay hidden until a trigger opens the room.');
+  aviso(n === 1 ? 'Start with the tiles of the starting room. Then add the hero spaces and at least one object. The other rooms open later, through the triggers of objects.' : 'Lay the tiles of room ' + n + '. They stay hidden until a trigger opens the room.');
   return n - 1;
 }
 /* ------------------------------------------------------------ the 3D terrain in the boxes
@@ -913,6 +913,8 @@ function problemasDaSala(si) {
       if (g.tipo === 'remove_enemy' && g.alvo === 'one' && !inimigoRef(g.inimigo)) p.push('"' + rotulo(o) + '": remove enemy without a target');
       if (g.tipo === 'mission' && !g.text) p.push('"' + rotulo(o) + '": objective without a text');
       if (g.tipo === 'unlock_map' && campanha && !noDoDesbloqueio(g)) p.push('"' + rotulo(o) + '": unlock a campaign map without a map');
+      if (g.tipo === 'campaign_var' && (!campanha || !g.nome || !variavelDe(g.nome))) p.push('"' + rotulo(o) + '": change a campaign variable without a variable');
+      if (g.tipo === 'campaign_var' && g.acao === 'use' && !(o['conta:' + g.uid] || []).length) p.push('"' + rotulo(o) + '": use a campaign variable with nothing inside');
       if (g.tipo === 'give_item' && (g.modo === 'item' || !g.modo) && !g.item) p.push('"' + rotulo(o) + '": give item without an item (workshop items only)');
       if (g.tipo === 'give_item' && g.item && !itemDaOficina(g.item)) p.push('"' + rotulo(o) + '": gives an item that is not in the workshop');
       if (g.tipo === 'item_pool' && !g.item) p.push('"' + rotulo(o) + '": change the item pool without an item');
@@ -945,7 +947,7 @@ function problemasDaSala(si) {
     [o, ...todosGatilhos(o)].flatMap(x => x.requisitos || []).forEach(r => { if (r.tipo === 'item' && !r.item) p.push('"' + rotulo(o) + '": requirement without an item'); if (r.tipo === 'item' && r.item && !itemDaOficina(r.item)) p.push('"' + rotulo(o) + '": requires an item that is not in the workshop'); if (r.tipo === 'mission' && r.uid === undefined) p.push('"' + rotulo(o) + '": requirement without a mission'); else if (r.tipo === 'mission' && !missoesInternas().some(m => m.uid === r.uid)) p.push('"' + rotulo(o) + '": requires a mission that no longer exists'); });
   });
   inimigosDaSala(s).forEach(({ e }) => { if (salaEm(e.pos[0], e.pos[1], e.level || 0) < 0) p.push(nomeIni(e.enemy) + ' is off the floor (level ' + (e.level || 0) + ')'); if (!ehPool(e.enemy) && !monstro(e.enemy)) p.push(nomeIni(e.enemy) + ' is not in the workshop'); });
-  if (vagasPoolDaSala(s) && !poolDaSala(si).map(monstro).filter(Boolean).length) p.push('Balanced spaces, but the spawn pool of this room is empty (Map setup or room panel)');
+  if (vagasPoolDaSala(s) && !poolDaSala(si).map(monstro).filter(Boolean).length) p.push('The spaces are balanced, but the spawn pool of this room is empty, so no monster can come. Add monsters to it in “Map setup” or in the room panel.');
   return p;
 }
 

@@ -151,11 +151,11 @@ function painelDeProezas(c, hid) {
   const fora = (oficina().facanhas || []).filter(f => f.heroi === hid && !ids.includes(f.id));
   c.innerHTML = `<div class="proezasDuas"><aside class="todasProezas" id="fp_todas"></aside><div class="proezasDoHeroi">
     <div class="cabF"><h2>${esc(tr('Feats of'))} ${esc(nomeDoPerfil(hid))} <span class="etq">${ids.length}</span></h2><div class="botoes"><button class="sm" id="fp_volta">◂ ${esc(tr('The party'))}</button><button class="sm primario" id="fp_nova">+ ${esc(tr('New feat'))}</button></div></div>
-    <p class="ajuda">${esc(ids.length ? tr('The feats the game offers this hero, two at a time, as their tier allows. Add more from the column on the left.') : tr('No feat defined: the game offers this hero its own feats. Add feats from the column on the left to choose them.'))}</p>
+    <p class="ajuda">${esc(ids.length ? tr('These are the feats the game offers this hero, two at a time, as the tier of each allows. Add more from the column on the left.') : tr('No feat is set here, so the game offers this hero its own feats. To choose them yourself, add feats from the column on the left.'))}</p>
     <div class="tiersProezas">${proezasPorTier(hid).map(g => { const falta = Math.max(0, g.n - g.ids.length); const aberto = _tiersAbertos.has(hid + ':' + g.t) || g.ids.includes(fichaSel);
       return `<details class="tierProeza ${falta ? 'falta' : ''}" data-tier="${g.t}" ${aberto ? 'open' : ''}><summary><span class="nomeTier">Tier ${g.t}</span><span class="casasTier">${casasDoTier(g, hid, false)}</span><small>${falta ? esc(falta + ' ' + tr(falta > 1 ? 'places empty' : 'place empty')) : g.ids.length ? '✓' : ''}</small></summary>
         <div class="listaProezas">${g.ids.map(id => { const f = (oficina().facanhas || []).find(x => x.id === id); const ruim = avisoDeArmaDaFacanha(id, hid);
-          return `<div class="no proeza ${fichaSel === id ? 'ativo' : ''} ${ruim ? 'erro' : ''}" data-fac="${esc(id)}"><div><div data-sem-traducao>${esc(nomeDaFacanhaId(id))}</div><small>${f ? esc(resumoFacanha(f)) + (f.base ? ' · ' + esc(tr('from the game')) : ' · ' + esc(tr('custom'))) : esc(tr('of the game, as it is'))}</small>${ruim ? `<small class="avisoVermelho">${esc(ruim)}</small>` : ''}</div><button class="sm" data-facx="${esc(id)}" title="${esc(tr('Take it out of this hero’s feats'))}">✕</button></div>`; }).join('') || `<p class="ajuda">${esc(tr('No feat in this tier: add one from the column on the left (its tier is set on its sheet).'))}</p>`}</div></details>`; }).join('')}</div>
+          return `<div class="no proeza ${fichaSel === id ? 'ativo' : ''} ${ruim ? 'erro' : ''}" data-fac="${esc(id)}"><div><div data-sem-traducao>${esc(nomeDaFacanhaId(id))}</div><small>${f ? esc(resumoFacanha(f)) + (f.base ? ' · ' + esc(tr('from the game')) : ' · ' + esc(tr('custom'))) : esc(tr('of the game, as it is'))}</small>${ruim ? `<small class="avisoVermelho">${esc(ruim)}</small>` : ''}</div><button class="sm" data-facx="${esc(id)}" title="${esc(tr('Take it out of this hero’s feats'))}">✕</button></div>`; }).join('') || `<p class="ajuda">${esc(tr('No feat in this tier yet. Add one from the column on the left; you set its tier on its sheet.'))}</p>`}</div></details>`; }).join('')}</div>
     ${fora.length ? `<div class="sub">${esc(tr('Feats of this hero in the workshop, not offered'))}</div><div>${fora.map(f => `<span class="tag">${esc(nomeFacanha(f))} <a href="#" data-facin="${esc(f.id)}">+</a></span>`).join(' ')}</div>` : ''}
     <div id="fp_ficha"></div></div></div>`;
   colunaDeTodasAsProezas($('#fp_todas'), hid);
@@ -182,7 +182,7 @@ function renderFacanhas() {
     <div class="botoes"><button class="sm" id="f_importarF">Import…</button><button class="sm primario" id="f_novaF">+ New feat</button></div>
     <p class="ajuda">A feat is a goal a hero pursues during the quests (attack with a spear 5 times, open 3 chests…). The game counts it by itself and gives the reward when it is done. Import the game’s feats (they stay as in the game; duplicate one to change it), or write new ones for any hero.</p>
     <div id="f_lista"></div></div>
-    <div class="bloco"><h2>Feat pool</h2><p class="ajuda">For each hero with a feat here, the game offers only these (the feats already in progress keep going). Heroes with none here keep the game’s feats.</p><div id="f_poolF"></div></div>`;
+    <div class="bloco"><h2>Feat pool</h2><p class="ajuda">If a hero has feats here, the game offers that hero only these. Feats already in progress keep going. Heroes with no feat here keep the game’s feats.</p><div id="f_poolF"></div></div>`;
   const l = $('#f_lista');
   botaoDeFiltro(esq.querySelector('.bloco'), lista, renderFacanhas);
   const ordem = lista.filter(f => HEROIS_IDS.includes(f.heroi)).sort((a, b) => HEROIS_IDS.indexOf(a.heroi) - HEROIS_IDS.indexOf(b.heroi));
@@ -235,12 +235,12 @@ const COM_HEROI = [1, 2, 3, 4, 5, 7, 8, 9, 10], COM_MONSTRO = [1, 2, 4, 9, 10], 
    readings), liga (on only), num (a number); g: group; em: the moments it fits */
 const CONDICOES_FEITO = [
   { k: 'armas', g: 'Hero', tipo: 'lista', nome: 'With these weapons', lista: () => CLASSES_ARMA, em: COM_HEROI, ajuda: 'Counts only while the hero fights with a weapon of one of the ticked kinds (the one in hand at that moment).' },
-  { k: 'AttackWithBothWeapons', g: 'Hero', tipo: 'liga', nome: 'Has used both weapons this round', em: COM_HEROI, ajuda: 'Counts only if the hero has already attacked with the other weapon this round: an attack with each weapon in the same round.' },
+  { k: 'AttackWithBothWeapons', g: 'Hero', tipo: 'liga', nome: 'Has used both weapons this round', em: COM_HEROI, ajuda: 'Counts only if the hero already attacked with the other weapon this round. So it needs one attack with each weapon in the same round.' },
   { k: 'lesao', g: 'Hero', tipo: 'sel', nome: 'The hero’s health', em: COM_HEROI, ajuda: 'The hero’s health at that moment. “At least” also counts a worse state (a major injury is at least a minor one); “exactly” counts that state only.' },
   { k: 'HeroAttackedThisRound', g: 'Hero', tipo: 'sim', nome: 'The hero attacked this round', sim: ['Has already attacked this round', 'Has not attacked yet this round'], em: COM_HEROI, ajuda: 'Whether this hero has already attacked some monster earlier this round.' },
-  { k: 'AnyHeroInjured', g: 'Hero', tipo: 'sim', nome: 'Some hero injured', sim: ['Some hero is injured', 'No hero is injured'], em: COM_HEROI, ajuda: 'Whether some hero of the party has an injury at that moment (at the moment “When the hero is hurt”, the hero being hurt does not count).' },
+  { k: 'AnyHeroInjured', g: 'Hero', tipo: 'sim', nome: 'Some hero injured', sim: ['Some hero is injured', 'No hero is injured'], em: COM_HEROI, ajuda: 'Whether some hero of the party has an injury at that moment. At the moment “When the hero is hurt”, the hero being hurt is left out.' },
   { k: 'AnyOtherHeroInjured', g: 'Hero', tipo: 'sim', nome: 'Another hero injured', sim: ['Another hero is injured', 'No other hero is injured'], em: COM_HEROI, ajuda: 'Whether some hero other than this one has an injury at that moment.' },
-  { k: 'AnyHero', g: 'Hero', tipo: 'liga', nome: 'Any hero’s action counts (not only this hero’s)', em: QUALQUER_HEROI, ajuda: 'The action of any hero counts toward this hero’s feat (attack, defeat, items gained), not only this hero’s own.' },
+  { k: 'AnyHero', g: 'Hero', tipo: 'liga', nome: 'Any hero’s action counts (not only this hero’s)', em: QUALQUER_HEROI, ajuda: 'The action of any hero counts toward this hero’s feat: an attack, a defeat, items gained. Without this, only this hero’s own actions count.' },
   { k: 'FirstAttackOfRound', g: 'Round', tipo: 'sim', nome: 'Attacks this round', sim: ['Before any hero attacks this round', 'After some hero attacked this round'], em: COM_HEROI, ajuda: 'Whether some hero has already attacked this round. “Before” counts only the first attack of the round.' },
   { k: 'FirstInteractionOfRound', g: 'Round', tipo: 'sim', nome: 'Interactions this round', sim: ['Before any hero interacts this round', 'After some hero interacted this round'], em: COM_HEROI, ajuda: 'Whether some hero has already interacted this round. “Before” counts only the first interaction of the round.' },
   { k: 'AllOtherHeroesDidDamageThisRound', g: 'Round', tipo: 'sim', nome: 'The other heroes attacked this round', sim: ['Every other hero attacked this round', 'Not every other hero attacked this round'], em: COM_HEROI, ajuda: 'Whether every other hero of the party has already attacked this round.' },
@@ -250,12 +250,12 @@ const CONDICOES_FEITO = [
   { k: 'condicao', g: 'Monster', tipo: 'sel', nome: 'The monster has a condition', em: COM_MONSTRO, ajuda: 'Counts only against a monster that has this condition at that moment.' },
   { k: 'StatusCount', g: 'Monster', tipo: 'num', nome: 'The monster has at least this many conditions', min: 1, em: COM_MONSTRO, ajuda: 'Counts only against a monster with at least this many conditions at once.' },
   { k: 'DamagedEnemy', g: 'Monster', tipo: 'sim', nome: 'The monster already damaged', sim: ['The monster is already damaged', 'The monster is undamaged'], em: COM_MONSTRO, ajuda: 'Whether the monster had already lost some health.' },
-  { k: 'mesmoInimigo', g: 'Monster', tipo: 'sim', nome: 'The same monster this round', sim: ['The same monster the hero attacked before this round', 'A different monster from the one attacked before this round'], em: COM_MONSTRO, ajuda: 'Compares with the monsters this hero attacked earlier this round. The first attack of the round always counts.' },
+  { k: 'mesmoInimigo', g: 'Monster', tipo: 'sim', nome: 'The same monster this round', sim: ['The same monster the hero attacked before this round', 'A different monster from the one attacked before this round'], em: COM_MONSTRO, ajuda: 'Compares the monster with the ones this hero already attacked this round. The first attack of the round always counts, since there is nothing to compare with yet.' },
   { k: 'FirstTimeAttackedByHero', g: 'Monster', tipo: 'sim', nome: 'First attack on this monster', sim: ['The first time this hero attacks this monster', 'The hero has attacked this monster before'], em: COM_MONSTRO, ajuda: 'Whether this hero is attacking this monster for the first time in the quest.' },
   { k: 'OtherHeroDidDamage', g: 'Monster', tipo: 'sim', nome: 'Other heroes attacked this monster', sim: ['Another hero also attacked this monster', 'Only this hero attacked this monster'], em: COM_MONSTRO, ajuda: 'Whether another hero has also attacked this monster.' },
   { k: 'EnemyWasAttackedThisRound', g: 'Monster', tipo: 'liga', nome: 'No hero attacked this monster yet this round', em: COM_MONSTRO, ajuda: 'Counts only if no hero has attacked this monster yet this round.' },
   { k: 'EnemyHasTactic', g: 'Monster', tipo: 'sim', nome: 'The monster’s tactic', sim: ['The monster has a tactic', 'The monster has no tactic'], em: COM_MONSTRO, ajuda: 'Whether the monster has a tactic card.' },
-  { k: 'DiedFromAffliction', g: 'Monster', tipo: 'sim', nome: 'Defeated by affliction', sim: ['Defeated by affliction', 'Not defeated by affliction'], em: [4], ajuda: 'Whether the monster was defeated by the damage of the Afflicted condition (not by an attack).' },
+  { k: 'DiedFromAffliction', g: 'Monster', tipo: 'sim', nome: 'Defeated by affliction', sim: ['Defeated by affliction', 'Not defeated by affliction'], em: [4], ajuda: 'Whether the monster was defeated by the damage of the Afflicted condition, instead of by an attack.' },
   { k: 'danoMinimo', g: 'Damage', tipo: 'num', nome: 'Minimum damage of the attack', min: 1, em: COM_DANO, ajuda: 'Counts only an attack that deals at least this much damage.' },
   { k: 'objeto', g: 'Object', tipo: 'sel', nome: 'Interacting with', em: COM_OBJETO, ajuda: 'Counts only interactions with this kind of object. Without this condition, every object counts except the sight tokens.' },
   { k: 'RequireObjectRemove', g: 'Object', tipo: 'liga', nome: 'The object leaves the board (opened, taken, put out)', em: COM_OBJETO, ajuda: 'Counts only when the object leaves the board with the interaction (a chest opened and gone, a token taken, a fire put out).' },
@@ -269,9 +269,9 @@ const CONTAGENS_FEITO = [
   { k: 'vezes', nome: 'Times', em: null, ajuda: 'Each time the moment comes and every condition holds, it counts one.' },
   { k: 'dano', nome: 'Damage dealt, in total', em: COM_DANO, ajuda: 'The damage of each counted attack is added up until it reaches the goal.' },
   { k: 'fraqueza', nome: 'Damage from weaknesses, in total', em: COM_DANO, ajuda: 'Only the damage that comes from the monster’s weaknesses is added up.' },
-  { k: 'excesso', nome: 'Damage from weaknesses beyond the monster’s health, in total', em: COM_DANO, ajuda: 'Only the weakness damage beyond the health the monster had left is added up (the damage “wasted” on the kill).' },
+  { k: 'excesso', nome: 'Damage from weaknesses beyond the monster’s health, in total', em: COM_DANO, ajuda: 'Adds up only the weakness damage beyond the health the monster had left, that is, the damage “wasted” on the kill.' },
   { k: 'naRodada', nome: 'Rounds in which it happens a number of times', em: POR_RODADA, n: 'Times in the same round', ajuda: 'A round counts one when it happens that many times in the same round.' },
-  { k: 'seguidas', nome: 'Rounds in a row in which it happens', em: POR_RODADA, n: 'From the round number', ajuda: 'It must happen at least once every round; from that round in a row on, each round counts one. A round without it starts the streak over.' },
+  { k: 'seguidas', nome: 'Rounds in a row in which it happens', em: POR_RODADA, n: 'From the round number', ajuda: 'It must happen at least once in every round. When the streak reaches that number of rounds in a row, each round counts one. A round without it starts the streak over. Example: with 3, the third round in a row counts 1, the fourth 1 more, and so on.' },
 ];
 const EXTRAS_FEITO = CONDICOES_FEITO.filter(d => /^[A-Z]/.test(d.k)).map(d => d.k).concat(['ExcessWeaknessDamage', 'AmountOfTimeDuringRound', 'ForAmountOfRounds']);
 const ativaCond = (x, d) => d.tipo === 'lista' ? !!(x[d.k] && x[d.k].length) : d.k === 'danoMinimo' ? (x.danoMinimo || 0) > 0 : d.tipo === 'liga' ? !!x[d.k] : x[d.k] !== null && x[d.k] !== undefined;
@@ -486,19 +486,19 @@ function fichaFacanha(c, f) {
   const ct = contagemDe(x); const cts = CONTAGENS_FEITO.filter(z => !z.em || z.em.includes(f.momento)); const ctd = CONTAGENS_FEITO.find(z => z.k === ct);
   const orig = !!f.base, mudado = orig && !!f.custom;
   c.innerHTML = `<div class="cabF"><h2>${esc(nomeFacanha(f))} ${etiquetaEstado(f)}</h2><div class="botoes">${orig ? `<button class="sm primario" id="ff_dup">⧉ ${esc(tr('Duplicate'))}</button>` : ''}${mudado ? `<button class="sm" id="ff_volta">↺ ${esc(tr('Back to the game’s'))}</button>` : ''}<button class="sm perigo" id="ff_apaga">Delete</button></div></div>
-    ${orig ? avisoOficial(mudado ? 'This original was changed by an older version of the editor: “↺ Back to the game’s” undoes it.' : '', 'Whether the workshop offers it (the pool of feats) is chosen in the list.') : ''}
+    ${orig ? avisoOficial(mudado ? 'An older version of the editor changed this original. To undo it, use “↺ Back to the game’s”.' : '', 'Whether the workshop offers it (the pool of feats) is chosen in the list.') : ''}
     <div class="folha"><div class="col">
       <div class="duas"><label class="campo">Name <input id="ff_nome" value="${esc(f.nome || '')}"></label>
       <label class="campo">Hero <select id="ff_heroi">${HEROIS_IDS.map(h => `<option value="${h}" ${f.heroi === h ? 'selected' : ''}>${esc(nomeDoPerfil(h))}</option>`).join('')}</select></label></div>
       <div id="ff_texto"></div>
       <div class="sub">${esc(tr('Trigger'))}</div>
       <label class="campo"><select id="ff_momento">${MOMENTOS_FACANHA.map(([v, n]) => `<option value="${v}" ${f.momento === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
-      <p class="ajuda">The moment the game checks the feat. Pick it first: the conditions and the ways of counting below are only the ones the game checks at this moment.</p>
+      <p class="ajuda">The moment when the game checks the feat. Pick it first: the conditions and ways of counting below change with it and show only what the game checks at that moment.</p>
       <div class="sub">${esc(tr('Conditions'))}</div>
       <div id="ff_conds">${ativas.map(linhaCond).join('') || `<p class="ajuda">${esc(tr('No condition: every time counts.'))}</p>`}</div>
       ${livres.length ? `<select id="ff_novaCond"><option value="">${esc(tr('+ add a condition…'))}</option>${GRUPOS_FEITO.map(([g, gn]) => { const ds = livres.filter(d => d.g === g); return ds.length ? `<optgroup label="${esc(tr(gn))}">${ds.map(d => `<option value="${d.k}" title="${esc(tr(d.ajuda || ''))}">${esc(tr(d.nome))}</option>`).join('')}</optgroup>` : ''; }).join('')}</select>` : ''}
-      <p class="ajuda">One at a time: every condition added must hold for the moment to count.${f.momento === 9 ? ' ' + tr('With a monster condition, only the attacks count (an interaction has no monster).') : ''}</p>
-      ${f.base && !f.extrasConhecidos ? '<p class="ajuda aviso">Other finer conditions of this feat in the game are kept as they are (the game data of this editor is older: open the game with the mod once to bring them here).</p>' : ''}
+      <p class="ajuda">One at a time: every condition added must hold for the moment to count.${f.momento === 9 ? ' ' + tr('With a monster condition, only the attacks count, since an interaction has no monster.') : ''}</p>
+      ${f.base && !f.extrasConhecidos ? '<p class="ajuda aviso">This feat has other, finer conditions in the game, and they are kept as they are. The game data of this editor is older: open the game with the mod once to bring them here.</p>' : ''}
       <div class="duas"><label class="campo">Counting <select id="ff_cont">${cts.map(z => `<option value="${z.k}" ${ct === z.k ? 'selected' : ''} title="${esc(tr(z.ajuda || ''))}">${esc(tr(z.nome))}</option>`).join('')}</select></label>
       <label class="campo">${esc(tr(ct === 'vezes' ? (f.momento === 6 ? 'Items gained' : 'x times') : /^(dano|fraqueza|excesso)$/.test(ct) ? 'Damage in total' : 'Rounds'))} <input type="number" min="1" id="ff_meta" value="${f.meta || 1}" style="width:80px"></label></div>
       ${ctd && ctd.n ? `<label class="campo">${esc(tr(ctd.n))} <input type="number" min="1" id="ff_contn" value="${(ct === 'naRodada' ? x.AmountOfTimeDuringRound : x.ForAmountOfRounds) || 2}" style="width:80px"></label>` : ''}
@@ -506,17 +506,17 @@ function fichaFacanha(c, f) {
     </div><div class="col">
       <div class="sub">Tier</div>
       <label class="campo">${esc(tr('Tier'))} <input type="number" min="0" id="ff_precisa" value="${f.precisa || 0}" style="width:80px"></label>
-      <p class="ajuda">${esc(tr('The tier is the number of feats the hero must have completed for this one to appear (0: from the start). The game offers each hero two feats at a time, among the ones their tier allows; its own go in tiers 0, 4, 8, 12 and 14.'))}</p>
+      <p class="ajuda">${esc(tr('The tier is how many feats the hero must have completed before this one appears (0: from the start). Example: a feat of tier 4 appears after the hero completes 4 feats. The game offers each hero two feats at a time, among those their tier allows. The game’s own feats use tiers 0, 4, 8, 12 and 14.'))}</p>
       ${avisoDeArmaDaFacanha(f.id, f.heroi) ? `<p class="avisoVermelho">${esc(avisoDeArmaDaFacanha(f.id, f.heroi))}</p>` : ''}
       <div class="sub">${esc(tr('Reward'))}</div>
       <div id="ff_premios"></div>
       <button class="sm" id="ff_premio">+ ${esc(tr('Reward…'))}</button>
-      <p class="ajuda">Like “Give an item”: any item of the workshop, plus the hero’s skill cards and the workshop’s recipes. In the game a feat only gives skill cards (the physical card at the table) and recipes; the items come through the mod, into the party’s inventory, when the players take the reward in the feats window.</p>
+      <p class="ajuda">Same list as “Give an item”: any item of the workshop, plus the hero’s skill cards and the workshop’s recipes. In the game, a feat gives only skill cards (the physical card at the table) and recipes. The mod delivers the items: they go to the party’s inventory when the players take the reward in the feats window.</p>
     </div></div>`;
   /* how the feat reads in the game: the name (in bold) and the text made from the rules (v235: the text is not typed) */
   const previa = () => { const el = $('#ff_texto'); if (!el) return; const auto = textoAutomatico(f); const t = textoDaFacanha(f); if (auto) f.texto = t;
     el.innerHTML = `<div class="sub">${esc(tr('Text'))}</div><p class="textoGerado" data-sem-traducao><b>${esc(nomeFacanha(f))}</b>: ${esc(semTagsFacanha(t))}</p>
-      <p class="ajuda">${esc(tr(orig && !f.custom ? 'The game’s text.' : auto ? 'Made from the trigger, the conditions and the counting below: it follows them. The goal is not in the text: the game shows it as the feat’s progress.' : 'The text of the game’s feat this one came from: once a rule changes, the text is made from the rules.'))}</p>`; };
+      <p class="ajuda">${esc(tr(orig && !f.custom ? 'The game’s text.' : auto ? 'This text is made from the trigger, the conditions and the counting below, and it follows their changes. The goal stays out of the text: the game shows it as the feat’s progress.' : 'This is the text of the game’s feat this one came from. Once you change a rule, the text is made from the rules.'))}</p>`; };
   const regra = () => { f.textoAuto = true; mudou(); previa(); };
   const re = () => { f.textoAuto = true; mudou(); renderFacanhas(); };
   $('#ff_nome').oninput = e => { f.nome = e.target.value; mudou(); previa(); };

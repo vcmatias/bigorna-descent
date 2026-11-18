@@ -34,7 +34,7 @@ namespace Bigorna.Encontro
         public const string NomeDoOneshot = "Bigorna Oneshot";
 
         /// <summary>Abre um mapa avulso: com grupo novo, ou com o grupo de uma partida gravada (Continuar herois).</summary>
-        public static string Lancar(Dmap m, GrupoDoSave.Save grupo = null, InfoOneshot oneshot = null)
+        public static string Lancar(Dmap m, GrupoDoSave.Save grupo = null, InfoOneshot oneshot = null, DifficultySetting? nivel = null)
         {
             // (v263: a lista guarda os mapas lidos; a partida joga uma cópia lida agora, que a partida pode mudar à vontade)
             if (m != null && !string.IsNullOrEmpty(m.Caminho) && File.Exists(m.Caminho)) try { m = Dmap.Carregar(m.Caminho); } catch (Exception ex) { Log.Info("relendo o mapa para jogar: " + ex.Message); }
@@ -53,7 +53,7 @@ namespace Bigorna.Encontro
                 partida.QuestId = cena.Id;
                 partida.EncounterIndex = 0;
                 partida.PartyName = oneshot != null ? NomeDoOneshot : "Bigorna";
-                partida.GameDifficulty = Dificuldade(m);
+                partida.GameDifficulty = nivel ?? Dificuldade(m);   // (v372: o nível escolhido no quadro do jogo; sem ele, o do mapa)
                 if (grupo != null) { var e = GrupoDoSave.Trazer(partida, grupo); if (e != null) return e; } else GrupoDoSave.SemOrigem();
                 var salvar = SingletonBehaviour<SaveLoadController>.Instance;
                 Jogo.DadosJogo.CurrentSaveIndex = 0;

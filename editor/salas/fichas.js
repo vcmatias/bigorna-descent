@@ -182,7 +182,7 @@ function listaEmGrupos(l, itens, pintar, grupo) {
   if (jogo.length) {
     const chave = chaveDaListaF(); const d = document.createElement('details'); d.className = 'rolJogo grupoJogo';
     d.open = !!_jogoAberto[chave] || jogo.some(x => x.id === fichaSel) || !proprios.length; d.ontoggle = () => { _jogoAberto[chave] = d.open; };
-    d.innerHTML = `<summary>${esc(tr('Of the game'))} <span class="etq">${jogo.length}</span></summary><p class="ajuda">${esc(tr('As in the game: they change nowhere. Duplicate one to make it yours and change it.'))}</p><div class="lista"></div>`;
+    d.innerHTML = `<summary>${esc(tr('Of the game'))} <span class="etq">${jogo.length}</span></summary><p class="ajuda">${esc(tr('These are as in the game and stay unchanged everywhere. Duplicate one to make it yours, then change the copy.'))}</p><div class="lista"></div>`;
     por(d.querySelector('.lista'), jogo); l.appendChild(d);
   }
   if (!vis.length) l.innerHTML = `<p class="ajuda">${esc(itens.length ? tr('Nothing with these filters.') : 'Nothing yet.')}</p>`;
@@ -209,7 +209,7 @@ function explicacaoDaAba(aba) {
   const dois = (en, pt) => '<div data-sem-traducao>' + L2(en, pt) + '</div>';
   switch (aba) {
     case 'monstros': return ['The monster workshop', `<p>Here you prepare the monsters of this ${onde}. Only the monsters listed here can be placed on the board or drawn from the spawn pool.</p>
-    <ul><li><b>Import</b> a monster from the game (Act I or Act II) and change what you want: name, health, defense, weaknesses and resistances, activations and tactics, loot, sounds, picture and figure.</li>
+    <ul><li><b>Import</b> a monster from the game (Act I or Act II), then change what you want: name, health, defense, weaknesses and resistances, activations and tactics, loot, sounds, picture and figure.</li>
     <li><b>Create</b> a new monster from a type: it borrows the behaviour of that type and you write the rest.</li></ul>
     ${typeof Tutorial !== 'undefined' && Tutorial.ativo() ? '<p><b>For this tutorial, import about 10 monsters</b> of the act you want to play: they go into the spawn pool of the map.</p>' : `<p><b>To begin, import just 2 or 3 monsters.</b> A short list is easier to balance and to test; add more as the ${onde} grows.</p>`}`];
     case 'itens': return ['The item workshop', `<p>Here you choose the items of this ${onde}: import them from the game, change them (name, rarity, value, damage, abilities) or create your own.
@@ -274,7 +274,7 @@ function renderFichas() {
   const escolhaTipo = '';
   esq.innerHTML = `<div class="bloco"><h2>${abaF === 'itens' ? TIPOS_ITEM.find(t => t[0] === tipoItem)[1] : titulo} <span class="etq">${lista.length}</span></h2>${escolhaTipo}
     <div class="botoes">${variante ? `<button class="sm primario" id="f_novo">+ New ${abaF === 'pecas' ? 'tile' : 'object'}</button>` : `<button class="sm" id="f_importar">Import…</button><button class="sm primario" id="f_novo">+ Create</button>`}${botaoLote()}</div>
-    <p class="ajuda">${abaF === 'monstros' ? 'Only monsters listed here can be placed on the board or drawn from the pool. Import the game’s monsters one by one (they stay as in the game; duplicate one to change it), or create your own from a type.' : abaF === 'personagens' ? 'Only NPCs listed here appear in dialogues (speaker and cast). Import the game’s NPCs (the six heroes of the box too, to speak as NPCs) or create your own with a portrait.' : abaF === 'itens' ? esc(TIPOS_ITEM.find(t => t[0] === tipoItem)[2]) + ' Only items listed in the workshop can be given by triggers, rewards and dialogues, dropped by monsters or crafted.' : abaF === 'pecas' ? 'Your own tiles, made from scratch: click the squares of their shape and pick a colour. Each one is a single physical piece (once per room, like the game tiles) and appears in the Tile palette.' : 'Your own objects, made from scratch: click the squares they cover, pick a colour and an icon, write default texts. They take triggers and requirements like any object and appear in the Object palette.'}</p>
+    <p class="ajuda">${abaF === 'monstros' ? 'Only the monsters listed here can go on the board or be drawn from the pool. Import the game’s monsters one by one: they stay as in the game, and you duplicate one to change it. Or create your own from a type.' : abaF === 'personagens' ? 'Only the NPCs listed here appear in dialogues, as speaker or cast. Import the game’s NPCs (including the six heroes of the box, so they can speak as NPCs) or create your own with a portrait.' : abaF === 'itens' ? esc(TIPOS_ITEM.find(t => t[0] === tipoItem)[2]) + ' Only the items listed in the Workshop can be given by triggers, rewards and dialogues, dropped by monsters or crafted. To use an item of the game, import it here first.' : abaF === 'pecas' ? 'Tiles you make yourself, from scratch. Click the squares of the shape and pick a colour. Each tile is a single physical piece: like the game tiles, it goes once per room. It then appears in the Tile palette.' : 'Your own objects, made from scratch. Click the squares they cover, pick a colour and an icon, and write default texts. They take triggers and requirements like any object and appear in the Object palette.'}</p>
     <div id="f_lista"></div></div>` + (abaF === 'monstros' ? `<div class="bloco"><h2>Spawn pool of the map</h2><p class="ajuda">Monsters the “Spawn from the pool” trigger draws from. Each room starts with this list and may adjust it.</p><div id="f_pool"></div></div>` : abaF === 'itens' ? `<div class="bloco"><h2>Item pool of the map</h2><p class="ajuda">Items the heroes may get in this map: random-item triggers draw from it.</p><div id="f_poolItens"></div></div>` : '');
   const l = $('#f_lista');
   botaoDeFiltro(esq.querySelector('.bloco'), lista, renderFichas);
@@ -630,7 +630,7 @@ function sonsExportados(m) {
 function fichaMonstro(c, m) {
   const orig = monstroOriginal(m);
   const cab = `<div class="cabF"><h2>${esc(m.nome)} <span class="etq ${orig ? '' : 'custom'}">${orig ? 'original of the game' : 'custom'}</span></h2><div class="botoes"><button class="sm ${orig ? 'primario' : ''}" id="fm_dup">Duplicate</button><button class="sm perigo" id="fm_apaga">Delete</button></div></div>`
-    + (orig ? avisoOficial(m.custom ? 'This original was changed by an older version of the editor: those changes stay out of the game.' : '', '') : '');
+    + (orig ? avisoOficial(m.custom ? 'An older version of the editor changed this original. The game leaves those changes out.' : '', '') : '');
   const variantes = CAT.monstros.filter(z => monstroDeEscolha(z) && TIPOS_MONSTRO[z.Type] === m.tipo && z.name_en && !/^ENEMY_/.test(z.name_en));
   c.innerHTML = cab + `<div class="folha">
     <div class="col">
@@ -639,26 +639,26 @@ function fichaMonstro(c, m) {
       <div data-descricao></div>
       <div class="duas"><label class="campo">Type ${orig ? `<input value="${esc(m.tipo)}" disabled>` : `<select data-tipom>${TIPOS_MONSTRO.filter(Boolean).slice().sort((a, b) => a.localeCompare(b)).map(t => `<option ${m.tipo === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`}<small class="ajuda">The figure, animations and behaviour family in the app.</small></label>
       <label class="campo">Size <select data-c="size">${TAMANHOS.map((t, i) => `<option value="${i}" ${m.size === i ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>
-      <label class="campo">Behaviour (rules and figure of…) <select data-c="comportamento">${variantes.map(z => `<option value="${esc(z._id)}" ${m.comportamento === z._id ? 'selected' : ''}>${esc(z.name_en)}${z.IsNamed ? ' (boss)' : ''}</option>`).join('')}</select><small class="ajuda">The app runs this monster with the logic, figure and animations of the chosen game monster of the same type.</small></label>
+      <label class="campo">Behaviour (rules and figure of…) <select data-c="comportamento">${variantes.map(z => `<option value="${esc(z._id)}" ${m.comportamento === z._id ? 'selected' : ''}>${esc(z.name_en)}${z.IsNamed ? ' (boss)' : ''}</option>`).join('')}</select><small class="ajuda">The app runs this monster with the logic, figure and animations of the game monster you choose here, of the same type.</small></label>
       <div class="duas"><label class="chk"><input type="checkbox" data-c="named" ${m.named ? 'checked' : ''}> Named (unique boss)</label><label class="chk"><input type="checkbox" data-c="villain" ${m.villain ? 'checked' : ''}> Villain (boss music and tab)</label></div>
       <div class="sub">Animated art (activation, attack and info windows)</div>
       <div class="botoes"><button class="sm ${m.arteModo === 'imagem' ? '' : 'ativo'}" data-arte="jogo">Animation of the game</button><button class="sm ${m.arteModo === 'imagem' ? 'ativo' : ''}" data-arte="imagem">My picture</button></div>
       ${m.arteModo === 'imagem' ? `<div class="retrato" style="margin-top:8px"><div class="quadro alto">${m.arte ? `<img loading="lazy" decoding="async" ${imgTardia(m.arte)} alt="">` : '<span>no picture</span>'}</div><div>
         <label class="sm botaoArquivo">Upload the picture (PNG)<input type="file" accept="image/png,image/webp,image/jpeg" data-arteimg hidden></label>${m.arte ? botaoAjustar('arte') : ''}
         ${ajustesArte(m, false, k => ({ esc: 'data-artesc', alt: 'data-artey', lado: 'data-artex' })[k])}
-        <p class="ajuda">Takes the place of the animated drawing of the behaviour monster in the windows that show it (its activation, a hero attacking it, its info). It is fitted to the part of each window that is really visible; the adjustments above move it from there. It breathes lightly, and the game’s own hit reactions (shake, flash) apply to it. PNG with a transparent background looks best.</p></div></div>`
+        <p class="ajuda">This picture takes the place of the animated drawing of the behaviour monster in the windows that show it: its activation, a hero attacking it, its info. It fits the part of each window that is really visible, and the adjustments above move it from there. It breathes lightly, and the game’s own hit reactions (shake, flash) apply to it. A PNG with a transparent background looks best.</p></div></div>`
         : '<p class="ajuda">The animated drawing of the monster chosen in Behaviour.</p>'}
       <div class="sub">Figure on the board</div>
       <div class="botoes"><button class="sm ${!['standee', 'modelo'].includes(m.figura) ? 'ativo' : ''}" data-fig="anim">${L2('Animated (game)', 'Animada (jogo)')}</button><button class="sm ${m.figura === 'standee' ? 'ativo' : ''}" data-fig="standee">Standing card</button><button class="sm ${m.figura === 'modelo' ? 'ativo' : ''}" data-fig="modelo">3D model</button></div>
       ${m.figura === 'modelo' ? `<div id="fm_modelo"></div>` : ''}
       ${m.figura === 'standee' ? `<div class="retrato" style="margin-top:8px"><div class="quadro alto">${standeeDoMonstro(m) ? `<img loading="lazy" decoding="async" ${imgTardia(standeeDoMonstro(m))} alt="">` : '<span>no picture</span>'}</div><div>
-        <p class="ajuda">${m.standee ? 'A picture of its own for the card.' : m.arte ? 'The picture of the monster (above), standing on the board.' : 'Upload the picture of the monster (Animated art → My picture): the card uses it. Or one for the card only:'}</p>
+        <p class="ajuda">${m.standee ? 'A picture of its own for the card.' : m.arte ? 'The picture of the monster (above), standing on the board.' : 'Upload the picture of the monster in Animated art → My picture, and the card uses it. Or upload one for the card only:'}</p>
         <label class="sm botaoArquivo">${m.arte || m.standee ? 'Another picture for the card' : 'Upload the card picture (PNG)'}<input type="file" accept="image/png,image/webp,image/jpeg" data-standee hidden></label>${standeeDoMonstro(m) ? botaoAjustar('standee') : ''}${m.standee && m.arte ? '<button class="sm" data-standeeArte>Use the monster’s picture</button>' : ''}
         <label class="campo">Size <select data-esc>${ESCALAS_STANDEE.map(([k, n]) => `<option value="${k}" ${(m.escalaStandee || 1) === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
-        <p class="ajuda">The animated figure of the behaviour monster is hidden and this picture stands in its place, turned to the camera, as tall as the figure it replaces (times the size). It breathes lightly and shakes when hurt; the monster still moves, attacks and is clicked as usual. Transparent PNG, taller than wide.</p></div></div>`
+        <p class="ajuda">On the board, this picture stands in place of the animated figure of the behaviour monster, which is hidden. It faces the camera and is as tall as the figure it replaces, times the size. It breathes lightly and shakes when hurt. The monster still moves, attacks and is clicked as usual. Use a transparent PNG, taller than wide.</p></div></div>`
         : '<p class="ajuda">The animated figure of the monster chosen in Behaviour.</p>'}
       <div class="sub">Tiers <button class="sm" id="fm_tier">+ Tier</button></div>
-      <p class="ajuda">One line per difficulty tier the monster exists in: starting health, defense and base attack. ⚖ Balance, beside the lowest tier, recalculates the others from it with the game's own curve.</p>
+      <p class="ajuda">One line for each difficulty tier the monster exists in: starting health, defense and base attack. ⚖ Balance, beside the lowest tier, recalculates the other tiers from it with the game's own curve.</p>
       <div id="fm_tiers"></div>
       <div class="sub">Weaknesses, resistances and immunities</div>
       <div class="wr">${DANOS.map(d => { const w = (m.wr || []).find(z => z.dano === d); const v = w ? w.tipo + ':' + (w.quando || 'always') : ''; const op = (val, txt) => `<option value="${val}" ${v === val ? 'selected' : ''}>${txt}</option>`;
@@ -669,10 +669,10 @@ function fichaMonstro(c, m) {
     </div>
     <div class="col">
       <div class="sub">Activations ${orig ? '' : '<button class="sm" id="fm_ativ">+ Activation</button><button class="sm" id="fm_ativImp">Import…</button>'}</div>
-      <p class="ajuda"><b>The order counts:</b> the monster does its activations in this order (1 first); ↑ ↓ change it. “next” chains them. Speed, damage, aim, attack, range, healing, shield, initiative and range type are the numbers the app uses; the text is what the players read.</p>
+      <p class="ajuda"><b>The order counts:</b> the monster does its activations in this order, 1 first. Use ↑ ↓ to change the order. In “next”, pick the activation that follows this one. Speed, damage, aim, attack, range, healing, shield, initiative and range type are the numbers the app uses; the text is what the players read.</p>
       <div id="fm_ativs"></div>
       <div class="sub">Tactics (manual activations) ${orig ? '' : '<button class="sm" id="fm_tat">+ Tactic</button><button class="sm" id="fm_tatImp">Import…</button>'}</div>
-      <p class="ajuda">Special activations the app may pick through the type’s behaviour. A tactic made here (+ Tactic) is picked by Bigorna instead: each round the app draws among the tactics whose condition holds, or none, never the same one twice in a row; the hint is shown when it is revealed, the text when the monster activates. With at least one of them, the game’s tactics of this monster stop coming.</p>
+      <p class="ajuda">Tactics are special activations. The app picks the game’s tactics through the type’s behaviour. A tactic you make here (“+ Tactic”) is picked by Bigorna instead: each round it draws one among the tactics whose condition holds at that moment, or none, and never the same one twice in a row. The hint shows when the tactic is revealed; the text shows when the monster activates. Once this monster has one of your tactics, the game’s tactics stop coming for it.</p>
       <div id="fm_tats"></div>
       <div class="sub">Defense (when a hero attacks it)</div>
       <p class="ajuda">The monster’s own rule shown in the attack window, like the bandit’s “Smokebomb”. Leave empty to keep the one of the behaviour monster.</p>
@@ -682,8 +682,8 @@ function fichaMonstro(c, m) {
       <label class="chk"><input type="checkbox" id="fm_defapos" ${m.defesaApos ? 'checked' : ''}> Show it after the attack (not before)</label>
       ${defesaImportada(m) ? `<div class="sub pequena">What the app does by itself when a hero attacks it</div>
       <div class="botoes">${[['jogo', 'Same as the behaviour monster'], ['nenhum', 'Nothing (the table applies the text)'], ['proprio', 'My own effect']].map(([k, n]) => `<button class="sm ${(m.defesaModo || 'jogo') === k ? 'ativo' : ''}" data-dmodo="${k}">${n}</button>`).join('')}</div>
-      ${(m.defesaModo || 'jogo') === 'proprio' ? `<div id="fm_defef">${(m.defesaEfeitos || []).map((f, i) => `<div class="linha efeitoDef"><select data-ef="tipo" data-i="${i}">${EFEITOS_DEFESA.map(([k, n]) => `<option value="${k}" ${f.tipo === k ? 'selected' : ''}>${n}</option>`).join('')}</select><label>N <select data-ef="n" data-i="${i}">${opcoesDoN(f)}</select></label>${camposDoReforco(f, 'd:' + i)}<button class="sm" data-efx="${i}">✕</button></div>`).join('') || '<p class="ajuda">No effect yet.</p>'}</div><button class="sm" id="fm_defadd">+ Effect</button><p class="ajuda">Applied every time a hero attacks this monster, before the attack. Write the same in the rules above so the players know.</p>`
-        : `<p class="ajuda">${(m.defesaModo || 'jogo') === 'nenhum' ? 'The app changes nothing; the players apply the defense at the table.' : 'The behaviour monster’s rule: ' + (DEFESA_AUTOMATICA[m.tipo] || 'none, the players apply the text at the table') + '.'}</p>`}` : (m.defesa || '').trim() ? '<p class="ajuda">A defense of your own: the players apply it at the table (the app applies by itself only a defense imported from the game).</p>' : ''}
+      ${(m.defesaModo || 'jogo') === 'proprio' ? `<div id="fm_defef">${(m.defesaEfeitos || []).map((f, i) => `<div class="linha efeitoDef"><select data-ef="tipo" data-i="${i}">${EFEITOS_DEFESA.map(([k, n]) => `<option value="${k}" ${f.tipo === k ? 'selected' : ''}>${n}</option>`).join('')}</select><label>N <select data-ef="n" data-i="${i}">${opcoesDoN(f)}</select></label>${camposDoReforco(f, 'd:' + i)}<button class="sm" data-efx="${i}">✕</button></div>`).join('') || '<p class="ajuda">No effect yet.</p>'}</div><button class="sm" id="fm_defadd">+ Effect</button><p class="ajuda">Applied every time a hero attacks this monster, just before the attack. Write the same effect in the rules above, so the players know about it.</p>`
+        : `<p class="ajuda">${(m.defesaModo || 'jogo') === 'nenhum' ? 'The app changes nothing; the players apply the defense at the table.' : 'The behaviour monster’s rule: ' + (DEFESA_AUTOMATICA[m.tipo] || 'none, the players apply the text at the table') + '.'}</p>`}` : (m.defesa || '').trim() ? '<p class="ajuda">A defense of your own: the players apply it at the table. The app applies a defense by itself only when it was imported from the game.</p>' : ''}
       <div class="sub">Default loot</div>
       <div id="fm_loot"></div>
       <div class="sub">Sounds</div>
@@ -730,7 +730,7 @@ function fichaMonstro(c, m) {
       marcar(m, c); tiers(); aviso('Tiers ' + m.tiers.map(t => t.tier).join(', ') + ' balanced from tier ' + base.tier + '.');
     }; };
   tiers(); $('#fm_tier').onclick = () => { const u = (m.tiers || []).reduce((a, t) => !a || t.tier > a.tier ? t : a, null); m.tiers.push(u ? tierPelaCurva(u, u.tier + 1) : { tier: 1, hp: 20, def: 1, atk: 1 }); marcar(m, c); tiers(); };
-  const ativs = (chave, el) => { const lista = m[chave] || (m[chave] = []); el.innerHTML = lista.map((a, i) => `<div class="ativ ${chave === 'taticas' ? 'tatica' : ''}"><div class="cabAtiv"><span class="numAtiv">${chave === 'taticas' ? L2('Tactic', 'Tática') : L2('Activation', 'Ativação')} ${i + 1}</span><input data-a="nome" data-i="${i}" value="${esc(nomeAtivacao(a))}" placeholder="Name">${orig ? '' : `<button class="sm" data-asobe="${i}" title="${esc(tr('Move up'))}" ${i ? '' : 'disabled'}>↑</button><button class="sm" data-adesce="${i}" title="${esc(tr('Move down'))}" ${i < lista.length - 1 ? '' : 'disabled'}>↓</button><button class="sm" data-arol="${i}" title="${esc(tr('Keep a copy in the roll of activations and tactics: it can be imported into any monster, in any map'))}">${noRol(chave, a) ? '✓ ' + esc(tr('In the roll')) : '+ ' + esc(tr('Add to the roll'))}</button><button class="sm" data-ax="${i}" title="Delete this ${chave === 'taticas' ? 'tactic' : 'activation'}">✕</button>`}</div>
+  const ativs = (chave, el) => { const lista = m[chave] || (m[chave] = []); el.innerHTML = lista.map((a, i) => `<div class="ativ ${chave === 'taticas' ? 'tatica' : ''}"><div class="cabAtiv"><span class="numAtiv">${chave === 'taticas' ? L2('Tactic', 'Tática') : L2('Activation', 'Ativação')} ${i + 1}</span><input data-a="nome" data-i="${i}" value="${esc(nomeAtivacao(a))}" placeholder="Name">${orig ? '' : `<button class="sm" data-asobe="${i}" title="${esc(tr('Move up'))}" ${i ? '' : 'disabled'}>↑</button><button class="sm" data-adesce="${i}" title="${esc(tr('Move down'))}" ${i < lista.length - 1 ? '' : 'disabled'}>↓</button><button class="sm" data-arol="${i}" title="${esc(tr('Keeps a copy in the roll of activations and tactics. You can then import it into any monster, in any map'))}">${noRol(chave, a) ? '✓ ' + esc(tr('In the roll')) : '+ ' + esc(tr('Add to the roll'))}</button><button class="sm" data-ax="${i}" title="Delete this ${chave === 'taticas' ? 'tactic' : 'activation'}">✕</button>`}</div>
       <div class="nums">${['speed', 'damage', 'aim', 'attack', 'range', 'healing', 'shield', 'initiative'].map(k => `<label>${k}<input type="number" data-a="${k}" data-i="${i}" value="${a[k] || 0}"></label>`).join('')}<label>range type<select data-a="rangeType" data-i="${i}">${ALCANCES.map(r => `<option ${a.rangeType === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label><label>next<select data-a="next" data-i="${i}"><option value="">—</option>${lista.map((z, j) => j !== i ? `<option value="${esc(z.id || z.nome)}" ${a.next === (z.id || z.nome) ? 'selected' : ''}>${esc(z.nome)}</option>` : '').join('')}</select></label></div>
       ${chave === 'taticas' && taticaPropria(a) ? `<div class="linha quandoTat"><label class="campo">When it can come <select data-a="quando" data-i="${i}">${QUANDO_TATICA.map(([k, n]) => `<option value="${k}" ${(a.quando || 'sempre') === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
         <div class="efeitosTat"><small>When revealed, the app applies:</small> ${(a.efeitos || []).map((f, j) => `<span class="tag"><select data-tef="tipo" data-i="${i}" data-j="${j}">${EFEITOS_DEFESA.map(([k, n]) => `<option value="${k}" ${f.tipo === k ? 'selected' : ''}>${n}</option>`).join('')}</select> N <select data-tef="n" data-i="${i}" data-j="${j}">${opcoesDoN(f)}</select>${camposDoReforco(f, i + ':' + j)} <a href="#" data-tefx="${i}:${j}">✕</a></span>`).join('')} <button class="sm" data-tefadd="${i}">+ effect</button></div></div>` : ''}
@@ -819,7 +819,7 @@ function campoDaCena(p) {
     ${modo === 'auto' ? `<label class="campo">${esc(tr('Figure of'))} <select data-cenade><option value="">${esc(tr('The one with the same name') + (p.cenaDe ? '' : f ? ': ' + f.nome : ': ' + tr('none')))}</option>${fs.map(x => `<option value="${esc(x.chave)}" ${p.cenaDe === x.chave ? 'selected' : ''} data-sem-traducao>${esc(x.nome)} (${esc(tr(x.tipo === 'hero' ? 'hero' : 'monster'))})</option>`).join('')}</select></label>` : modo === 'imagem' ? `<label class="campo">&nbsp;<span class="linha"><label class="sm botaoArquivo">${esc(tr('Upload PNG/JPG'))}<input type="file" accept="image/png,image/jpeg,image/webp" data-cenaarq hidden></label></span></label>` : ''}</div>
     ${fonte ? `<label class="campo">${esc(tr('Cut from the bottom'))} <span class="linha"><input type="range" min="0" max="80" step="1" value="${corte}" data-cenacorte style="flex:1"><b data-cenapct>${corte}%</b></span></label>
       <div class="previaCena" data-previacena><img alt="" data-cenaimg></div>` : ''}
-    <p class="ajuda">${esc(modo === 'auto' ? (fonte ? tr('The picture of the animated figure, with the legs cut off: only the torso shows in the scenes. Move the cut to fit it.') : tr('No monster or hero with an animated-figure picture goes by this name: the scenes show the portrait. Link one above, or pick a picture of its own.')) : modo === 'imagem' ? tr('A picture for the scenes (transparent PNG of the figure looks best); the cut takes off its bottom part.') : tr('The scenes show the portrait.'))}</p>`;
+    <p class="ajuda">${esc(modo === 'auto' ? (fonte ? tr('This is the picture of the animated figure, with the legs cut off. Only the torso shows in the scenes. Move the cut until it fits.') : tr('No monster or hero with an animated-figure picture has this name, so the scenes show the portrait. Link one above, or pick a picture of its own.')) : modo === 'imagem' ? tr('Pick a picture for the scenes. A transparent PNG of the figure looks best. The cut takes off its bottom part.') : tr('The scenes show the portrait.'))}</p>`;
 }
 function ligarCena(c, p) {
   const s = c.querySelector('[data-cenamodo]'); if (!s) return;
@@ -838,7 +838,7 @@ function fichaPersonagem(c, p) {
     ${orig ? avisoOficial('', '') : ''}<div class="folha"><div class="col">
     ${retratoCampo(p, 'Portrait in the story boxes (speaker and cast). Transparent PNG of the bust, 512 px or more, looks best.')}
     <label class="campo">Name <input data-c="nome" value="${esc(p.nome)}"></label>
-    ${ehHeroiDaCaixa(p.base) ? '<p class="ajuda">A hero of the box used as an NPC: it only speaks in dialogues. To change the playable hero, use the Heroes tab.</p>' : ''}
+    ${ehHeroiDaCaixa(p.base) ? '<p class="ajuda">A hero of the box used as an NPC: here it only speaks in dialogues. To change the hero the players play, use the “Heroes” tab.</p>' : ''}
     <label class="campo">Notes (for you, not shown in the app) <textarea data-c="desc" rows="3">${esc(p.desc || '')}</textarea></label>
     </div><div class="col">${campoDaCena(p)}</div></div>`;
   ligarRetrato(c, p, 512); ligarEspelhos(c, p); ligarCena(c, p);
@@ -859,17 +859,17 @@ function fichaItem(c, i) {
   const receitas = (oficina().receitas || []).filter(r => r.item === i.id);
   const orig = !!i.base, mudado = orig && itemMudou(i);
   c.innerHTML = `<div class="cabF"><h2>${esc(i.nome)} <span class="etq ${orig ? '' : 'custom'}">${orig ? (mudado ? 'original of the game, changed' : 'original of the game') : 'custom'}</span></h2><div class="botoes">${orig ? '<button class="sm primario" id="fi_dup">⧉ Duplicate</button>' : ''}${mudado ? '<button class="sm" id="fi_volta">↺ Back to the game’s</button>' : ''}<button class="sm perigo" id="fi_apaga">Delete</button></div></div>
-    ${orig ? avisoOficial(mudado ? 'This original was changed by an older version of the editor: “↺ Back to the game’s” undoes it.' : '', '') : ''}<div class="folha"><div class="col">
+    ${orig ? avisoOficial(mudado ? 'An older version of the editor changed this original. To undo it, use “↺ Back to the game’s”.' : '', '') : ''}<div class="folha"><div class="col">
     ${retratoCampo(i, mat ? 'The material’s picture in the app. Square, 256 px or more.' : 'Card art shown in the app. Square, 256 px or more.')}
     <label class="campo">Name <input data-c="nome" value="${esc(i.nome)}"></label>
     <div data-descricao></div>
     ${mat ? `<div class="duas"><label class="campo">Kind <select data-c="tipoMaterial"><option value="0" ${!+i.tipoMaterial ? 'selected' : ''}>Base material (common: leather, metal…)</option><option value="1" ${+i.tipoMaterial === 1 ? 'selected' : ''}>Essence (uncommon: Ignos, Lumos…)</option></select></label>
       <label class="campo">Value (loot points) <input type="number" min="1" data-c="valor" value="${i.valor || 5}"></label></div>
-      <p class="ajuda">Random loot is paid in materials up to its points: the value is what one unit is worth. Recipes list how many units they cost.</p>`
+      <p class="ajuda">Random loot pays materials up to its points. The value is what one unit is worth. Example: loot of 6 points can pay 3 units of value 2. Recipes list how many units they cost.</p>`
     : `<div class="duas"><label class="campo">Kind <input value="${esc(tr(TIPOS_ITEM.find(t => doTipoItem(i, t[0]))?.[1] || i.cls))}${i.cls === 'TableItem' ? ' (table-only card)' : ''}" disabled></label><label class="campo">Rarity <select data-c="raridade">${RARIDADES.map((r, k) => k ? `<option value="${k}" ${i.raridade === k ? 'selected' : ''}>${r}</option>` : '').join('')}</select></label></div>
     <div class="duas"><label class="campo">Value (gold) <input type="number" min="0" data-c="valor" value="${i.valor || 0}"></label>${i.cls === 'ConsumableModel' ? `<label class="chk"><input type="checkbox" data-c="unico" ${i.unico ? 'checked' : ''}> Unique (one per party)</label>` : ''}</div>
-    ${i.cls === 'ArmorModel' || i.cls === 'ConsumableModel' ? `<p class="ajuda">${i.cls === 'ArmorModel' ? 'Armor' : 'A consumable'} is played at the table: the app keeps it in the inventory and shows its card, with your name, text and art.</p>` : i.cls !== 'TableItem' ? `<label class="campo">Effect of (game item of the same kind) <select data-c="efeitoBase"><option value="">— none: played at the table —</option>${bases.map(b => `<option value="${esc(b._id)}" ${(i.efeitoBase || (i.custom ? '' : i.base)) === b._id ? 'selected' : ''}>${esc(b.name_en)}</option>`).join('')}</select><small class="ajuda">The app applies the effect of this game item; the card shows your name, text and art.</small></label>` : '<p class="ajuda">A card the app shows and hands to the party; its effect is applied at the table.</p>'}`}
-    ${i.cls === 'TrinketModel' && !orig ? `<div class="sub">Triggers</div><p class="ajuda">What makes this trinket go off while a hero has it equipped, the chance of it, and what the app does then. The text goes on screen when it goes off, for what the table applies (health, fatigue…).</p><div id="fi_disparos"></div>` : ''}
+    ${i.cls === 'ArmorModel' || i.cls === 'ConsumableModel' ? `<p class="ajuda">${i.cls === 'ArmorModel' ? 'Armor' : 'A consumable'} is played at the table: the app keeps it in the inventory and shows its card, with your name, text and art.</p>` : i.cls !== 'TableItem' ? `<label class="campo">Effect of (game item of the same kind) <select data-c="efeitoBase"><option value="">— none: played at the table —</option>${bases.map(b => `<option value="${esc(b._id)}" ${(i.efeitoBase || (i.custom ? '' : i.base)) === b._id ? 'selected' : ''}>${esc(b.name_en)}</option>`).join('')}</select><small class="ajuda">The app applies the effect of this game item. The card shows your name, text and art.</small></label>` : '<p class="ajuda">A card the app shows and hands to the party; its effect is applied at the table.</p>'}`}
+    ${i.cls === 'TrinketModel' && !orig ? `<div class="sub">Triggers</div><p class="ajuda">Set what makes this trinket go off while a hero has it equipped, the chance of that, and what the app does then. When it goes off, its text shows on screen, so the table applies the rest (health, fatigue…).</p><div id="fi_disparos"></div>` : ''}
     ${mat ? `<div class="sub">${esc(tr('Recipes that cost it'))}</div><div id="fi_usam"></div>` : `<div class="sub">${esc(tr('Recipe'))}</div><div id="fi_receitas"></div>`}
     </div></div>`;
   ligarRetrato(c, i, 256); ligarEspelhos(c, i);
@@ -883,7 +883,7 @@ function fichaItem(c, i) {
     // o clique abre a ficha da coisa, também a da versão + pelo item dela)
     const doMat = r => (r.custos || []).filter(x => x.mat === i.id || (i.base && x.mat === i.base)).reduce((s, x) => s + (+x.qtd || 0), 0);
     fu.innerHTML = usam.length ? usam.map((r, k) => { const a = itemAlvo(r.item);
-      return `<a href="#" class="tag receitaUsa" data-usa="${k}" title="${esc((a?.nome || '?') + ' ← ' + custoResumo(r))}">${a?.img ? `<img class="icoPeca" loading="lazy" decoding="async" ${imgTardia(a.img)} alt="">` : '<span class="icoPeca"></span>'}<span>${esc(a?.nome || '?')}</span> <small>× ${doMat(r)}</small></a>`; }).join(' ') : `<p class="ajuda">${esc(tr('No recipe costs it yet: the recipes are made in the sheet of the item they craft.'))}</p>`;
+      return `<a href="#" class="tag receitaUsa" data-usa="${k}" title="${esc((a?.nome || '?') + ' ← ' + custoResumo(r))}">${a?.img ? `<img class="icoPeca" loading="lazy" decoding="async" ${imgTardia(a.img)} alt="">` : '<span class="icoPeca"></span>'}<span>${esc(a?.nome || '?')}</span> <small>× ${doMat(r)}</small></a>`; }).join(' ') : `<p class="ajuda">${esc(tr('No recipe uses it yet. You make recipes on the sheet of the item they craft.'))}</p>`;
     fu.querySelectorAll('[data-usa]').forEach(a => a.onclick = ev => { ev.preventDefault(); const r = usam[+a.dataset.usa]; const ids = [r.item, semMais(r.item)]; const x = ITENS_B().find(z => ids.some(id => z.id === id || (z.base && z.base === id))); if (!x) return aviso(tr('The item of this recipe is not in the Workshop.')); abrirFichas('itens', x.id); }); }
   $('#fi_apaga').onclick = () => apagarFicha(i);
   if (!orig) return;
@@ -1005,7 +1005,7 @@ function fichaPeca(c, v) {
     <div class="sub">Kind</div>
     <div class="botoes"><button class="sm ${!v.underlay ? 'ativo' : ''}" data-und="0">Tile</button><button class="sm ${v.underlay ? 'ativo' : ''}" data-und="1">Underlay</button></div>
     <label class="campo">How many of this piece you have <input type="number" min="1" max="99" id="fv_copias" value="${Math.max(1, +v.copias || 1)}" style="width:70px"></label>
-    ${v.underlay ? `<p class="ajuda">An underlay lies on the floor under the tiles (level 0), like water or spikes: the tiles go on top of it. It is not bound to one room, and the map may use it as many times as you have copies.</p>` : ''}
+    ${v.underlay ? `<p class="ajuda">An underlay lies on the floor under the tiles (level 0), like water or spikes, and the tiles go on top of it. It belongs to no room, and the map can use it as many times as you have copies.</p>` : ''}
     <div class="sub">Shape</div><div id="fv_forma"></div>
     <div class="sub">Surface</div>
     <div class="botoes">${MODOS_TEXTURA.map(([k, n]) => `<button class="sm ${modo === k ? 'ativo' : ''}" data-tm="${k}">${n}</button>`).join('')}</div>
@@ -1015,7 +1015,7 @@ function fichaPeca(c, v) {
     <label class="campo">Notes (for you) <textarea data-c="notas" rows="3">${esc(v.notas || '')}</textarea></label>
     </div><div class="col">
     <div class="sub">Preview</div><div class="previa"><img id="fv_prev" loading="lazy" decoding="async" ${imgTardia(miniatura(t, v))} alt=""></div>
-    <p class="ajuda">${v.underlay ? 'A workshop underlay is your own board piece: in the app the mod lays it under the tiles, with your picture or colour.' : 'A workshop tile is your own physical piece: the map uses it as many times as you have it (in a room, or in rooms on the table together), like the tiles of the boxes; it takes pillars in its sockets (between two squares on a straight edge) when elevated. In the app the mod builds it as a flat tile of this shape, with your picture or colour, and the heroes walk on it like on any tile.'}</p>
+    <p class="ajuda">${v.underlay ? 'A Workshop underlay is your own board piece. In the app, the mod lays it under the tiles, with your picture or colour.' : 'A workshop tile is a physical piece of your own. Like the tiles of the boxes, the map uses it as many times as you have it, in one room or in rooms that are on the table together. When elevated, it takes pillars in its sockets (between two squares on a straight edge). In the app, the mod builds it as a flat tile of this shape, with your picture or colour. The heroes walk on it like on any tile.'}</p>
     </div></div>`;
   const refazer = () => { const img = c.querySelector('#fv_prev'); if (img) img.src = miniatura(defPeca(v.id), v); renderFichasLista(); desenhar(); };
   liga(c, v, k => { if (k === 'nome') { c.querySelector('h2').firstChild.textContent = v.nome + ' '; renderFichasLista(true); } });
@@ -1051,7 +1051,7 @@ function campoModelo3d(el, m, mudou, objeto) {
     <div class="linha" style="margin-top:6px"><label class="sm botaoArquivo">${m.modeloTex ? 'Replace the texture…' : 'Upload the texture (PNG, JPG)…'}<input type="file" accept="image/png,image/jpeg,image/webp" data-objtex hidden></label>${m.modeloTex ? `<img loading="lazy" decoding="async" ${imgTardia(m.modeloTex)} alt="" style="width:40px;height:40px;object-fit:cover;border-radius:4px"><button class="sm" data-objtexx>✕</button>` : '<span class="ajuda">none: a grey unpainted miniature</span>'}</div>
     <div class="duas">${objeto ? `<label class="campo">Height <select data-altmod>${ALTURAS_MODELO.map(([k, n]) => `<option value="${k}" ${(m.alturaModelo || 1) === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>` : `<label class="campo">Size <select data-escmod>${ESCALAS_STANDEE.map(([k, n]) => `<option value="${k}" ${(m.escalaModelo || 1) === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>`}
     <label class="campo">Facing <select data-giromod>${GIROS_MODELO.map(([k, n]) => `<option value="${k}" ${(m.giroModelo || 0) === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>
-    <p class="ajuda">${objeto ? 'Your model stands on the object’s squares, centred, as tall as the height chosen, turned with the object; clicking it uses the object.' : 'The figure of the behaviour monster is hidden and your model stands in its place, as tall as the figure it replaces (times the size), turned as the monster turns.'} <b>OBJ</b> (Wavefront) with UVs and one texture image: in Blender, File → Export → Wavefront (.obj). Up to about 100,000 faces keeps the game smooth. The file is saved next to the map files.</p></div></div>`;
+    <p class="ajuda">${objeto ? 'Your model stands on the object’s squares, centred, as tall as the height chosen, turned with the object; clicking it uses the object.' : 'The figure of the behaviour monster is hidden, and your model stands in its place. It is as tall as the figure it replaces (times the size), and it turns as the monster turns.'} <b>OBJ</b> (Wavefront) with UVs and one texture image. In Blender: File → Export → Wavefront (.obj). Keep it under about 100,000 faces so the game stays smooth. The file is saved next to the map files.</p></div></div>`;
   const cv = el.querySelector('[data-previa3d]');
   if (blob) previaObj(cv, blob, m); else { const g = cv.getContext('2d'); g.fillStyle = '#15171b'; g.fillRect(0, 0, cv.width, cv.height); g.fillStyle = '#8b93a1'; g.font = '12px system-ui'; g.fillText('no model', 60, 124); }
   el.querySelector('[data-obj]').onchange = async e => {
@@ -1138,7 +1138,7 @@ const CHAVE_ROL = 'bigorna-rol-ativacoes';
    Bem Mirado"), or "Ataque básico" for the basic ones. Typing a name keeps what was typed. */
 function nomeAtivacao(a) {
   const n = (a && a.nome) || '';
-  if (IDIOMA !== 'pt' || !/^[A-Z][A-Za-z]*( [A-Z0-9][A-Za-z0-9]*)+$/.test(n)) return n;
+  if (IDIOMA === 'en' || !/^[A-Z][A-Za-z]*( [A-Z0-9][A-Za-z0-9]*)+$/.test(n)) return n;
   const m = (a.text || '').match(/^\s*<b>([^<]+?):?\s*<\/b>/); if (m) return m[1].trim();
   const b = n.match(/\b(?:Basic|Default)(?: (\d))?$/); if (b) return 'Ataque básico' + (b[1] ? ' ' + b[1] : '');
   return n;
@@ -1181,9 +1181,9 @@ const TRAVADO_SEL = '[data-travado]';
 document.addEventListener('pointerdown', e => {
   const caixa = e.target && e.target.closest && e.target.closest('.oficialTravado, .comTravados'); if (!caixa) return;
   if (e.target.closest(TRAVADO_SEL) || [...caixa.querySelectorAll(TRAVADO_SEL)].some(x => { if (!x.getClientRects().length) return false; const r = x.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; }))
-    aviso(tr('An original of the game does not change here: “Duplicate” it (with another name) and change the copy.'));
+    aviso(tr('An original of the game stays the same here. To change it, use “Duplicate” (with another name) and change the copy.'));
 }, true);
-const avisoOficial = (oque, livre) => `<p class="ajuda aviso">${oque ? esc(tr(oque)) + ' ' : ''}${esc(tr('An original of the game: in the game, the game’s own enters, in the language the game is played in, and this sheet only shows it (nothing changes here). Duplicate it, with another name, to make one of your own from it.'))}${livre ? ' ' + esc(tr(livre)) : ''}</p>`;
+const avisoOficial = (oque, livre) => `<p class="ajuda aviso">${oque ? esc(tr(oque)) + ' ' : ''}${esc(tr('An original of the game. In play, the game uses its own version, in the language you play in; this sheet only shows it. To make one of your own from it, duplicate it with another name.'))}${livre ? ' ' + esc(tr(livre)) : ''}</p>`;
 /* the name of a copy: asked, different from every name in `nomes` */
 function nomeDaCopia(nome, nomes, pergunta) {
   const usados = new Set(nomes.map(n => (n || '').trim().toLowerCase()));
@@ -1257,12 +1257,12 @@ function fichaObjeto(c, v) {
       : v.exibir === 'block' ? `<div class="retrato" style="margin-top:8px"><div class="quadro"><img loading="lazy" decoding="async" ${imgTardia(v.topo || iconeObj(v.id))} alt=""></div><div>
         <label class="sm botaoArquivo">Upload the top picture (PNG)<input type="file" accept="image/png,image/webp,image/jpeg" data-topo hidden></label>${v.topo ? botaoAjustar('topo') + '<button class="sm" data-topoLimpa>Use the icon</button>' : ''}
         <label class="campo">Height <select data-altb>${ALTURAS_BLOCO.map(([h, n]) => `<option value="${h}" ${(v.alturaBloco || 0.6) === h ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
-        <p class="ajuda">A solid block in the object’s colour on each of its squares, with the picture laid on top across all of them (the icon, if you upload none). Square pictures fit best. Clicking the block uses the object.</p></div></div>`
+        <p class="ajuda">Each square of the object shows a solid block in the object’s colour, and your picture lies on top across all of them (the icon, if you upload none). Square pictures fit best. Clicking the block uses the object.</p></div></div>`
       : v.exibir === 'model' ? '<div id="fv_modelo"></div>'
-      : `<p class="ajuda">${esc(tr('A generic interaction token of the game, standing on coloured squares of this shape (with the uploaded icon above it, if any). An object made before the token left the choices keeps it; new objects pick among the other three.'))}</p>`}
-    <p class="ajuda">Either way the players put your own piece there at the table. Triggers, requirements and texts work as on any object.</p>
+      : `<p class="ajuda">${esc(tr('This is a generic interaction token of the game. It stands on coloured squares of this shape, with the uploaded icon above it, if any. Objects made before this token left the choices keep it; new objects pick among the other three.'))}</p>`}
+    <p class="ajuda">In both cases the players put your own piece there at the table. Triggers, requirements and texts work as on any object.</p>
     <div class="sub">Default</div>
-    <p class="ajuda">${padroesDaOficina()[v.id] ? tr('This object has a default') + ' (' + (padroesDaOficina()[v.id].gatilhos || []).length + ' ' + tr('trigger(s)') + ').' : tr('This object has no default yet.')} ${tr('To program it: place the object on the map, give it texts and triggers, and use “Save as the default” in its panel. Objects placed with “Default” ticked come with it.')}</p>
+    <p class="ajuda">${padroesDaOficina()[v.id] ? tr('This object has a default') + ' (' + (padroesDaOficina()[v.id].gatilhos || []).length + ' ' + tr('trigger(s)') + ').' : tr('This object has no default yet.')} ${tr('To give it one: place the object on the map, write its texts, add its triggers and click “Save as the default” in its panel. From then on, objects of this kind placed with “Default script” ticked come with that programming.')}</p>
     ${padroesDaOficina()[v.id] ? '<button class="sm" id="fv_padraoLimpa">' + tr('Remove the default') + '</button>' : ''}
     </div></div>`;
   const refazer = () => { const img = c.querySelector('#fv_prev'); if (img) img.src = iconeObj(v.id); renderFichasLista(); desenhar(); };
@@ -1428,7 +1428,7 @@ function editorDeTexto(d, a, mudou, opc = {}) {
   a.vagasDica = a.vagasDica || vagasDe(a.hint, ['monster', 'hero']);
   d.innerHTML = `<div class="campo"><span>${esc(tr(opc.soRegras ? 'Text' : 'Text (as the players read it)'))}</span><div data-caixa="text"></div></div>
     ${opc.soRegras ? '' : `<div class="campo"><span>${esc(tr('Hint before it'))} <small>${esc(tr('(optional, shown before the activation)'))}</small></span><div data-caixa="hint"></div></div>`}
-    <p class="ajuda">${esc(tr('Write it as it shows in the app: B for the name of the rule (“Bloodlust:”), I for the narration, Icons ▾ for the game’s icons, the chips for the names the app fills in. Rule words like scar, terrify or focus are highlighted by themselves.'))}</p>`;
+    <p class="ajuda">${esc(tr('Write the text as it shows in the app. Use B for the name of the rule (“Bloodlust:”), I for the narration, Icons ▾ for the game’s icons and the chips for the names the app fills in. Rule words written in English, such as scar, terrify or focus, are highlighted by themselves.'))}</p>`;
   caixaDoApp(d.querySelector('[data-caixa=text]'), { tmp: a.text || '', vagas: a.vagas, chips: ['monster', 'hero'], linhas: 3, placeholder: opc.exemploRegras || tr('Bloodlust: after the attack, the target is pushed 2 spaces.'), aoMudar: t => { a.text = t; mudou(); } });
   const dh = d.querySelector('[data-caixa=hint]'); if (dh) caixaDoApp(dh, { tmp: a.hint || '', vagas: a.vagasDica, chips: ['monster', 'hero'], linhas: 1, termos: false, placeholder: tr('The monster eyes the weakest hero…'), aoMudar: t => { a.hint = t; mudou(); } });
 }
@@ -1443,7 +1443,7 @@ function fichaPadraoJogo(c, k) {
     <div class="sub">${tr('Text when looked at')}</div><p>${esc(p.textClick || '—')}</p>
     <div class="sub">${tr('Text when used')}</div><p>${esc(p.textUse || '—')}</p>
     <div class="sub">${tr('Triggers')}</div>${lista ? `<ul>${lista}</ul>` : '<p>—</p>'}
-    <p class="ajuda">${tr('Objects of this kind placed with “Default” ticked come with this programming. To change it: place one on the map, program it and use “Save as the default” in its panel. The same as the game’s one, it leaves this list.')}</p></div></div>`;
+    <p class="ajuda">${tr('Objects of this kind placed with “Default script” ticked come with this programming. To change it: place one on the map, program it and click “Save as the default” in its panel. If the default becomes equal to the game’s, it leaves this list.')}</p></div></div>`;
   c.querySelector('#fpj_volta').onclick = () => { delete padroesDaOficina()[k]; fichaSel = null; renderFichas(); };
 }
 
@@ -1456,7 +1456,7 @@ const nomeDaPecaDoJogo = t => t.kind === 'underlay' ? tr('Underlay') + ' · ' + 
 function rolDasPecasDoJogo(bloco) {
   const pecas = abaF === 'pecas'; const lista = pecas ? pecasDoRol() : OBJETOS;
   const d = document.createElement('details'); d.className = 'rolJogo'; d.open = rolJogoAberto || pecaDoJogoSel(); d.ontoggle = () => { rolJogoAberto = d.open; };
-  d.innerHTML = `<summary>${esc(tr(pecas ? 'Tiles of the game' : 'Objects of the game'))} <span class="etq">${lista.length}</span></summary><p class="ajuda">${esc(tr(pecas ? 'The game’s tiles, as they are. Duplicate one to make a Workshop tile of the same shape.' : 'The game’s objects, as they are. Duplicate one to make a copy: the same piece of the game, with a default (texts and triggers) of its own.'))}</p><div class="lista"></div>`;
+  d.innerHTML = `<summary>${esc(tr(pecas ? 'Tiles of the game' : 'Objects of the game'))} <span class="etq">${lista.length}</span></summary><p class="ajuda">${esc(tr(pecas ? 'The game’s tiles, as they are. Duplicate one to make a Workshop tile of the same shape.' : 'These are the game’s objects, as they are. To change one, duplicate it. The copy is the same piece of the game, with its own default texts and triggers. You then change the copy.'))}</p><div class="lista"></div>`;
   const l = d.querySelector('.lista');
   lista.forEach(t => { const e = document.createElement('div'); e.className = 'no' + (fichaSel === 'jogo:' + t.id ? ' ativo' : '');
     const img = pecas ? miniatura(t) : iconeObj(t.id); const nome = pecas ? nomeDaPecaDoJogo(t) : nomeObj(t.id);
@@ -1472,7 +1472,7 @@ function fichaPecaJogo(c, k) {
   c.innerHTML = `<div class="cabF"><h2>${esc(nome)} <span class="etq">${esc(tr('the game’s tile'))}</span></h2><div class="botoes"><button class="sm primario" id="fpj_dup">⧉ ${esc(tr('Duplicate'))}</button></div></div>
     <div class="folha"><div class="col"><div class="previa"><img class="previaPixel" loading="lazy" decoding="async" ${imgTardia(miniatura(t))} alt=""></div></div><div class="col">
     <p>${t.cells.length} ${esc(tr('square(s)'))} · ${t.w}×${t.h}${(t.act || 1) === 2 ? ' · ' + esc(tr('Act II box')) : ''}</p>
-    <p class="ajuda">${esc(tr('A tile of the game box: it is changed nowhere. “Duplicate” makes a Workshop tile of the same shape, in the colour of this floor, to change at will (a physical piece of your own, drawn by the mod).'))}</p></div></div>`;
+    <p class="ajuda">${esc(tr('This tile comes from the game box, so it stays the same here. “Duplicate” makes a Workshop tile with the same shape, in the colour of this floor. You can change that copy at will. It is a physical piece of your own, drawn by the mod.'))}</p></div></div>`;
   c.querySelector('#fpj_dup').onclick = () => {
     const x0 = Math.min(...t.cells.map(q => q[0])), y0 = Math.min(...t.cells.map(q => q[1]));
     const v = { id: 'B_' + uid(), custom: true, nome: nome + ' ' + tr('(copy)'), cells: t.cells.map(([x, y]) => [x - x0, y - y0]), cor: COR_DO_CHAO[texturaDe(t)] || PALETA_CORES[0], notas: '' };
@@ -1552,7 +1552,7 @@ function fichaObjetoJogo(c, k) {
   const o = OBJETO[k]; const meu = !!padroesDaOficina()[k];
   c.innerHTML = `<div class="cabF"><h2>${esc(nomeObj(k))} <span class="etq ${meu ? 'custom' : ''}">${esc(tr(meu ? 'game object · default of its own' : 'the game’s object'))}</span></h2><div class="botoes"><button class="sm primario" id="foj_dup">⧉ ${esc(tr('Duplicate'))}</button><button class="sm" id="foj_volta" ${meu ? '' : 'hidden'}>${esc(tr('Back to the game’s default'))}</button></div></div>
     <div class="folha"><div class="col"><div class="retrato"><div class="quadro"><img loading="lazy" decoding="async" ${imgTardia(iconeObj(k))} alt=""></div><div><p>${o.w || 1}×${o.h || 1}${(o.act || 1) === 2 ? ' · ' + esc(tr('Act II box')) : ''}</p></div></div>
-      <p class="ajuda">${esc(tr('An object of the game. Its default (the texts and triggers it comes with when placed with “Default script” ticked) changes here for your Workshop; “Back to the game’s default” undoes it. “Duplicate” makes a copy: the same piece, with a default of its own; make as many as you like, each with a different default.'))}</p>
+      <p class="ajuda">${esc(tr('This is an object of the game. Its default is the texts and triggers it comes with when you place it with “Default script” ticked. Change that default here, for your Workshop; “Back to the game’s default” undoes it. “Duplicate” makes a copy: the same piece with a default of its own. Make as many as you like, each with a different default.'))}</p>
     </div><div class="col"><div class="sub">${esc(tr('Default'))}</div><div class="painelCopia"></div></div></div>`;
   entrarPadraoNaOficina({ chave: k, tipo: k, molde: null, nome: nomeObj(k) }, c.querySelector('.painelCopia'));
   c.querySelector('#foj_dup').onclick = () => { guardarPadraoDaOficina(); duplicarObjetoDoJogo(k, nomeObj(k) + ' ' + tr('(copy)'), padraoParaCopia(k)); aviso(tr('Duplicated: the copy has its own default, to change at will.')); };
@@ -1565,7 +1565,7 @@ function fichaClone(c, v) {
       <label class="campo">${esc(tr('Name'))} <input data-c="nome" value="${esc(v.nome)}"></label>
       <div class="retrato"><div class="quadro"><img loading="lazy" decoding="async" ${imgTardia(iconeObj(k))} alt=""></div><div><p class="ajuda">${esc(tr('On the board and in the game it is the game’s piece') + ' (' + nomeObj(k) + ', ' + (OBJETO[k].w || 1) + '×' + (OBJETO[k].h || 1) + '). ' + tr('What changes is its default.'))}</p></div></div>
       <label class="campo">${esc(tr('Notes (for you)'))} <textarea data-c="notas" rows="3">${esc(v.notas || '')}</textarea></label>
-      <p class="ajuda">${esc(tr('Copies placed with “Default script” ticked come with this default. Changed on the map and saved with “Save as the default”, the default of the copy changes too.'))}</p>
+      <p class="ajuda">${esc(tr('Copies placed with “Default script” ticked come with this default. If you change one on the map and save it with “Save as the default”, the default of this copy changes too.'))}</p>
       <button class="sm" id="fc_jogo">${esc(tr('Back to the game’s default'))}</button>
     </div><div class="col">
       <div class="sub">${esc(tr('Default'))}</div>

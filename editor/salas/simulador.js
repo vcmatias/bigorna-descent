@@ -321,7 +321,7 @@ function formularioSimulacao() {
   const g = simulacaoGuardada(); const her = g.listaHerois || [2, 3, 4];
   return `<div class="simCfg"><div class="linha"><span>${tr('Heroes')}:</span>${[1, 2, 3, 4].map(n => `<label class="chk"><input type="checkbox" data-simh="${n}" ${her.includes(n) ? 'checked' : ''}> ${n}</label>`).join('')}</div>
     <div class="grade2">${CAMPOS_SIM.map(([k, rot, def, mi, ma, pa]) => `<label class="campo"><span>${tr(rot)}</span><input type="number" data-sim="${k}" min="${mi}" max="${ma}" step="${pa}" value="${g[k] != null ? g[k] : def}"></label>`).join('')}</div>
-    <p class="ajuda">${tr('An attack deals the average damage minus the share of the monster’s defence (at least 1); a test passes when the average successes reach what it asks. The findings (too easy, too hard) keep the measures of the easy level.')}</p></div>`;
+    <p class="ajuda">${tr('How the simulation counts: an attack deals the average damage minus the monster’s share of defence, and at least 1. A test passes when the average successes reach what it asks. The findings (too easy, too hard) always use the measures of the easy level.')}</p></div>`;
 }
 function lerSimulacaoCustom(sel = '#gm_simCfg') {
   const c = {}; document.querySelectorAll(sel + ' [data-sim]').forEach(i => { const v = parseFloat(i.value); const campo = CAMPOS_SIM.find(x => x[0] === i.dataset.sim); c[i.dataset.sim] = isFinite(v) ? Math.min(campo[4], Math.max(campo[3], v)) : campo[2]; });

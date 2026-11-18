@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -255,7 +255,7 @@ namespace Bigorna.Menu
                             T("Baixar pacote", "Get the package"), () => IrParaPacotes(faltamC, c.NomeVisivel), null, null, Acervo.Acervo.TextoFaltam(faltamC));
                         continue;
                     }
-                    Action recomecar = () => { _paginaSaves = 0; AbrirSaves(c.NomeVisivel + T(" · recomeçar", " · restart"), () => Lancou(Campanha.Campanha.Comecar(c, true)), s => Lancou(Campanha.Campanha.Comecar(c, true, s))); };
+                    Action recomecar = () => { _paginaSaves = 0; AbrirSaves(c.NomeVisivel + T(" · recomeçar", " · restart"), () => ComNivel(null, nv => Campanha.Campanha.Comecar(c, true, null, nv)), s => ComNivel(s, nv => Campanha.Campanha.Comecar(c, true, s, nv))); };
                     string principal, outro, detalhe = null; Action aoPrincipal, aoOutro;
                     if (andamento != null)
                     {
@@ -268,8 +268,8 @@ namespace Bigorna.Menu
                     else if (comecada) { principal = T("Continuar", "Continue"); aoPrincipal = () => Lancou(Campanha.Campanha.Comecar(c, false)); outro = T("Recomeçar…", "Restart…"); aoOutro = recomecar; }
                     else
                     {
-                        principal = T("Grupo novo", "New party"); aoPrincipal = () => Lancou(Campanha.Campanha.Comecar(c, false));
-                        outro = T("Usar meus heróis", "Use my heroes"); aoOutro = () => { _paginaSaves = 0; AbrirSaves(c.NomeVisivel, null, s => Lancou(Campanha.Campanha.Comecar(c, false, s))); };
+                        principal = T("Grupo novo", "New party"); aoPrincipal = () => ComNivel(null, nv => Campanha.Campanha.Comecar(c, false, null, nv));
+                        outro = T("Usar meus heróis", "Use my heroes"); aoOutro = () => { _paginaSaves = 0; AbrirSaves(c.NomeVisivel, null, s => ComNivel(s, nv => Campanha.Campanha.Comecar(c, false, s, nv))); };
                         detalhe = Encontro.GrupoDoSave.TextoCurto;
                     }
                     Ficha(++n, c.NomeVisivel, resumo, PainelMapas.AlteradoEm(c), c.Metadados?.Autor, AtoExigido.Ato2(c) ? Act.ActII : Act.ActI, principal, aoPrincipal, outro, aoOutro,
@@ -285,8 +285,8 @@ namespace Bigorna.Menu
                             T("Baixar pacote", "Get the package"), () => IrParaPacotes(faltamM, m.NomeVisivel), null, null, Acervo.Acervo.TextoFaltam(faltamM));
                         continue;
                     }
-                    Ficha(++n, m.NomeVisivel, m.Resumo(T), PainelMapas.AlteradoEm(m), m.Metadados?.Autor, AtoExigido.Ato2(m) ? Act.ActII : Act.ActI, T("Grupo novo", "New party"), () => { var e = Lancador.Lancar(m); Lancou(e); },
-                        T("Usar meus heróis", "Use my heroes"), () => { _paginaSaves = 0; AbrirSaves(m.NomeVisivel, null, s => Lancou(Lancador.Lancar(m, s))); },
+                    Ficha(++n, m.NomeVisivel, m.Resumo(T), PainelMapas.AlteradoEm(m), m.Metadados?.Autor, AtoExigido.Ato2(m) ? Act.ActII : Act.ActI, T("Grupo novo", "New party"), () => ComNivel(null, nv => Lancador.Lancar(m, null, null, nv)),
+                        T("Usar meus heróis", "Use my heroes"), () => { _paginaSaves = 0; AbrirSaves(m.NomeVisivel, null, s => ComNivel(s, nv => Lancador.Lancar(m, s, null, nv))); },
                         Encontro.GrupoDoSave.TextoCurto, m.Linguas.Count > 1 ? string.Join(",", m.Linguas.ToArray()) : null, m.LinguaEmUso, m.Linguas.Count > 1 ? EscolherLingua(m.Caminho) : null);
                 }
             else if (_aba == 3 || _aba == 4)
@@ -398,14 +398,14 @@ namespace Bigorna.Menu
                 if (c == null) { Lancou(T("A campanha baixada não apareceu na pasta de mapas.", "The downloaded campaign is not in the maps folder.")); return; }
                 // (a escolha: continuar a partida em andamento, grupo novo ou os seus heróis)
                 var andamento = Campanha.SavesDaComunidade.EmAndamento(c); int ranhura = andamento?.Key ?? -1; _paginaSaves = 0;
-                AbrirSaves(c.NomeVisivel, () => Lancou(Campanha.Campanha.Comecar(c, false)), s => Lancou(Campanha.Campanha.Comecar(c, false, s)),
+                AbrirSaves(c.NomeVisivel, () => ComNivel(null, nv => Campanha.Campanha.Comecar(c, false, null, nv)), s => ComNivel(s, nv => Campanha.Campanha.Comecar(c, false, s, nv)),
                     andamento != null ? (Action)(() => Lancou(Campanha.SavesDaComunidade.Continuar(ranhura, c))) : null);
             }
             else
             {
                 var m = PainelMapas.Mapas.FirstOrDefault(x => string.Equals(Path.GetDirectoryName(x.Caminho ?? "")?.TrimEnd('/', '\\'), pasta.TrimEnd('/', '\\'), StringComparison.OrdinalIgnoreCase));
                 if (m == null) { Lancou(T("O mapa baixado não apareceu na pasta de mapas.", "The downloaded map is not in the maps folder.")); return; }
-                _paginaSaves = 0; AbrirSaves(m.NomeVisivel, () => Lancou(Lancador.Lancar(m)), s => Lancou(Lancador.Lancar(m, s)));
+                _paginaSaves = 0; AbrirSaves(m.NomeVisivel, () => ComNivel(null, nv => Lancador.Lancar(m, null, null, nv)), s => ComNivel(s, nv => Lancador.Lancar(m, s, null, nv)));
             }
         }
 
@@ -1040,9 +1040,15 @@ namespace Bigorna.Menu
                     try { m = Formato.Dmap.Carregar(_gerado.Caminho); } catch (Exception ex) { Log.Erro("mapa oneshot: lendo o mapa", ex); }
                     if (m == null) { _gerado = new Oneshot.Resultado { Erro = T("O mapa gerado não abriu. Gerem outro.", "The generated map did not open. Generate another.") }; DialogoOneshot(false); return; }
                     Log.Info("«Jogar» mapa oneshot " + _gerado.Semente + (_equipe != null ? " com a equipe do save " + _equipe.Slot : " com equipe nova"));
-                    var erro = Encontro.Lancador.Lancar(m, _equipe, new Encontro.Lancador.InfoOneshot { Semente = _gerado.Semente, Duracao = _duracaoOS, Dificuldade = 10 + (_gerado.Perigo >= 1 ? _gerado.Perigo : PerigoOS), Equipe = _equipe?.Rotulo });
-                    if (erro == null) { var go = _missao; _missao = null; if (go != null) UnityEngine.Object.Destroy(go); _avisoOS = null; _gerado = null; _verSimulacao = false; }   // (v268: o mapa jogado sai do quadro: na volta, Gerar; o mesmo mapa, pela semente)
-                    Lancou(erro);
+                    // (v372: a Fácil / Normal / Difícil da janela fez o mapa; o nível do jogo entra por cima, no quadro do jogo)
+                    var info = new Encontro.Lancador.InfoOneshot { Semente = _gerado.Semente, Duracao = _duracaoOS, Dificuldade = 10 + (_gerado.Perigo >= 1 ? _gerado.Perigo : PerigoOS), Equipe = _equipe?.Rotulo };
+                    var equipe = _equipe;
+                    ComNivel(equipe, nv =>
+                    {
+                        var erro = Encontro.Lancador.Lancar(m, equipe, info, nv);
+                        if (erro == null) { var go = _missao; _missao = null; if (go != null) UnityEngine.Object.Destroy(go); _avisoOS = null; _gerado = null; _verSimulacao = false; }   // (v268: o mapa jogado sai do quadro: na volta, Gerar; o mesmo mapa, pela semente)
+                        return erro;
+                    });
                 });
                 Marcar(principal, !_gerandoOS, _gerandoOS);
                 _missao.transform.SetAsLastSibling();
@@ -1514,6 +1520,18 @@ namespace Bigorna.Menu
                 go.transform.SetAsLastSibling();
             }
             catch (Exception ex) { Log.Info("destaque da partida oficial: " + ex.Message); }
+        }
+
+        /// <summary>v372: antes de começar um mapa, um oneshot ou uma campanha, o quadro de dificuldade do próprio jogo (Journey,
+        /// Standard, Heroic, Warfare), marcado no nível da equipe gravada (Standard com equipe nova). A tela do mod sai enquanto ele
+        /// está aberto e volta quando ele fecha sem confirmar, ou quando a partida não começa.</summary>
+        static void ComNivel(Encontro.GrupoDoSave.Save s, Func<DifficultySetting?, string> lancar)
+        {
+            bool estava = _tela != null && _tela.activeSelf;
+            if (_tela != null) _tela.SetActive(false);
+            Action voltar = () => { if (_tela != null && estava) _tela.SetActive(true); };
+            bool abriu = NivelDoJogo.Perguntar(NivelDoJogo.DoSave(s), nv => { var e = lancar(nv); if (e != null) voltar(); Lancou(e); }, voltar);
+            if (!abriu) { voltar(); Lancou(lancar(null)); }
         }
 
         static void Lancou(string erro)

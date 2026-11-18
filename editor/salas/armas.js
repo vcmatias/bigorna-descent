@@ -68,7 +68,7 @@ function renomearCategoria(id) { const c = categoriaPorId(id); if (!c) return; c
 function apagarCategoria(id) {
   const c = categoriaPorId(id); if (!c) return;
   const ids = new Set([id, ...subcategoriasDe(id).map(s => s.id)]);
-  if (!confirm(tr('Delete the category and its subcategories? The weapons and parts in them stay, without a category.') + ' (' + c.nome + ')')) return;
+  if (!confirm(tr('Delete the category and its subcategories? The weapons and parts inside them stay, with no category.') + ' (' + c.nome + ')')) return;
   oficina().categoriasArmas = categoriasArmas().filter(x => !ids.has(x.id));
   const m = oficina().armasCat; Object.keys(m).forEach(k => { if (ids.has(m[k])) delete m[k]; });
   ITENS_B().forEach(i => { if (ids.has(i.categoria)) delete i.categoria; });
@@ -114,9 +114,9 @@ function listaPorCategoria(l, dosHerois, runas) {
    (any hero may take them, and they are not split in parts) share one entry */
 let slotSel = 0;
 const EXPL_SLOT = [
-  ['Heads', 'damage, damage types and the hero’s power', 'The striking end of the weapon. It sets the damage and the damage types of every attack, and holds the hero’s power: an ability the hero spends to use. One head is fitted at a time; the party may own several.'],
+  ['Heads', 'damage, damage types and the hero’s power', 'The striking end of the weapon. It sets the damage and the damage types of every attack. It also holds the hero’s power, an ability the hero spends to use. The weapon has one head at a time, and the party can own several.'],
   ['Hafts', 'an ability that may trigger on hits', 'The shaft or guard that joins head and grip. It gives an ability that may trigger when an attack hits; its chance is shown in %.'],
-  ['Grips', 'another ability that may trigger on hits', 'Where the hero holds the weapon. It gives a second ability that may trigger when an attack hits (chance in %).']];
+  ['Grips', 'another ability that may trigger on hits', 'Where the hero holds the weapon. It gives a second ability, which may trigger when an attack hits (the chance is in %).']];
 const EXPL_RUNA = [['A', 'The rune: damage, damage types and power'], ['B', 'First effect: an ability that may trigger on hits'], ['C', 'Second effect: another ability that may trigger on hits']];
 const ehRunaId = wid => { const w = armaPorId(wid); return !!w && w.Class === 12; };
 /* parts of the workshop (made here, handed out by triggers or crafted by recipes) of a kind and slot */
@@ -188,14 +188,14 @@ function fichaArma(c, x) {
     const sl = it ? 'ABC'.indexOf(it.slot || 'A') : gp && gp.Slot !== undefined ? gp.Slot : -1; if (sl >= 0 && !nova) { porNaForja(w, sl, pecaAberta); slotSel = x.runa ? slotSel : sl; } pecaAberta = null; }
   const etiqueta = propria ? 'rune of the workshop' : armaMudou(a) ? (nova ? 'new weapon' : 'changed') : 'as in the game';
   const cab = `<div class="cabF"><h2>${esc(nomeDaArma(w))} <span class="etq ${armaMudou(a) ? 'custom' : ''}">${etiqueta}</span></h2><div class="botoes">${propria ? '<button class="sm perigo" id="fa_apaga">Delete this rune</button>' : armaMudou(a) ? '<button class="sm perigo" id="fa_volta">Back to the game’s weapon</button>' : ''}</div></div>`;
-  const quem = x.runa ? 'A rune: any hero may take it, in the hero choice before a quest or in the armory, once the party has its rune (part A).' : `Weapon ${x.i + 1} of ${esc(nomeDoHeroi(x.heroi))} (${NOME_CLASSE[k]}).`;
-  const nomeCampo = `<div class="duas">${propria || nova ? `<label class="campo">Name <input data-wnome="${w._id}" value="${esc(nova ? nova.nome || '' : a.nome || '')}" placeholder="${esc(nova ? (propria ? 'Name of the new rune' : 'Name of the new weapon') : w.name_en)}"></label>` : `<p class="ajuda">${esc(tr('A weapon of the game: its parts stay as in the game. Duplicate a part (✎ beside its name) to make one of your own from it, and put it together here.'))}</p>`}
+  const quem = x.runa ? 'A rune: any hero can take it once the party has its rune (part A). The hero takes it in the hero choice before a quest or in the armory.' : `Weapon ${x.i + 1} of ${esc(nomeDoHeroi(x.heroi))} (${NOME_CLASSE[k]}).`;
+  const nomeCampo = `<div class="duas">${propria || nova ? `<label class="campo">Name <input data-wnome="${w._id}" value="${esc(nova ? nova.nome || '' : a.nome || '')}" placeholder="${esc(nova ? (propria ? 'Name of the new rune' : 'Name of the new weapon') : w.name_en)}"></label>` : `<p class="ajuda">${esc(tr('A weapon of the game: its parts stay as in the game. To change one, duplicate the part (✎ beside its name). You get a part of your own, which you put together here.'))}</p>`}
     <label class="campo">${esc(tr('Category'))} <span class="linha"><select data-wcat>${opcoesCategoria(categoriaDaArma(w._id))}</select><button class="sm" data-novacat title="${esc(tr('New category'))}">+</button></span></label></div><p class="ajuda">${quem}</p>` +
-    (propria ? `<label class="campo">Made from <select data-rbase>${RUNAS_JOGO().map(r => `<option value="${r._id}" ${a.base === r._id ? 'selected' : ''}>${esc(nomeDoJogo(r))}${r._id === 'WEAPON_DRAGONSBANE' ? ' (Dragonsbane)' : ''}</option>`).join('')}</select></label><p class="ajuda">The game rune it copies: frame, figure and sounds in the app, and the pictures of the parts you leave as they are.</p>
+    (propria ? `<label class="campo">Made from <select data-rbase>${RUNAS_JOGO().map(r => `<option value="${r._id}" ${a.base === r._id ? 'selected' : ''}>${esc(nomeDoJogo(r))}${r._id === 'WEAPON_DRAGONSBANE' ? ' (Dragonsbane)' : ''}</option>`).join('')}</select></label><p class="ajuda">The game rune it copies. The app uses its frame, figure and sounds, and the pictures of any parts you leave as they are.</p>
       <label class="chk"><input type="checkbox" data-rinicio ${a.inicio ? 'checked' : ''}> The party has it from the start of the ${campanha ? 'campaign’s maps' : 'map'} (the heroes pick it in the hero choice)</label>` : '')
     + (nova ? `<label class="campo">Range <select data-nk="alcance">${ALCANCES.map(r => `<option ${(nova.alcance || ALCANCES[w.RangeApproximation] || 'Melee') === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label>` : '');
   // (a new weapon in the place of a game one: only in projects made before; the parts of the workshop do it now)
-  const modos = nova && !x.runa ? `<p class="ajuda aviso">${esc(tr('A new weapon in the place of this one (made in an older version). “Back to the game’s weapon” undoes it.'))}</p>` : '';
+  const modos = nova && !x.runa ? `<p class="ajuda aviso">${esc(tr('An older version of the editor put a new weapon in the place of this one. To undo it, use “Back to the game’s weapon”.'))}</p>` : '';
   c.innerHTML = `<div class="armasGrade"><div class="armasMeio" id="fa_meio"></div><div class="armasForja">${cab}<div class="ativ arma" data-arma="${w._id}">${nomeCampo}${modos}<div id="fa_forja"></div></div></div></div>`;
   // (the sheet keeps its scroll while the same weapon is redrawn: a part chosen, a piece forged…)
   c.scrollTop = yFicha;
@@ -255,7 +255,7 @@ function formPecaPropria(el, w, it, apos, aoApagar) {
     <label class="campo">${s === 0 ? 'Power of the hero' : 'Ability'} <select data-ik="habilidade"><option value="">${s === 0 ? 'My own power (text)' : 'My own ability (text and chance)'}</option><option value="-" ${it.habilidade === '-' ? 'selected' : ''}>None</option>${habilidadesParaCopiar(s).map(x => `<option value="${x.a._id}" ${it.habilidade === x.a._id ? 'selected' : ''}>${L2('Copy: ', 'Cópia: ')}${esc(semGlifo(x.a.name_en || x.p.name_en))}${/_UPGRADED$/.test(x.p._id) ? ' +' : ''}${automatica(x.p) ? L2(' (automatic)', ' (automática)') : ''}</option>`).join('')}</select></label>
     ${it.habilidade && it.habilidade !== '-' ? `<p class="ajuda">${esc(textoDoJogo(hab && hab.desc_en))}</p>` : it.habilidade === '-' ? '' : `${s > 0 ? `<label class="campo">Chance (%) <input type="number" min="0" max="100" data-ik="habChance" value="${it.habChance ?? 30}" style="width:70px"></label>` : ''}<div class="txAtiv" data-itx></div>`}
     <label class="campo">${esc(tr('Category'))} <select data-icat>${opcoesCategoria(categoriaDaPeca(it))}</select></label>
-    <p class="ajuda">An item of the workshop: give it with a “Give an item” trigger or craft it with a recipe; the heroes fit it in the armory.</p>
+    <p class="ajuda">An item of the workshop. Give it with a “Give an item” trigger, or let the heroes craft it with a recipe. The heroes fit it in the armory.</p>
     <div class="sub">${esc(tr('Recipe'))}</div><div data-ireceitas></div>
     <div class="botoes"><button class="sm perigo" data-iapaga>Delete this part</button></div>`;
   const redes = () => (apos || renderArmas)();
@@ -280,7 +280,7 @@ function resumoPeca(p, e) {
 function formPeca(el, w, p, apos) {
   const hab = habilidadeDe(p); const a = armaEditada(w._id) || {}; const e = (a.pecas || {})[p._id] || {};
   const tr0 = e.traits || (p.Traits || []).map(t => DANOS[t]); const ch = hab ? (e.chance ?? Math.round(hab.Chance * 100)) : 0;
-  el.innerHTML = `<p class="ajuda aviso">${esc(tr('A part of the game: it stays as in the game. Duplicate it to make one of your own, the same in everything, to change and to put together in the forge.'))}</p>
+  el.innerHTML = `<p class="ajuda aviso">${esc(tr('A part of the game: it stays as in the game. Duplicate it to get one of your own, identical in everything. You can change the copy and put it together in the forge.'))}</p>
     <div class="retrato imgPeca"><div class="quadro"><img loading="lazy" decoding="async" ${imgTardia(e.imagem || imagemDaPeca(p))} alt=""></div><div><b data-sem-traducao>${esc(semGlifo(e.nome || p.name_en))}</b>
       ${p.Slot === 0 ? `<p>${esc(tr('Damage'))}: ${e.dano ?? p.Damage} · ${tr0.map(d => esc(tr(d))).join(', ')}</p>` : ''}${hab && p.Slot > 0 ? `<p>${esc(tr('Chance'))}: ${ch}%</p>` : ''}</div></div>
     ${hab ? `<div class="sub pequena">${p.Slot === 0 ? 'Power of the hero (spend to use)' : 'Ability'}</div><div class="previaTx caixaApp" data-sem-traducao>${tmpParaHtml(e.texto || hab.desc_en || '', vagasDe(e.texto || hab.desc_en || '', ['monster', 'hero']))}</div>` : '<p class="ajuda">No ability (a starting part).</p>'}
@@ -345,7 +345,7 @@ function campoImagemPeca(propria, doJogo, pre) {
   const atual = propria || doJogo;
   return `<div class="retrato imgPeca"><div class="quadro">${atual ? `<img loading="lazy" decoding="async" ${imgTardia(atual)} alt="" data-${pre}medida>` : '<span>no picture</span>'}</div><div>
     <label class="sm botaoArquivo">Upload a picture (PNG)<input type="file" accept="image/png,image/webp,image/jpeg" data-${pre}img hidden></label>
-    ${propria ? `<button class="sm" data-${pre}esp title="Zoom on this piece alone and paint over it, in any colour, or erase what should not show">🖌 Fine tuning</button><button class="sm" data-${pre}imgjogo>Use the game’s</button>` : ''}
+    ${propria ? `<button class="sm" data-${pre}esp title="Zooms in on this piece alone, so you can paint over it in any colour or erase what should stay hidden">🖌 Fine tuning</button><button class="sm" data-${pre}imgjogo>Use the game’s</button>` : ''}
     <p class="ajuda" data-${pre}dica>The piece as drawn in the weapon. Transparent PNG, ideally the same shape as the game’s${doJogo ? ' (<span data-' + pre + 'tam>…</span>)' : ''}.</p></div></div>`;
 }
 /* 🖌 Fine tuning from the stats of a part (the same painter as the forge's): the painted picture takes the place of the
@@ -418,7 +418,7 @@ async function ligarForja(el, w) {
   const wid = w._id; const lay = moldeDaArma(w); const f = estadoDaForja(w);
   // (a part of the game stays as it is: only the parts of the workshop (and a new weapon of an older project) move)
   const editavel = k => !!((armaEditada(wid) || {}).nova || pecaPropriaDaArma(f.escolhidas[k]));
-  const linhasPecas = [0, 1, 2].map(s => `<div class="mtPeca ${editavel(s) ? '' : 'doJogo'}" data-mts="${s}"><b>${'ABC'[s]}</b><span class="mtNome" data-sem-traducao>${esc(nomeNaForja(w, s))}</span><button class="sm lapis" data-stats="${s}" title="${esc(tr('Its stats'))}">✎</button><small class="etq mtForjada" data-mtforjada="${s}" title="${esc(tr('Forged'))}">✔</small>${editavel(s) ? `<button class="sm primario mtForjar" data-forjar="${s}" title="${esc(tr('Keep this piece as it is now (only this one): in the game too'))}">⚒ Forge</button><button class="sm mtRedef" data-redefinir="${s}" title="${esc(tr('Undo what was forged, painted or moved on this piece (only this one): its picture and its place of before'))}">↺ Reset</button>` : `<small class="etq">${esc(tr('of the game'))}</small>`}</div>`).join('');
+  const linhasPecas = [0, 1, 2].map(s => `<div class="mtPeca ${editavel(s) ? '' : 'doJogo'}" data-mts="${s}"><b>${'ABC'[s]}</b><span class="mtNome" data-sem-traducao>${esc(nomeNaForja(w, s))}</span><button class="sm lapis" data-stats="${s}" title="${esc(tr('Its stats'))}">✎</button><small class="etq mtForjada" data-mtforjada="${s}" title="${esc(tr('Forged'))}">✔</small>${editavel(s) ? `<button class="sm primario mtForjar" data-forjar="${s}" title="${esc(tr('Keep this piece as it is now (only this one): in the game too'))}">⚒ Forge</button><button class="sm mtRedef" data-redefinir="${s}" title="${esc(tr('Undoes what was forged, painted or moved on this piece only. Its picture and its place go back to how they were'))}">↺ Reset</button>` : `<small class="etq">${esc(tr('of the game'))}</small>`}</div>`).join('');
   if (!lay) { el.innerHTML = `<div class="forjaLado semMolde">${linhasPecas}<p class="ajuda">${esc(tr('No layout known for this weapon.'))}</p></div>`;
     el.querySelectorAll('[data-stats]').forEach(b => b.onclick = () => abrirStats(w, +b.dataset.stats)); el.querySelectorAll('[data-mtforjada]').forEach(d => { d.style.display = 'none'; }); return; }
   const jogo = s => lay['ABC'[s]].slice(0, 4);
@@ -433,13 +433,13 @@ async function ligarForja(el, w) {
   const ajustar = c => { const b = caixa(c.s); if (!c.img) return; c.k = Math.min(b.w / c.img.naturalWidth, b.h / c.img.naturalHeight); c.x = b.cx; c.y = b.cy; c.r = 0; c.ex = c.ey = c.fx = c.fy = 1; };
   const carregar = (c, src) => new Promise(ok => { c.src = src; if (!src) { c.img = null; return ok(); } const i = new Image(); i.onload = () => { c.img = i; ok(); }; i.onerror = () => { c.img = null; ok(); }; i.src = src; });
   const L = 620;
-  el.innerHTML = `<p class="ajuda">${esc(tr('Pick the parts in the middle column (a double click, or ✎, opens the stats of one). To change a piece, first choose A, B or C on the right; then, on its square, drag it, pull the corners (size) or the sides (stretch or shorten it) and turn it by the round handle (Shift: by 15°; or Q/E, the wheel for the size); mirror it, and paint over it or erase parts of it (🖌 Fine tuning). A double click on another piece (where it is alone) makes it the chosen one. The parts of the game stay as they are; the ones of the workshop change.'))}</p><p class="ajuda">${esc(tr('⚒ Forge, on the row of a piece, keeps that piece as it is now (only that one), in the game too. ↺ Reset, beside it, undoes what was forged, painted or moved on that piece only.'))}${lay.rot ? ' <span>In the app this weapon is turned ' + Math.abs(lay.rot) + '°.</span>' : ''}</p>
+  el.innerHTML = `<p class="ajuda">${esc(tr('Pick the parts in the middle column. A double click on one, or ✎, opens its stats. To change a piece, first choose A, B or C on the right. Then, on its square: drag it; pull the corners to resize it; pull the sides to stretch or shorten it; turn it by the round handle (Shift: by 15°). Q/E also turn it, and the wheel changes the size. You can mirror it, paint over it or erase parts of it (🖌 Fine tuning). A double click on another piece, where it stands alone, makes it the chosen one. The parts of the game stay as they are; the ones of the workshop change.'))}</p><p class="ajuda">${esc(tr('⚒ Forge, on the row of a piece, keeps that piece as it is now, in the game too. Only that piece changes. ↺ Reset, beside it, undoes what was forged, painted or moved on that piece only.'))}${lay.rot ? ' <span>In the app this weapon is turned ' + Math.abs(lay.rot) + '°.</span>' : ''}</p>
     <div class="montagem"><canvas id="mt_tela" width="${L}" height="${L}" tabindex="0"></canvas><div class="mtLado">
       ${linhasPecas}
       <p class="ajuda" id="mt_nada">${esc(tr('Choose A, B or C above to change a piece.'))}</p>
       <div class="mtAjustes">
         <p class="ajuda mtMedidas" id="mt_medidas"></p>
-        <div class="botoes mtBotoes"><button class="sm" id="mt_fx" title="Mirror left to right (H)">⇋ Mirror</button><button class="sm" id="mt_fy" title="Mirror top to bottom (V)">⇵ Flip</button><button class="sm" id="mt_fino" title="Zoom on this piece alone and paint over it, in any colour, or erase what should not show">🖌 Fine tuning</button></div>
+        <div class="botoes mtBotoes"><button class="sm" id="mt_fx" title="Mirror left to right (H)">⇋ Mirror</button><button class="sm" id="mt_fy" title="Mirror top to bottom (V)">⇵ Flip</button><button class="sm" id="mt_fino" title="Zooms in on this piece alone, so you can paint over it in any colour or erase what should stay hidden">🖌 Fine tuning</button></div>
       </div>
       <p class="ajuda mtAviso" id="mt_aviso" ${f.mexida ? '' : 'hidden'}>${esc(tr('Not forged yet: Forge keeps it.'))}</p>
       <div class="botoes"><button class="sm" id="mt_png">Download the template (PNG)</button></div>
@@ -561,7 +561,7 @@ async function ligarForja(el, w) {
     const x = cv.getContext('2d'); x.scale(cv.width / b.w, cv.height / b.h); x.translate(b.w / 2, b.h / 2); x.rotate(-phi); x.translate(-b.cx, -b.cy); desenharCamada(x, c); return cv.toDataURL('image/png'); };
   /* ⚒ Forge on a piece's row: only that piece is kept; the others stay as they are, changed or not */
   const forjar = k => {
-    if (!editavel(k)) return aviso(tr('Only parts of the workshop are forged: duplicate a part of the game (✎) to make one of your own.'));
+    if (!editavel(k)) return aviso(tr('Only workshop parts can be forged. To get one, duplicate a part of the game (✎).'));
     const c = camadas[k]; if (!c.img) return aviso(tr('This piece has no picture to forge.'));
     escolher(k); const arma = armaParaEditar(wid);
     if (c.mexida) fixarCaixa(k); const png = assar(c); let e;
@@ -618,12 +618,12 @@ function ajusteFino(img, nome, aoConcluir) {
       <div class="botoes pintorSel"><button class="sm" id="pf_cortar" title="Ctrl+X">✂ Cut</button><button class="sm" id="pf_copiar" title="Ctrl+C">⧉ Copy</button><button class="sm" id="pf_colar" title="Ctrl+V">📋 Paste</button><button class="sm" id="pf_apagar" title="Delete">🗑 Delete</button><button class="sm" id="pf_selfx" title="${esc(tr('Mirror the selection'))}">⇋</button><button class="sm" id="pf_selfy" title="${esc(tr('Flip the selection'))}">⇵</button></div>
       <label class="campo">Size <span class="linha"><input type="range" id="pf_tam" min="1" max="120" value="12" style="flex:1"><span class="mtPct" id="pf_tamn">12</span></span></label>
       <label class="campo">Strength <span class="linha"><input type="range" id="pf_forca" min="5" max="100" value="100" style="flex:1"><span class="mtPct" id="pf_forcan">100%</span></span></label>
-      <label class="campo" title="${esc(tr('How different a colour may be and still be filled or erased by the bucket and the magic eraser'))}">Tolerance <span class="linha"><input type="range" id="pf_tol" min="0" max="160" value="32" style="flex:1"><span class="mtPct" id="pf_toln">32</span></span></label>
-      <label class="campo" title="${esc(tr('The magic eraser cleans the edge it leaves (this many pixels): the colour erased comes out of it (no light fringe) and, ticked, it takes this colour (a dark outline). Clicked on a transparent part, it cleans the fringe left by an older erase. 0: no edge'))}">Edge <span class="linha"><input type="range" id="pf_borda" min="0" max="8" value="3" style="flex:1"><span class="mtPct" id="pf_bordan">3</span><label class="chk" title="${esc(tr('Paint the edge in this colour (off: the edge only loses the colour erased)'))}"><input type="checkbox" id="pf_bordapinta" checked></label><input type="color" id="pf_bordacor" value="#000000" title="${esc(tr('Colour of the edge'))}"><button class="sm" id="pf_contorno" title="${esc(tr('An outline of the edge colour and size around the whole piece'))}">◌ Outline</button></span></label>
+      <label class="campo" title="${esc(tr('How far a colour may differ and still be filled by the bucket or erased by the magic eraser. Higher: more colours are taken'))}">Tolerance <span class="linha"><input type="range" id="pf_tol" min="0" max="160" value="32" style="flex:1"><span class="mtPct" id="pf_toln">32</span></span></label>
+      <label class="campo" title="${esc(tr('Edge the magic eraser cleans, in pixels. The erased colour leaves that edge, so no light fringe stays. Ticked, the edge takes this colour (a dark outline). Click a transparent part to clean an old fringe. 0: no edge'))}">Edge <span class="linha"><input type="range" id="pf_borda" min="0" max="8" value="3" style="flex:1"><span class="mtPct" id="pf_bordan">3</span><label class="chk" title="${esc(tr('Paint the edge in this colour (off: the edge only loses the colour erased)'))}"><input type="checkbox" id="pf_bordapinta" checked></label><input type="color" id="pf_bordacor" value="#000000" title="${esc(tr('Colour of the edge'))}"><button class="sm" id="pf_contorno" title="${esc(tr('An outline of the edge colour and size around the whole piece'))}">◌ Outline</button></span></label>
       <label class="chk"><input type="checkbox" id="pf_cheio"> Filled shapes</label>
       <div class="botoes"><button class="sm" id="pf_desf" title="Ctrl+Z">↶ Undo</button><button class="sm" id="pf_ref" title="Ctrl+Y">↷ Redo</button><button class="sm" id="pf_ver" title="The whole piece in the window">⤢ Fit</button></div>
-      <p class="ajuda">${esc(tr('The wheel zooms; the arrows (Shift: farther), the right button or Space move the piece in the window. The eraser and the magic eraser take away what should not show (it becomes transparent); Shift keeps a line straight and a shape square.'))}</p>
-      <p class="ajuda">${esc(tr('⬚ Select or ➰ Free select (drawn freely) a part, then ✂ Ctrl+X, ⧉ Ctrl+C, 📋 Ctrl+V or Delete. Drag a selection to move it (Ctrl: a copy); the arrows nudge it; Enter or a click outside fixes it, Esc gives it up. What is copied can be pasted on another piece too; a picture copied elsewhere comes in with Ctrl+V.'))}</p>
+      <p class="ajuda">${esc(tr('The wheel zooms. The arrows (Shift: farther), the right button or Space move the piece in the window. The eraser and the magic eraser remove what should stay hidden: that area becomes transparent. Hold Shift to keep a line straight or a shape square.'))}</p>
+      <p class="ajuda">${esc(tr('To pick a part, use ⬚ Select or ➰ Free select (you draw it freely). Then use ✂ Ctrl+X, ⧉ Ctrl+C, 📋 Ctrl+V or Delete. Drag the selection to move it; hold Ctrl to move a copy. The arrows nudge it. Enter or a click outside fixes it; Esc gives it up. You can paste what you copied on another piece too. A picture copied in another program comes in with Ctrl+V.'))}</p>
       <div class="botoes"><button class="sm primario" id="pf_ok">Done</button><button class="sm" id="pf_nao">Cancel</button></div>
     </div></div>`, (el, fecharJ) => {
     const tela = el.querySelector('.pintorTela'), g = tela.getContext('2d');

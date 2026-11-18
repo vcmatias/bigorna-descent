@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -112,13 +112,15 @@ namespace Bigorna
             }
         }
 
-        /// <summary>A lingua para o editor, ao lado dele (o editor carrega esse arquivo antes dos dados): portugues ou ingles,
-        /// as linguas dele.</summary>
+        /// <summary>A lingua para o editor, ao lado dele (o editor carrega esse arquivo antes dos dados): portugues, espanhol, frances,
+        /// alemao, italiano ou ingles, as linguas dele.</summary>
+        /// <summary>v374: as línguas da interface do editor (as outras abrem em inglês).</summary>
+        static readonly string[] LinguasDoEditor = { "pt", "es", "fr", "de", "it", "pl", "hu", "cs", "ru", "ko", "zh-cn", "zh-tw" };
         public static void GravarParaOEditor()
         {
             try
             {
-                var conteudo = "window.BIGORNA_IDIOMA = \"" + (Codigo == "pt" ? "pt" : "en") + "\";\n";
+                var conteudo = "window.BIGORNA_IDIOMA = \"" + (System.Array.IndexOf(LinguasDoEditor, Codigo) >= 0 ? Codigo : "en") + "\";\n";   // (v373, v374: as línguas que o editor tem)
                 Directory.CreateDirectory(Path.GetDirectoryName(ArquivoDoEditor));
                 if (File.Exists(ArquivoDoEditor) && File.ReadAllText(ArquivoDoEditor) == conteudo) return;
                 File.WriteAllText(ArquivoDoEditor, conteudo);

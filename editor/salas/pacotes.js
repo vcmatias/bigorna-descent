@@ -70,7 +70,7 @@ function exportarPacote(opcoesDaTela = {}) {   // (v243: depois(pk): what comes 
   const b = oficina(); let soMeus = true;
   const lista = c => (b[c.k] || []).filter(x => (!soMeus || c.proprio(x)) && !(c.k === 'receitas' && receitaDeItemDaOficina(x)));   // (v245: recipes go with their items)
   const marcadas = new Map(CATEGORIAS_PACOTE.map(c => [c.k, new Set(lista(c).map(idDaEntrada))]));
-  modal(tr('Export a Workshop package'), `<p class="ajuda">${tr('Pick what goes into the package: a .bigorna file that another map, another campaign or another player can import (⚙ → Import a package). What an entry needs goes along: a monster’s loot, a recipe’s item and materials, a feat’s rewards.')}</p>
+  modal(tr('Export a Workshop package'), `<p class="ajuda">${tr('Pick what goes into the package. You get a .bigorna file that another map, another campaign or another player can import (⚙ → Import a package). What each entry needs goes along with it: a monster’s loot, a recipe’s item and materials, a feat’s rewards.')}</p>
     <div class="linha"><label class="campo">${tr('Package name')} <input id="pk_nome" value="${esc(campanha?.meta?.name || projeto.meta.name || '')}" placeholder="${esc(tr('My creations'))}"></label>
       <label class="campo">${tr('Save as')} <select id="pk_qual"><option value="">${tr('A new package')}</option></select></label></div>
     <label class="chk"><input type="checkbox" id="pk_meus" checked> ${tr('Only what I made or changed')}</label>
@@ -123,7 +123,7 @@ function iguaisDoPacote(pk, escolha) {
 }
 /* the list of them, to choose which the package replaces (all ticked); aoDecidir(Set of the package's keys "k:id") */
 function perguntarSubstituir(pk, iguais, aoDecidir) {
-  modal(tr('Already in your Workshop'), `<p class="ajuda">${esc(tr('The package') + ' “' + (pk.nome || pk.id) + '” ' + tr('has entries your Workshop already has. Tick those the package replaces; the others stay as yours.'))}</p>
+  modal(tr('Already in your Workshop'), `<p class="ajuda">${esc(tr('The package') + ' “' + (pk.nome || pk.id) + '” ' + tr('has entries your Workshop already has. Tick the ones the package should replace; the others stay as yours.'))}</p>
     <div class="listaPacote">${CATEGORIAS_PACOTE.map(c => { const l = iguais.filter(g => g.c === c); if (!l.length) return '';
       return `<details class="catPacote" open><summary><b>${esc(tr(c.nome))}</b> <small>${l.length}</small></summary>${l.map(g => `<label class="chk sub"><input type="checkbox" data-sub="${esc(c.k + ':' + g.x.id)}" checked> <span data-sem-traducao>${esc(c.rotulo(g.x) || g.x.id)}</span> <small>${esc(g.porId ? tr('the same entry') : tr('the same name'))}${(c.rotulo(g.y) || '') !== (c.rotulo(g.x) || '') ? ' · ' + esc(tr('yours')) + ': <span data-sem-traducao>' + esc(c.rotulo(g.y) || g.y.id) + '</span>' : ''}</small></label>`).join('')}</details>`; }).join('')}</div>
     <div class="linha"><button class="sm" id="ps_nada">${esc(tr('Untick all'))}</button><span class="espaco"></span><button id="ps_manter">${esc(tr('Keep mine'))}</button><button class="primario" id="ps_ok">${esc(tr('Replace the ticked'))}</button></div>`, (el, fechar) => {
@@ -288,7 +288,7 @@ async function atualizarDoPacote(pk) {
 async function abrirBibliotecaDePacotes() {
   if (Arquivos.ativo) return abrirPacotesDaPasta();
   const l = await bibliotecaDePacotes();
-  modal(tr('My packages'), `<p class="ajuda">${tr('The packages exported or imported in this browser. Add one to the map or campaign on screen, update it where a newer edition exists, or save its file to share with other authors. The maps you export keep everything inside them: players need no package.')}</p><div id="pk_bib" class="listaPacote"></div>`, (el, fechar) => {
+  modal(tr('My packages'), `<p class="ajuda">${tr('The packages you exported or imported in this browser. Add one to the map or campaign on screen, update it where a newer edition exists, or save its file to share with other authors. The maps you export carry everything inside them, so players need no package.')}</p><div id="pk_bib" class="listaPacote"></div>`, (el, fechar) => {
     const pinta = async () => {
       const lista = await bibliotecaDePacotes(); const uso = usoDosPacotes();
       el.querySelector('#pk_bib').innerHTML = lista.length ? lista.map(p => { const u = uso.get(p.id);
@@ -347,7 +347,7 @@ async function instalarNaPasta(pk, arquivos) {
 }
 /* ⚙ → My packages, in the app: one's Workshop and the packages of the folder */
 function abrirPacotesDaPasta() {
-  modal(tr('My packages'), `<p class="ajuda">${tr('The Workshop is kept in the Pacotes folder of the game: your own (it changes as you work) and the packages imported or brought from the community library (their entries are in the Workshop and change in a copy). Every package in that folder comes in when the editor opens.')}</p><div id="pk_bib" class="listaPacote"></div>`, (el, fechar) => {
+  modal(tr('My packages'), `<p class="ajuda">${tr('The Workshop lives in the Pacotes folder of the game. Your own package changes as you work. The packages you import or bring from the community library add their entries to the Workshop; when you change one of those entries, the editor changes a copy. Every package in that folder loads when the editor opens.')}</p><div id="pk_bib" class="listaPacote"></div>`, (el, fechar) => {
     const pinta = () => {
       const l = [fichaDoMeuPacote(), ...PACOTES_DA_PASTA];
       el.querySelector('#pk_bib').innerHTML = l.map(p => `<div class="catPacote fichaPacote" data-id="${esc(p.id)}"><div><b data-sem-traducao>${esc(p.nome)}</b> <small>${p.meu ? tr('your Workshop') + ' · ' : ''}${tr('edition')} ${p.edicao} · ${p.n} ${tr('entries')}${p.autor ? ' · <span data-sem-traducao>' + esc(p.autor) + '</span>' : ''}</small></div>
@@ -355,7 +355,7 @@ function abrirPacotesDaPasta() {
       el.querySelectorAll('[data-acao]').forEach(bt => bt.onclick = async () => {
         const id = bt.closest('[data-id]').dataset.id;
         if (bt.dataset.acao === 'arquivo') { const pk = await lerDaBiblioteca(id); if (!pk) return aviso(tr('This package is no longer in the folder.')); if (id === MEU_PACOTE.id) await anexarMidia(pk); baixarArquivo(nomeDeArquivo(pk.nome), await textoAvulso(pk)); return; }
-        const p = PACOTES_DA_PASTA.find(x => x.id === id); if (!p || !confirm(tr('Remove this package from the Workshop and from the Pacotes folder? Maps that use its entries keep them inside.'))) return;
+        const p = PACOTES_DA_PASTA.find(x => x.id === id); if (!p || !confirm(tr('Remove this package from the Workshop and from the Pacotes folder? Maps that use its entries keep a copy of them inside.'))) return;
         try { await Arquivos.apagar('Pacotes/' + p.pasta); } catch (e) { return aviso(e.message || String(e)); }
         tirarDoPacote(id); PACOTES_DA_PASTA = PACOTES_DA_PASTA.filter(x => x.id !== id); tudo(); if (!$('#telaFichas').hidden) renderFichas(); pinta();
       });
@@ -382,7 +382,7 @@ function avisoDoPacote() {
   const x = entradaAberta(), c = $('#centroF'); if (!x || !doPacote(x) || !c || c.querySelector('.avisoPacote')) return;
   c.querySelectorAll('.cabF .perigo, [data-iapaga]').forEach(e => { e.style.display = 'none'; });
   const av = document.createElement('div'); av.className = 'avisoPacote';
-  av.innerHTML = `<p class="ajuda">${esc(tr('From the package'))} “<span data-sem-traducao>${esc(nomeDoPacote(x))}</span>”. ${esc(tr(vitrineDoJogo(x) ? 'An original of the game: it stays as the game has it.' : 'To change it, the editor makes a version of yours, with a new ID (it asks at the first change); the package’s stays as it is. To take it out, remove the package (📚 My packages).'))}</p>`;
+  av.innerHTML = `<p class="ajuda">${esc(tr('From the package'))} “<span data-sem-traducao>${esc(nomeDoPacote(x))}</span>”. ${esc(tr(vitrineDoJogo(x) ? 'An original of the game: it stays as the game has it.' : 'To change it, the editor makes a version of your own, with a new ID; it asks you at the first change. The package’s version stays as it is. To take it out, remove the package (📚 My packages).'))}</p>`;
   c.prepend(av);
 }
 /* the first change on the sheet of a package's entry: the question comes before anything changes */
@@ -393,8 +393,8 @@ function pedirVersaoDoPacote(ev) {
   ev.preventDefault(); ev.stopPropagation(); if (ev.type === 'focusin' && t.blur) t.blur();
   if (document.querySelector('.modal[data-versaopacote]')) return;
   const f = escolherOpcao(tr('This belongs to the package') + ' “' + nomeDoPacote(x) + '”', [
-    { id: 'alterar', titulo: tr('Change it: a version of yours, with a new ID'), sub: tr('Same name; the changes go into it. It will not get the changes the creator releases in new editions of the package. The maps and entries that use the package’s keep using it.') },
-    { id: 'clone', titulo: tr('Create a clone'), sub: tr('A copy of your own, with another name; the package’s stays as it is, with its updates.') }
+    { id: 'alterar', titulo: tr('Change it: a version of yours, with a new ID'), sub: tr('It keeps the same name, and your changes go into it. It will miss the changes the creator releases in new editions of the package. The maps and entries that use the package’s version keep using it.') },
+    { id: 'clone', titulo: tr('Create a clone'), sub: tr('A copy of your own, with another name. The package’s version stays as it is and keeps getting its updates.') }
   ], id => versaoDoPacote(x, id === 'clone'), esc(tr('The package’s entry stays as the creator made it.')));
   f.dataset.versaopacote = '1';
 }
