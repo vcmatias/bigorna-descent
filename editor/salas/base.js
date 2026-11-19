@@ -786,7 +786,7 @@ function foraDeCadaSala(p) {
       // (a hidden object comes to the table by another one: that one is used first)
       if (x.o.hidden) { const l = traz.get(k) || []; if (l.length === 1) usar(l[0]); }
       // (a lock: the count it asks, when the pieces that add to it are exactly enough, all of them)
-      (x.o.gatilhos || []).forEach(g => (g.requisitos || []).forEach(q => { if (q.tipo !== 'counter' || !q.contador) return; const m = somam.get(q.contador); if (!m) return;
+      (x.o.gatilhos || []).forEach(g => (g.requisitos || []).forEach(q => { if (q.tipo !== 'counter' || !q.contador || q.op === 'gt') return; const m = somam.get(q.contador); if (!m) return;
         let total = 0; m.forEach((n, kk) => { if (kk !== k) total += n; }); if (total > 0 && total <= (+q.meta || 1)) m.forEach((n, kk) => { if (kk !== k) usar(kk); }); }));
       subir(x.ri); };
     const subir = s0 => { if (s0 < 0 || vistas.has(s0)) return; vistas.add(s0); (abre.get(s0) || []).forEach(usar); };
@@ -944,7 +944,7 @@ function problemasDaSala(si) {
       if (g.tipo === 'sound' && g.somModo === 'arquivo' && !g.som?.arquivo) p.push('"' + rotulo(o) + '": play a sound without a file');
     });
     if (ehArco(o) && (o.gatilhos || []).length) p.push('"' + rotulo(o) + '": archways and bell frames cannot be clicked in the game, so their triggers never run');
-    [o, ...todosGatilhos(o)].flatMap(x => x.requisitos || []).forEach(r => { if (r.tipo === 'item' && !r.item) p.push('"' + rotulo(o) + '": requirement without an item'); if (r.tipo === 'item' && r.item && !itemDaOficina(r.item)) p.push('"' + rotulo(o) + '": requires an item that is not in the workshop'); if (r.tipo === 'mission' && r.uid === undefined) p.push('"' + rotulo(o) + '": requirement without a mission'); else if (r.tipo === 'mission' && !missoesInternas().some(m => m.uid === r.uid)) p.push('"' + rotulo(o) + '": requires a mission that no longer exists'); });
+    [o, ...todosGatilhos(o)].flatMap(x => x.requisitos || []).forEach(r => { if (r.tipo === 'item' && !r.item) p.push('"' + rotulo(o) + '": requirement without an item'); if (r.tipo === 'counter' && r.op === 'gt' && (!r.outro || r.outro === r.contador)) p.push('"' + rotulo(o) + '": counter requirement without the other counter'); if (r.tipo === 'item' && r.item && !itemDaOficina(r.item)) p.push('"' + rotulo(o) + '": requires an item that is not in the workshop'); if (r.tipo === 'mission' && r.uid === undefined) p.push('"' + rotulo(o) + '": requirement without a mission'); else if (r.tipo === 'mission' && !missoesInternas().some(m => m.uid === r.uid)) p.push('"' + rotulo(o) + '": requires a mission that no longer exists'); });
   });
   inimigosDaSala(s).forEach(({ e }) => { if (salaEm(e.pos[0], e.pos[1], e.level || 0) < 0) p.push(nomeIni(e.enemy) + ' is off the floor (level ' + (e.level || 0) + ')'); if (!ehPool(e.enemy) && !monstro(e.enemy)) p.push(nomeIni(e.enemy) + ' is not in the workshop'); });
   if (vagasPoolDaSala(s) && !poolDaSala(si).map(monstro).filter(Boolean).length) p.push('The spaces are balanced, but the spawn pool of this room is empty, so no monster can come. Add monsters to it in “Map setup” or in the room panel.');

@@ -994,6 +994,12 @@ namespace Bigorna.Menu
                     Linha("<size=80%>" + string.Join("  ·  ", new[] { new[] { T("Curta (3 salas)", "Short (3 rooms)"), T("Média (6 salas)", "Medium (6 rooms)"), T("Longa (8 salas)", "Long (8 rooms)") }[Mathf.Clamp(_duracaoOS, 0, 2)], NomeDoAjuste(_difOS, _ajusteOS), TF("{0} heróis", "{0} heroes", _nHeroisOS) }) + "</size>   " + nomeDaEquipe, 32f, 24f);
                     Divisoria();
                     { var sc = Oneshot.SimulacaoCompacta(_gerado); if (sc != null) Linha(sc, 40f, 24f); }
+                    // (v380: o Perigo aqui também, junto da simulação: o mesmo mapa (a mesma semente) sai de novo com o ajuste novo, e a
+                    //  simulação mostra o efeito; dá para ir ajustando)
+                    if (!string.IsNullOrEmpty(_gerado.Semente))
+                    { var faj = Fileira(56f); Rotulo(faj.transform, TF("Perigo: {0}", "Danger: {0}", NomeDoAjusteFino(_ajusteOS)), 300f); var ba = new List<Button>();
+                      for (int i = -2; i <= 2; i++) { int k = i; ba.Add(Botao(faj.transform, i > 0 ? "+" + i : i < 0 ? "−" + (-i) : "0", new Vector2(100f, 52f), () => { if (_gerandoOS || _ajusteOS == k) return; Som("UI_Click"); _ajusteOS = k; Log.Info("mapa oneshot: Perigo " + k + " na tela do resultado"); GerarOneshot(_gerado.Semente); })); }
+                      for (int j = 0; j < 5; j++) Marcar(ba[j], j - 2 == _ajusteOS, _gerandoOS); }
                     { var fo = Fileira(52f); var bo = Botao(fo.transform, (_verSimulacao ? "« " + T("Esconder detalhes", "Hide details") : T("Ver detalhes", "See details") + " »"), new Vector2(360f, 48f), () => { _verSimulacao = !_verSimulacao; DialogoOneshot(false); }); Marcar(bo, true); }
                     if (_verSimulacao)
                     {

@@ -529,3 +529,5 @@ img[data-leve][src^="data:image/gif"] { background: var(--painel2, #2a2d35); }
 .tag.receitaUsa{padding:2px 8px 2px 3px;text-decoration:none;color:inherit}.tag.receitaUsa .icoPeca{width:24px;height:24px}.tag.receitaUsa small{color:var(--fraco)}
 /* v251: the picture of an NPC in the scenes (the torso: the bottom cut off) */
 .previaCena{position:relative;overflow:hidden;width:min(260px,100%);border:1px solid var(--borda);border-radius:8px;background:repeating-conic-gradient(#20232a 0 25%,#191b20 0 50%) 0 0/16px 16px;aspect-ratio:3/4}.previaCena img{position:absolute;left:0;top:0;width:100%;height:auto;display:block}
+/* v380: «+ details» of the simulation: round by round */
+.simBal tr.simDet td{border-bottom:none;padding:0 0 4px;color:inherit}.simDiario summary{cursor:pointer;color:var(--fraco);font-size:12px}.simDiario .diaSim{margin:4px 0 6px 6px}.simDiario ul{margin:2px 0 2px 16px;padding:0}.simDiario li{margin:1px 0}.simDiario small{color:var(--fraco)}.simDiario .fimSim{margin:6px 0 4px 6px}

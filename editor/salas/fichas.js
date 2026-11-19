@@ -834,7 +834,7 @@ function ligarCena(c, p) {
 function fichaPersonagem(c, p) {
   const herois = CAT.herois.filter(h => h._cls === 'HeroModel');
   const orig = !!p.base, mudado = orig && !!(p.nomeJogo ? p.nome !== p.nomeJogo : false);
-  c.innerHTML = `<div class="cabF"><h2>${esc(p.nome)} <span class="etq ${orig ? '' : 'custom'}">${orig ? 'original of the game' : 'custom'}</span></h2><div class="botoes">${orig ? '<button class="sm primario" id="fp_dup">⧉ Duplicate</button>' : ''}${mudado ? '<button class="sm" id="fp_volta">↺ Back to the game’s</button>' : ''}<button class="sm perigo" id="fp_apaga">Delete</button></div></div>
+  c.innerHTML = `<div class="cabF"><h2>${esc(p.nome)} <span class="etq ${orig ? '' : 'custom'}">${orig ? 'original of the game' : 'custom'}</span></h2><div class="botoes"><button class="sm ${orig ? 'primario' : ''}" id="fp_dup">⧉ Duplicate</button>${mudado ? '<button class="sm" id="fp_volta">↺ Back to the game’s</button>' : ''}<button class="sm perigo" id="fp_apaga">Delete</button></div></div>
     ${orig ? avisoOficial('', '') : ''}<div class="folha"><div class="col">
     ${retratoCampo(p, 'Portrait in the story boxes (speaker and cast). Transparent PNG of the bust, 512 px or more, looks best.')}
     <label class="campo">Name <input data-c="nome" value="${esc(p.nome)}"></label>
@@ -844,11 +844,12 @@ function fichaPersonagem(c, p) {
   ligarRetrato(c, p, 512); ligarEspelhos(c, p); ligarCena(c, p);
   liga(c, p, k => { if (k === 'nome') { c.querySelector('h2').firstChild.textContent = p.nome + ' '; renderFichasLista(true); } });
   $('#fp_apaga').onclick = () => apagarFicha(p);
+  // (v379: a copy of one's own NPC too; an original's copy leaves the game's entry)
+  $('#fp_dup').onclick = () => { const nome = nomeDaCopia(p.nome, PERSONAGENS_B().map(z => z.nome)); if (!nome) return;
+    const d = clone(p); d.id = 'B_' + uid(); d.nome = nome; d.custom = true; if (orig) { d.base = null; delete d.nomeJogo; }
+    PERSONAGENS_B().push(d); fichaSel = d.id; renderFichas(); aviso(tr('Duplicated: this one is yours to change.')); };
   if (!orig) return;
   travarOficial(c, '');
-  $('#fp_dup').onclick = () => { const nome = nomeDaCopia(p.nome, PERSONAGENS_B().map(z => z.nome)); if (!nome) return;
-    const d = clone(p); d.id = 'B_' + uid(); d.nome = nome; d.custom = true; d.base = null; delete d.nomeJogo;
-    PERSONAGENS_B().push(d); fichaSel = d.id; renderFichas(); aviso(tr('Duplicated: this one is yours to change.')); };
   const vj = $('#fp_volta'); if (vj) vj.onclick = () => { p.nome = p.nomeJogo; renderFichas(); };
 }
 
@@ -858,7 +859,7 @@ function fichaItem(c, i) {
   const bases = CAT.itens.filter(z => z._cls === (i.cls === 'TableItem' ? 'TrinketModel' : i.cls) && z.name_en && z.name_en !== 'Text' && z._name !== 'Text');
   const receitas = (oficina().receitas || []).filter(r => r.item === i.id);
   const orig = !!i.base, mudado = orig && itemMudou(i);
-  c.innerHTML = `<div class="cabF"><h2>${esc(i.nome)} <span class="etq ${orig ? '' : 'custom'}">${orig ? (mudado ? 'original of the game, changed' : 'original of the game') : 'custom'}</span></h2><div class="botoes">${orig ? '<button class="sm primario" id="fi_dup">⧉ Duplicate</button>' : ''}${mudado ? '<button class="sm" id="fi_volta">↺ Back to the game’s</button>' : ''}<button class="sm perigo" id="fi_apaga">Delete</button></div></div>
+  c.innerHTML = `<div class="cabF"><h2>${esc(i.nome)} <span class="etq ${orig ? '' : 'custom'}">${orig ? (mudado ? 'original of the game, changed' : 'original of the game') : 'custom'}</span></h2><div class="botoes"><button class="sm ${orig ? 'primario' : ''}" id="fi_dup">⧉ Duplicate</button>${mudado ? '<button class="sm" id="fi_volta">↺ Back to the game’s</button>' : ''}<button class="sm perigo" id="fi_apaga">Delete</button></div></div>
     ${orig ? avisoOficial(mudado ? 'An older version of the editor changed this original. To undo it, use “↺ Back to the game’s”.' : '', '') : ''}<div class="folha"><div class="col">
     ${retratoCampo(i, mat ? 'The material’s picture in the app. Square, 256 px or more.' : 'Card art shown in the app. Square, 256 px or more.')}
     <label class="campo">Name <input data-c="nome" value="${esc(i.nome)}"></label>
@@ -886,11 +887,12 @@ function fichaItem(c, i) {
       return `<a href="#" class="tag receitaUsa" data-usa="${k}" title="${esc((a?.nome || '?') + ' ← ' + custoResumo(r))}">${a?.img ? `<img class="icoPeca" loading="lazy" decoding="async" ${imgTardia(a.img)} alt="">` : '<span class="icoPeca"></span>'}<span>${esc(a?.nome || '?')}</span> <small>× ${doMat(r)}</small></a>`; }).join(' ') : `<p class="ajuda">${esc(tr('No recipe uses it yet. You make recipes on the sheet of the item they craft.'))}</p>`;
     fu.querySelectorAll('[data-usa]').forEach(a => a.onclick = ev => { ev.preventDefault(); const r = usam[+a.dataset.usa]; const ids = [r.item, semMais(r.item)]; const x = ITENS_B().find(z => ids.some(id => z.id === id || (z.base && z.base === id))); if (!x) return aviso(tr('The item of this recipe is not in the Workshop.')); abrirFichas('itens', x.id); }); }
   $('#fi_apaga').onclick = () => apagarFicha(i);
+  // (v379: a copy of one's own item too: weapon parts, armour, trinkets, consumables, materials)
+  $('#fi_dup').onclick = () => { const nome = nomeDaCopia(i.nome, ITENS_B().map(z => z.nome)); if (!nome) return;
+    const d = clone(i); d.id = 'B_' + uid(); d.nome = nome; d.custom = true; if (orig) { d.efeitoBase = i.efeitoBase || i.base; d.base = null; delete d.nomeJogo; }
+    ITENS_B().push(d); fichaSel = d.id; renderFichas(); aviso(tr('Duplicated: this one is yours to change.')); };
   if (!orig) return;
   travarOficial(c, '#fi_receitas');
-  $('#fi_dup').onclick = () => { const nome = nomeDaCopia(i.nome, ITENS_B().map(z => z.nome)); if (!nome) return;
-    const d = clone(i); d.id = 'B_' + uid(); d.nome = nome; d.custom = true; d.efeitoBase = i.efeitoBase || i.base; d.base = null; delete d.nomeJogo;
-    ITENS_B().push(d); fichaSel = d.id; renderFichas(); aviso(tr('Duplicated: this one is yours to change.')); };
   const vj = $('#fi_volta'); if (vj) vj.onclick = () => { voltarItemAoJogo(i); renderFichas(); };
 }
 /* ------------------------------------------------------------ the triggers of a trinket (like the tactics of a monster)

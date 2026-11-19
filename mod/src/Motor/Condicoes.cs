@@ -79,6 +79,8 @@ namespace Bigorna.Motor
                     return Bigorna.Campanha.Progresso.Vale(e, Bigorna.Campanha.Campanha.NoMapa ? Bigorna.Campanha.Campanha.Estado : null);
                 }
                 case "varAbove": return Roteiro.Var(P.Texto(p, "var")) > P.Inteiro(p, "value", 1);
+                // v379: one variable (or counter) is more than another; both may be campaign variables ("campaign:...")
+                case "varAboveVar": return Roteiro.Var(P.Texto(p, "var")) > Roteiro.Var(P.Texto(p, "other"));
                 case "roundAtLeast": return Roteiro.Rodada >= P.Inteiro(p, "round", 3);
                 case "roundBefore": return Roteiro.Rodada < P.Inteiro(p, "round", 3);
                 case "enemyInPlay": return Inimigos.Vivos(P.Texto(p, "enemy"), P.Texto(p, "group")).Any();

@@ -735,7 +735,9 @@ function pecasQueDestravam(pm, plano, rng, notas, hosts, alvo, R, n, trancar = t
     o['ok:' + g.uid] = [gatilhoTexto(RT(T.ok, v)), { uid: uid(), tipo: 'counter', contador: cont.nome, acao: 'add', n: 1, texto: conta, requisitos: [] }]
       .concat(casas.length ? [{ uid: uid(), tipo: 'spawn', fonte: 'pool', cells: casas.map(c => [c.x, c.y, c.nivel]), inimigos: [], intensidade: Math.max(1, Math.min(10, plano.base - 2)), requisitos: [] }] : []);
     o['fail:' + g.uid] = [gatilhoTexto(RT(T.falha, v))];
-    o.usos = cumul ? 'always' : 0;
+    // (v382: a failed try is tried again, as the failure text says: the piece stays on the table until a test gives, and the
+    //  success spends it. With one use, a failed test took the piece off the table, and the way it locked never opened)
+    o.usos = 'always'; g.gastaNoSucesso = true;
   } : (o, cont) => { o.gatilhos.unshift(gatilhoTexto(RT(R.achar, v)), { uid: uid(), tipo: 'counter', contador: cont.nome, acao: 'add', n: 1, texto: conta, requisitos: [] }); };
   // the look and the reveal: on a token always; on another object only when the piece IS the object (a seal carved in the
   // lectern), not when it lies inside it (a key in a chest keeps the chest's look, and is found by opening it)

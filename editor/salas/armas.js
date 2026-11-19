@@ -187,7 +187,7 @@ function fichaArma(c, x) {
   if (pecaAberta) { const it = ITENS_B().find(i => i.id === pecaAberta && i.cls === 'WeaponPartsModel'); const gp = itemDoJogo(pecaAberta);
     const sl = it ? 'ABC'.indexOf(it.slot || 'A') : gp && gp.Slot !== undefined ? gp.Slot : -1; if (sl >= 0 && !nova) { porNaForja(w, sl, pecaAberta); slotSel = x.runa ? slotSel : sl; } pecaAberta = null; }
   const etiqueta = propria ? 'rune of the workshop' : armaMudou(a) ? (nova ? 'new weapon' : 'changed') : 'as in the game';
-  const cab = `<div class="cabF"><h2>${esc(nomeDaArma(w))} <span class="etq ${armaMudou(a) ? 'custom' : ''}">${etiqueta}</span></h2><div class="botoes">${propria ? '<button class="sm perigo" id="fa_apaga">Delete this rune</button>' : armaMudou(a) ? '<button class="sm perigo" id="fa_volta">Back to the game’s weapon</button>' : ''}</div></div>`;
+  const cab = `<div class="cabF"><h2>${esc(nomeDaArma(w))} <span class="etq ${armaMudou(a) ? 'custom' : ''}">${etiqueta}</span></h2><div class="botoes">${propria ? `<button class="sm" id="fa_dup">⧉ ${esc(tr('Duplicate'))}</button><button class="sm perigo" id="fa_apaga">Delete this rune</button>` : armaMudou(a) ? '<button class="sm perigo" id="fa_volta">Back to the game’s weapon</button>' : ''}</div></div>`;
   const quem = x.runa ? 'A rune: any hero can take it once the party has its rune (part A). The hero takes it in the hero choice before a quest or in the armory.' : `Weapon ${x.i + 1} of ${esc(nomeDoHeroi(x.heroi))} (${NOME_CLASSE[k]}).`;
   const nomeCampo = `<div class="duas">${propria || nova ? `<label class="campo">Name <input data-wnome="${w._id}" value="${esc(nova ? nova.nome || '' : a.nome || '')}" placeholder="${esc(nova ? (propria ? 'Name of the new rune' : 'Name of the new weapon') : w.name_en)}"></label>` : `<p class="ajuda">${esc(tr('A weapon of the game: its parts stay as in the game. To change one, duplicate the part (✎ beside its name). You get a part of your own, which you put together here.'))}</p>`}
     <label class="campo">${esc(tr('Category'))} <span class="linha"><select data-wcat>${opcoesCategoria(categoriaDaArma(w._id))}</select><button class="sm" data-novacat title="${esc(tr('New category'))}">+</button></span></label></div><p class="ajuda">${quem}</p>` +
@@ -201,6 +201,10 @@ function fichaArma(c, x) {
   c.scrollTop = yFicha;
   pintarMeio(w, x);
   ligarForja($('#fa_forja'), w).then(() => { if (_rolagemFicha === w._id && c.isConnected) c.scrollTop = yFicha; });
+  // (v379: a copy of a rune of the workshop, with its parts, pictures and category)
+  const dup = $('#fa_dup'); if (dup) dup.onclick = () => { const nome = nomeDaCopia(nomeDaArma(w), RUNAS_PROPRIAS().map(r => (r.nova || {}).nome).concat(RUNAS_JOGO().map(nomeDaArma))); if (!nome) return;
+    const d = clone(a); d.id = 'B_' + uid(); d.nova = d.nova || {}; d.nova.nome = nome; oficina().armas.push(d); if (oficina().armasCat[w._id]) oficina().armasCat[d.id] = oficina().armasCat[w._id];
+    armaSel = d.id; pecaAberta = null; forja = null; renderArmas(); aviso(tr('Duplicated: this one is yours to change.')); };
   const apaga = $('#fa_apaga'); if (apaga) apaga.onclick = () => { if (!confirm('Delete the rune “' + nomeDaArma(w) + '”?')) return; oficina().armas = oficina().armas.filter(z => z.id !== w._id); esquecerFicha('itens', 'RUNA:' + w._id); armaSel = null; forja = null; renderArmas(); };
   const rb = c.querySelector('[data-rbase]'); if (rb) rb.onchange = () => { a.base = rb.value; forja = null; renderArmas(); };
   const ri = c.querySelector('[data-rinicio]'); if (ri) ri.onchange = () => { a.inicio = ri.checked; renderArmas(); };
@@ -215,7 +219,7 @@ let _cliqueMeio = {}, _rolagemMeio = { w: null, y: 0 }, _rolagemFicha = null;
 function pintarMeio(w, x) {
   const el = $('#fa_meio'); if (!el) return; const k = x ? x.k : w.Class; const a = armaEditada(w._id) || {}; const nova = a.nova; const f = estadoDaForja(w);
   const runa = w.Class === 12; const s0 = runa ? null : slotSel;
-  const linha = (id, img, nome, sub, s, propria) => `<div class="pecaMeio ${f.escolhidas[s] === id && !nova ? 'naForja' : ''}" ${propria ? `data-pecap="${esc(id)}"` : `data-peca="${esc(id)}"`} data-slotp="${s}" title="${esc(tr('Click: into the forge · double click: its stats'))}">${img ? `<img loading="lazy" decoding="async" ${imgTardia(img)} alt="">` : '<span class="semImg"></span>'}<div><b data-sem-traducao>${esc(nome)}</b><small>${esc(sub)}</small></div><button class="sm lapis" data-pstats title="${esc(tr(propria ? 'Its stats' : 'Its stats (a part of the game: duplicate it to change it)'))}">✎</button></div>`;
+  const linha = (id, img, nome, sub, s, propria) => `<div class="pecaMeio ${f.escolhidas[s] === id && !nova ? 'naForja' : ''}" ${propria ? `data-pecap="${esc(id)}"` : `data-peca="${esc(id)}"`} data-slotp="${s}" title="${esc(tr('Click: into the forge · double click: its stats'))}">${img ? `<img loading="lazy" decoding="async" ${imgTardia(img)} alt="">` : '<span class="semImg"></span>'}<div><b data-sem-traducao>${esc(nome)}</b><small>${esc(sub)}</small></div><button class="sm lapis" data-pstats title="${esc(tr(propria ? 'Its stats' : 'Its stats (a part of the game: duplicate it to change it)'))}">✎</button>${propria ? `<button class="sm lapis perigo" data-papaga title="${esc(tr('Delete this part'))}">🗑</button>` : ''}</div>`;
   let html;
   if (nova) {
     const sl = s0 === null ? 0 : s0; const q = (nova.pecas || {})['ABC'[sl]] || {};
@@ -239,8 +243,11 @@ function pintarMeio(w, x) {
   el.querySelectorAll('[data-peca],[data-pecap]').forEach(d => { const id = d.dataset.peca || d.dataset.pecap, sl = +d.dataset.slotp;
     const stats = () => { if (!nova) porNaForja(w, sl, id); renderArmas(); abrirStats(w, sl); };
     // (the first click redraws the column: the second one is caught by the time and the part, not by the element)
-    d.onclick = e => { if (e.target.closest('[data-pstats]')) return; const agora = Date.now(); if (_cliqueMeio.id === id && agora - _cliqueMeio.t < 450) { _cliqueMeio = {}; return stats(); } _cliqueMeio = { id, t: agora }; if (nova || f.escolhidas[sl] === id) return; porNaForja(w, sl, id); renderArmas(); };
-    const b = d.querySelector('[data-pstats]'); if (b) b.onclick = e => { e.stopPropagation(); stats(); }; });
+    d.onclick = e => { if (e.target.closest('[data-pstats],[data-papaga]')) return; const agora = Date.now(); if (_cliqueMeio.id === id && agora - _cliqueMeio.t < 450) { _cliqueMeio = {}; return stats(); } _cliqueMeio = { id, t: agora }; if (nova || f.escolhidas[sl] === id) return; porNaForja(w, sl, id); renderArmas(); };
+    const b = d.querySelector('[data-pstats]'); if (b) b.onclick = e => { e.stopPropagation(); stats(); };
+    // (v381: 🗑 beside ✎ on a part of the workshop: deletes it, as «Delete this part» in its stats)
+    const lx = d.querySelector('[data-papaga]'); if (lx) lx.onclick = e => { e.stopPropagation(); const l = bestiario().itens; const it = l.find(i => i.id === id); if (!it || !confirm(tr('Delete') + ' “' + (it.nome || '') + '”?')) return;
+      l.splice(l.indexOf(it), 1); tirarReceitasDoItem(it); esquecerFicha('itens', it.id); if (pecaAberta === it.id) pecaAberta = null; if (forja) forja.escolhidas = forja.escolhidas.map((x, n) => x === it.id ? forja.inicio[n] : x); renderArmas(); }; });
   const np = el.querySelector('[data-novapeca]'); if (np) np.onclick = () => { const sl = +np.dataset.novapeca; const nome = tr(['New head', 'New haft', 'New grip'][sl]);
     const it = { id: 'B_' + uid(), base: null, custom: true, cls: 'WeaponPartsModel', nome, desc: '', raridade: 1, valor: 50, imagemBase: '', retrato: '', classe: CLASSES_ARMA[k], slot: 'ABC'[sl], traits: sl ? [] : ['Slash'], dano: sl ? 0 : 3, habilidade: '', habTexto: '', habChance: 30, unico: false, digital: true, efeitoBase: '' };
     bestiario().itens.push(it); porNaForja(w, sl, it.id); renderArmas(); abrirStats(w, sl); };
@@ -257,7 +264,7 @@ function formPecaPropria(el, w, it, apos, aoApagar) {
     <label class="campo">${esc(tr('Category'))} <select data-icat>${opcoesCategoria(categoriaDaPeca(it))}</select></label>
     <p class="ajuda">An item of the workshop. Give it with a “Give an item” trigger, or let the heroes craft it with a recipe. The heroes fit it in the armory.</p>
     <div class="sub">${esc(tr('Recipe'))}</div><div data-ireceitas></div>
-    <div class="botoes"><button class="sm perigo" data-iapaga>Delete this part</button></div>`;
+    <div class="botoes"><button class="sm" data-idup>⧉ ${esc(tr('Duplicate'))}</button><button class="sm perigo" data-iapaga>Delete this part</button></div>`;
   const redes = () => (apos || renderArmas)();
   el.querySelectorAll('[data-ik]').forEach(inp => { const h = () => { const k = inp.dataset.ik; it[k] = inp.type === 'number' || k === 'raridade' ? +inp.value || 0 : inp.value;  if (inp.tagName === 'SELECT') redes(); }; if (inp.tagName === 'SELECT') inp.onchange = h; else inp.oninput = h; });
   el.querySelectorAll('[data-itrait]').forEach(cb => cb.onchange = () => { it.traits = [...el.querySelectorAll('[data-itrait]:checked')].map(z => z.value); });
@@ -268,6 +275,9 @@ function formPecaPropria(el, w, it, apos, aoApagar) {
   const tx = el.querySelector('[data-itx]'); if (tx) { const obj = { text: it.habTexto || '', hint: '' }; editorDeTexto(tx, obj, () => { it.habTexto = obj.text; }, { soRegras: true, exemploNome: s === 0 ? 'Heavy Blow' : 'Bleed', exemploRegras: s === 0 ? 'Spend 1 [fatigue]: add 2 [damage].' : 'The target suffers 1 [damage].' }); }
   const ic = el.querySelector('[data-icat]'); if (ic) ic.onchange = () => { if (ic.value) it.categoria = ic.value; else delete it.categoria; redes(); };
   const ir = el.querySelector('[data-ireceitas]'); if (ir) { const refazer = () => editorDeReceitas(ir, it, refazer); refazer(); }
+  // (v379: a copy of the part, in the same weapon and slot, put in the forge)
+  el.querySelector('[data-idup]').onclick = () => { const nome = nomeDaCopia(it.nome || '', ITENS_B().map(z => z.nome)); if (!nome) return;
+    const d = clone(it); d.id = 'B_' + uid(); d.nome = nome; bestiario().itens.push(d); if (forja) forja.escolhidas = forja.escolhidas.map((x, n) => x === it.id ? d.id : x); redes(); aviso(tr('Duplicated: this one is yours to change.')); };
   el.querySelector('[data-iapaga]').onclick = () => { if (!confirm('Delete “' + it.nome + '”?')) return; const l = bestiario().itens; l.splice(l.indexOf(it), 1); tirarReceitasDoItem(it); esquecerFicha('itens', it.id); pecaAberta = null; if (forja) forja.escolhidas = forja.escolhidas.map((x, n) => x === it.id ? forja.inicio[n] : x); if (aoApagar) aoApagar(); else redes(); };
 }
 function resumoPeca(p, e) {

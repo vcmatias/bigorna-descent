@@ -13,7 +13,12 @@
    - moving to another room (or across the room) is a move of the whole party: one action of each hero.
    What it reports, besides the outcome: health lost and left, rounds, items and gold, monsters, heals that came when the
    party was whole, effects against monsters used with no monster in play. */
-const SIM = { herois: 2, vida: 8, acoes: 2, sucessos: 2, dano: 3, defesa: 0.5, golpe: 0, fadiga: 0.3, maxRodadas: 60 };
+const SIM = { herois: 2, vida: 8, acoes: 2, sucessos: 2, dano: 3, defesa: 0.5, golpe: 0, fadiga: 0.3, maxRodadas: 60, foco: 0.6, custoUso: 2, sucessosAtaque: 2 };
+/* v382 (calibrated against maps played in the app, 19/11/2026): the health of the heroes' cards, in the order of the starter four
+   (Brynn, Syrus, Galaden, Vaerix), so a party of two has a fragile hero as at the table; a monster's hit goes to the hero with the
+   least health left most of the time (SIM.foco), as the app's targets did; using a thing costs one more action (the walk inside the
+   room to it: SIM.custoUso); an attack rolls the hero's die: about 2 successes with the advantage paid in fatigue (SIM.sucessosAtaque) */
+const VIDAS_POR_ATO = { 1: [10, 7, 9, 8], 2: [14, 9, 12, 11] };
 /* v261: the health of a hero by act (the average of the hero cards: Act I about 8, Act II 11) */
 const VIDA_POR_ATO = { 1: 8, 2: 11 };
 
@@ -29,6 +34,7 @@ function simularMapa(pm, opcoes = {}) {
   //  was played by the Easy party, and every Normal and Hard map was lost)
   const dif = ['facil', 'normal', 'dificil'].includes(opcoes.dificuldade) ? opcoes.dificuldade : (pm.meta && pm.meta.gerado && pm.meta.gerado.dificuldade) || 'facil';
   const cfg = { ...SIM, ...opcoes, ato, dificuldade: dif }; if (opcoes.vida == null) cfg.vida = VIDA_POR_ATO[ato] || SIM.vida;
+  cfg.vidas = opcoes.vida != null ? null : (VIDAS_POR_ATO[ato] || null);
   // (v365: the party of a Normal or Hard map is the one those maps are made for: weapons that hit harder (5 a success) and armour
   //  that blocks 1 of each monster's hit; measured on generated maps: 3 heroes win about 8 Normal maps in 10 and 2 Hard maps in 3 (asked as the game asks for them, BigornaGerador.rodar)
   //  Easy keeps its party. To be measured against the table (the plan of the simulator, item 6))
@@ -38,41 +44,67 @@ function simularMapa(pm, opcoes = {}) {
   return comProjeto(pm, () => simularPartida(pm, cfg, H));
 }
 function simularPartida(pm, cfg, H) {
-  const R = { venceu: false, perdeu: false, motivo: '', rodadas: 0, limite: pm.meta.limite || 0, vidaMax: H * cfg.vida, danoSofrido: 0, vidaMin: H * cfg.vida, curaUtil: 0, curaPerdida: 0, curasCheio: [],
+  const maxH = Array.from({ length: H }, (_, i) => (cfg.vidas && cfg.vidas[i % cfg.vidas.length]) || cfg.vida); const vidaTot = maxH.reduce((a, b) => a + b, 0);
+  const R = { venceu: false, perdeu: false, motivo: '', rodadas: 0, limite: pm.meta.limite || 0, vidaMax: vidaTot, danoSofrido: 0, vidaMin: vidaTot, curaUtil: 0, curaPerdida: 0, curasCheio: [],
     itens: 0, pontosEspolio: 0, ouro: 0, monstros: 0, monstrosPorSala: {}, efeitosVazios: [], testesImpossiveis: [], travado: false, usados: 0, log: [] };
-  let vida = H * cfg.vida, fadiga = 0, ouro = 0, rodada = 1, local = 0, venceu = false, perdeu = false;
+  let vida = vidaTot, fadiga = 0, ouro = 0, rodada = 1, local = 0, venceu = false, perdeu = false;
   const abertas = new Set([0]); const removidas = new Set(); const cont = {}; const contCheio = new Set(); const vigias = [];
   (pm.contadores || []).forEach(c => { cont[c.nome] = +c.inicio || 0; });   // (a new counter starts at 0; an older one, or a flag of the generator, at its start)
   const usos = new Map(); const gastos = new Set(); const escondidos = new Set(); const tirados = new Set(); const opcoesUsadas = new Map(); const acumulado = {};
   const timers = []; const vivos = []; const grupos = {};   // monsters in play; groups: uid → {sala, dono, lista, vivos}
   pm.salas.forEach((s, si) => s.objetos.forEach((o, oi) => { if (o.hidden) escondidos.add(si + ':' + oi); }));
   const log = t => { if (R.log.length < 400) R.log.push('R' + rodada + ': ' + t); };
+  // v380: the diary, round by round, in plain sentences (English, translated where it is shown): «+ details» of the table
+  R.diario = []; let dia = null, nEv = 0; const nota = t => { if (nEv > 3000) return; if (!dia || dia.r !== rodada) { dia = { r: rodada, ev: [] }; R.diario.push(dia); } dia.ev.push(t); nEv++; };
+  const nomeDe = o => o.name || nomeObj(o.type); const golpes = { n: 0, dano: 0, caidos: 0 };
+  const fimDaRodada = () => { nota('—'); dia.ev.pop(); dia.fim = { vida: Math.max(0, vida), max: vidaTot, fadiga, emJogo: vivos.filter(m => m.hp > 0).length }; };
+  const soltarGolpes = () => { if (golpes.n) nota('The heroes attack ' + golpes.n + ' time(s): ' + golpes.dano + ' damage' + (golpes.caidos ? ', ' + golpes.caidos + ' monster(s) defeated.' : '.')); golpes.n = golpes.dano = golpes.caidos = 0; };
   const numeroDe = (t, re) => { const m = re.exec(t || ''); return m ? +m[1] : 0; };
   // ---- effects told in texts (the table applies them): damage, fatigue, heals
   const efeitosDoTexto = (t, onde) => {
     if (!t) return; const cada = /(cada herói(?! que)|every hero(?! carrying)|each hero(?! carrying)|todos os heróis)/i.test(t) ? H : 1;
     // (a test told in the text, "whoever fails suffers 2 damage": the party rolls its successes; a test asks at most 2 here)
     if (/(quem falhar|whoever fails|who fails)/i.test(t) && cfg.sucessos >= 2) return;
-    const dano = numeroDe(t, /(?:sofre|sofrem|sofram|suffers?)\s+(\d+)\s+(?:de\s+)?(?:dano|damage)/i); if (dano) ferir(dano * cada, 'texto');
-    const fad = numeroDe(t, /(?:sofre|sofrem|sofram|suffers?)\s+(\d+)\s+(?:de\s+)?(?:fadiga|fatigue)/i); if (fad) fadiga += fad * cada;
+    const dano = numeroDe(t, /(?:sofre|sofrem|sofram|suffers?)\s+(\d+)\s+(?:de\s+)?(?:dano|damage)/i); if (dano) ferir(dano * cada, 'texto', cada > 1 ? 'cada' : undefined);
+    const fad = numeroDe(t, /(?:sofre|sofrem|sofram|suffers?)\s+(\d+)\s+(?:de\s+)?(?:fadiga|fatigue)/i); if (fad) { fadiga += fad * cada; nota('A text gives the party ' + fad * cada + ' fatigue.'); }
     let cura = numeroDe(t, /(?:cura|curam|heals?)\s+(\d+)/i); if (/(cura tudo|heals? fully|cura toda)/i.test(t)) cura = cfg.vida;
-    if (cura) curar(cura * cada, onde);
+    if (cura) curar(cura * cada, onde, cada > 1);
   };
-  R.danoPor = {}; const ferir = (n, de) => { R.danoPor[de] = (R.danoPor[de] || 0) + n; vida -= n; R.danoSofrido += n; if (vida < R.vidaMin) R.vidaMin = vida; if (vida <= 0 && !perdeu) { perdeu = true; R.motivo = 'party defeated (' + de + ')'; } };
-  const curar = (n, onde) => { const falta = H * cfg.vida - vida; const util = Math.min(falta, n); vida += util; R.curaUtil += util; R.curaPerdida += n - util; if (n - util > 0 && util === 0) R.curasCheio.push(onde); };
+  // v380: each hero's own health, besides the party's pool (the pool decides the end; each hero's is told in the table):
+  // a monster keeps hitting the hero it went for when it came in (one after the other as they come), a damage to one hero goes
+  // to the one with the most health left, a heal to one hero to the most wounded, the fatigue at the end is shared
+  const vidaH = maxH.slice(), danoH = Array(H).fill(0), minH = maxH.slice(); let proxAlvo = 0;
+  // (which hero a monster's hit lands on: half the time the one it went for, else any hero, by a fixed draw: the same map gives
+  //  the same story every time)
+  let semente = 0; for (const c of String((pm.meta && pm.meta.name) || '') + H) semente = (Math.imul(semente, 31) + c.charCodeAt(0)) >>> 0; semente = semente || 7;
+  const sorteio = () => { semente = (Math.imul(semente, 1103515245) + 12345) >>> 0; return (semente >>> 16) / 65536; };
+  const alvoDoGolpe = m => sorteio() < cfg.foco ? vidaH.indexOf(Math.min(...vidaH)) : sorteio() < 0.5 ? m.alvo : Math.floor(sorteio() * H);
+  const maisVida = () => vidaH.indexOf(Math.max(...vidaH)), maisFerido = () => vidaH.indexOf(Math.min(...vidaH));
+  // (the rule book, p. 18 and 14: a hero at 0 health is wounded and comes back to full health; the first wound is light, the next
+  //  one turns it severe, and a hero with a severe wound who is wounded again makes the heroes lose)
+  const feridas = Array(H).fill(0);
+  const ferirH = (i, n, de) => { if (perdeu) return; danoH[i] += n; vidaH[i] -= n; if (vidaH[i] < minH[i]) minH[i] = vidaH[i];
+    if (vidaH[i] > 0) return; feridas[i]++; minH[i] = 0;
+    if (feridas[i] >= 3) { perdeu = true; R.motivo = 'severe wound (' + de + ')'; nota('Hero ' + (i + 1) + ', with a severe wound, is wounded again: the heroes lose.'); return; }
+    vidaH[i] = maxH[i]; nota(feridas[i] === 1 ? 'Hero ' + (i + 1) + ' is wounded: a light wound, and back to full health.' : 'Hero ' + (i + 1) + ' is wounded again: the wound turns severe, and back to full health.'); };
+  const repartir = (n, de) => { const b = Math.floor(n / H); let resto = n - b * H; for (let i = 0; i < H; i++) { const x = b + (resto > 0 ? 1 : 0); if (resto > 0) resto--; if (x) ferirH(i, x, de); } };
+  const somaH = () => vidaH.reduce((a, v) => a + Math.max(0, v), 0);
+  R.danoPor = {}; const ferir = (n, de, quem) => { if (quem === 'cada' || de === 'fatigue') repartir(n, de); else ferirH(typeof quem === 'number' ? quem % H : maisVida(), n, de); if (de === 'texto') nota('A text deals ' + n + ' damage to the party.'); else if (de === 'fatigue') nota('The fatigue weighs as ' + n + ' damage at the end.'); R.danoPor[de] = (R.danoPor[de] || 0) + n; R.danoSofrido += n; vida = somaH(); if (vida < R.vidaMin) R.vidaMin = vida; };
+  const curar = (n, onde, cada) => { const antes = somaH(); if (cada) { const por = Math.floor(n / H); vidaH.forEach((v, i) => { vidaH[i] = Math.min(maxH[i], v + por); }); } else { const i = maisFerido(); vidaH[i] = Math.min(maxH[i], vidaH[i] + n); }
+    const util = somaH() - antes; vida = antes; nota(util ? 'The party heals ' + util + '.' : 'A heal of ' + n + ' with the party whole: nothing to heal.'); vida += util; R.curaUtil += util; R.curaPerdida += n - util; if (n - util > 0 && util === 0) R.curasCheio.push(onde); };
   // ---- requirements
   const vivosDaSala = si => vivos.filter(m => m.sala === si && m.hp > 0).length;
-  const reqOk = rs => (rs || []).every(r => r.tipo === 'counter' ? (cont[r.contador] || 0) >= (r.meta || 1) : r.tipo === 'room_open' ? abertas.has(r.sala) : r.tipo === 'enemies_defeated' ? abertas.has(r.sala) && !vivosDaSala(r.sala) : r.tipo === 'gold' ? ouro >= (r.amount || 0) : true);
+  const reqOk = rs => (rs || []).every(r => r.tipo === 'counter' ? (r.op === 'gt' ? (cont[r.contador] || 0) > (cont[r.outro] || 0) : (cont[r.contador] || 0) >= (r.meta || 1)) : r.tipo === 'room_open' ? abertas.has(r.sala) : r.tipo === 'enemies_defeated' ? abertas.has(r.sala) && !vivosDaSala(r.sala) : r.tipo === 'gold' ? ouro >= (r.amount || 0) : true);
   // ---- monsters
   const statsDe = (id, tier) => { const m = monstro(id); const ts = (m?.tiers || []); const t = ts.find(x => x.tier === tier) || ts.slice().sort((a, b) => Math.abs(a.tier - tier) - Math.abs(b.tier - tier))[0]; return t ? { hp: t.hp, def: t.def, atk: t.atk } : { hp: 20, def: 1, atk: 1 }; };
   const media = (ids, tier) => { const ss = ids.map(id => statsDe(id, tier)); if (!ss.length) return { hp: 20, def: 1, atk: 1 }; const k = x => Math.round(ss.reduce((a, s) => a + s[x], 0) / ss.length); return { hp: k('hp'), def: k('def'), atk: k('atk') }; };
-  const entrar = (sala, st, grupo, dono) => { const m = { sala, ...st, grupo, dono, chegando: sala !== local }; log('monster in room ' + (sala + 1) + ' hp' + st.hp + ' atk' + st.atk + ' def' + st.def); vivos.push(m); R.monstros++; R.monstrosPorSala[sala] = (R.monstrosPorSala[sala] || 0) + 1; if (grupo) { grupos[grupo] = grupos[grupo] || { sala, lista: [], dono }; grupos[grupo].lista.push(m); } return m; };
+  const entrar = (sala, st, grupo, dono) => { const m = { sala, ...st, grupo, dono, chegando: sala !== local, alvo: proxAlvo++ % H }; nota('A monster comes into room ' + (sala + 1) + (dono && dono.enemy ? ', “' + nomeIni(dono.enemy) + '”' : '') + ': health ' + st.hp + ', attack ' + st.atk + ', defence ' + st.def + '.'); log('monster in room ' + (sala + 1) + ' hp' + st.hp + ' atk' + st.atk + ' def' + st.def); vivos.push(m); R.monstros++; R.monstrosPorSala[sala] = (R.monstrosPorSala[sala] || 0) + 1; if (grupo) { grupos[grupo] = grupos[grupo] || { sala, lista: [], dono }; grupos[grupo].lista.push(m); } return m; };
   const poolDaSala = si => poolDe(pm, si).filter(id => monstro(id));
   const porPool = (si, vagas, intensidade, grupo, dono, minimo) => { if (!vagas) return; const x = simularVagas(vagas, intensidade, poolDaSala(si), H, pm, [], minimo || 0); for (let k = 0; k < x.n; k++) entrar(si, media(poolDaSala(si), x.tier), grupo, dono); };
   // (how deep a room is: the rooms opened one from the other, from the start; a detour is as deep as the room beside it on the way)
   const _fundura = new Map(); const fundura = si => { if (_fundura.has(si)) return _fundura.get(si); _fundura.set(si, 0); const ab = si > 0 ? abridorDe(pm, si) : null; const f = ab && ab.ri !== si ? fundura(ab.ri) + 1 : 0; _fundura.set(si, f); return f; };
   const mare = (pm.eventos || []).some(ev => Object.keys(ev).some(k => Array.isArray(ev[k]) && ev[k].some(x => x && x.tipo === 'remove_room')));
-  const abrirSala = si => { if (abertas.has(si) || removidas.has(si)) return; abertas.add(si); log('room ' + (si + 1) + ' opens');
+  const abrirSala = si => { if (abertas.has(si) || removidas.has(si)) return; abertas.add(si); log('room ' + (si + 1) + ' opens'); nota('Room ' + (si + 1) + ' opens.');
     const s = pm.salas[si]; (s.inimigos || []).filter(e => !ehPool(e.enemy)).forEach(e => { const m = entrar(si, statsDe(e.enemy, (e.tierPorHerois ? e.tierPorHerois[Math.min(3, H - 1)] : e.tier) || 1), null, e); if (e.bonusAtaque) m.atk += e.bonusAtaque; if (e.bonusDefesa) m.def += e.bonusDefesa; });
     porPool(si, vagasPoolDaSala(s), intensidadeDaSala(s), 'G' + si, s.grupoPool || null); };
   // ---- the lists of an owner
@@ -84,29 +116,31 @@ function simularPartida(pm, cfg, H) {
     switch (g.tipo) {
       case 'text': efeitosDoTexto(g.text, 'room ' + (si + 1)); break;
       case 'counter': { const a = g.acao || 'add'; if (a === 'use') { vigias.push({ o, g, si, feito: false }); break; }
-        cont[g.contador] = a === 'set' ? (g.n ?? 0) : a === 'sub' ? (cont[g.contador] || 0) - (g.n ?? 1) : (cont[g.contador] || 0) + (g.n ?? 1); { const cc = (pm.contadores || []).find(x => x.nome === g.contador); const l = cc ? limiteDoContador(cc) : 0; if (l && cont[g.contador] > l) cont[g.contador] = l; } contadores(); break; }
+        cont[g.contador] = a === 'set' ? (g.n ?? 0) : a === 'sub' ? (cont[g.contador] || 0) - (g.n ?? 1) : (cont[g.contador] || 0) + (g.n ?? 1); { const cc = (pm.contadores || []).find(x => x.nome === g.contador); const l = cc ? limiteDoContador(cc) : 0; if (l && cont[g.contador] > l) cont[g.contador] = l; } nota('The count “' + g.contador + '” goes to ' + cont[g.contador] + '.'); contadores(); break; }
       case 'open_room': abrirSala(g.sala); break;
       case 'spawn': if (g.fonte === 'pool') porPool(si, (g.cells || []).length, intensidadeDoGatilho(g), g.uid, o, g.minimo); else (g.inimigos || []).forEach(e => { const m = entrar(si, statsDe(e.enemy, (e.tierPorHerois ? e.tierPorHerois[Math.min(3, H - 1)] : e.tier) || 1), g.uid, o); m.dono = e; if (e.bonusAtaque) m.atk += e.bonusAtaque; }); break;
       case 'rounds': timers.push({ o, g, si, desde: rodada, feitas: 0 }); break;
       case 'skill_test': { const S = g.successes || 2; let ok;
         if (g.cumulativo) { acumulado[g.uid] = (acumulado[g.uid] || 0) + cfg.sucessos; ok = acumulado[g.uid] >= S; } else ok = cfg.sucessos >= S;
         if (!ok && !g.cumulativo) { ctx.impossivel = true; if (!R.testesImpossiveis.includes(g.uid)) R.testesImpossiveis.push(g.uid); }
+        nota(g.cumulativo ? 'Test of ' + S + ' success(es), adding up: ' + acumulado[g.uid] + ' so far' + (ok ? ', passed.' : '.') : 'Test of ' + S + ' success(es): ' + (ok ? 'passed.' : 'failed (the party rolls ' + cfg.sucessos + ').'));
         ctx.teste = ok ? 'ok' : 'fail'; executar(o, (ok ? 'ok:' : 'fail:') + g.uid, si, ctx); if (ok && g.cumulativo) ctx.gasta = true; break; }
-      case 'choice': { const i = escolher(o, g, si); ctx.opcao = i; if (i === -2) { ctx.nada = true; break; } if (i < 0) break; if (g.umaVez) { const u = opcoesUsadas.get(g.uid) || new Set(); u.add(i); opcoesUsadas.set(g.uid, u); }
+      case 'choice': { const i = escolher(o, g, si); ctx.opcao = i; if (i === -2) { ctx.nada = true; nota('No answer is worth it now.'); break; } if (i < 0) break; nota('Answer chosen: “' + (((g.options[i] || {}).text || '?').trim().replace(/[.!…]+$/, '') || '?') + '”.'); if (g.umaVez) { const u = opcoesUsadas.get(g.uid) || new Set(); u.add(i); opcoesUsadas.set(g.uid, u); }
         executar(o, 'op' + i + ':' + g.uid, si, ctx); break; }
       case 'remove_object': { const k = g.proprio ? ctx.chave : g.objSala + ':' + g.objIndex; if (k) tirados.add(k); break; }
       case 'add_object': escondidos.delete(g.objSala + ':' + g.objIndex); break;
       case 'give_item': if (g.acao === 'remove') { if (g.modo === 'gold') ouro -= g.amount || 0; break; }
-        if (g.modo === 'gold') { ouro += g.amount || 0; R.ouro += g.amount || 0; } else if (g.modo === 'newitem') { if ((g.requisitos || []).some(r => r.tipo === 'gold')) R.comprados = (R.comprados || 0) + (g.amount || 1); else R.itens += g.amount || 1; } else R.pontosEspolio += g.points || 0; break;
-      case 'move_heroes': local = g._sala ?? (salaDasCasas(g.cells) ?? local); break;
-      case 'remove_room': if (!removidas.has(g.sala)) log('room ' + (g.sala + 1) + ' leaves the table'); removidas.add(g.sala); if (g.sala > 0) abertas.delete(g.sala); vivos.forEach(m => { if (m.sala === g.sala) m.hp = 0; }); break;
+        if (g.modo === 'gold') { ouro += g.amount || 0; R.ouro += g.amount || 0; nota('The party gets ' + (g.amount || 0) + ' gold.'); } else if (g.modo === 'newitem' && !(g.requisitos || []).some(r => r.tipo === 'gold')) nota('The party finds ' + (g.amount || 1) + ' item(s).'); else if (g.modo !== 'newitem') nota('The party gets loot worth ' + (g.points || 0) + ' point(s).');
+        if (g.modo === 'gold') { } else if (g.modo === 'newitem') { if ((g.requisitos || []).some(r => r.tipo === 'gold')) R.comprados = (R.comprados || 0) + (g.amount || 1); else R.itens += g.amount || 1; } else R.pontosEspolio += g.points || 0; break;
+      case 'move_heroes': local = g._sala ?? (salaDasCasas(g.cells) ?? local); nota('The heroes are moved to room ' + (local + 1) + '.'); break;
+      case 'remove_room': if (!removidas.has(g.sala)) { log('room ' + (g.sala + 1) + ' leaves the table'); nota('Room ' + (g.sala + 1) + ' leaves the table.'); } removidas.add(g.sala); if (g.sala > 0) abertas.delete(g.sala); vivos.forEach(m => { if (m.sala === g.sala) m.hp = 0; }); break;
       case 'enemy_condition': { if (g.acao === 'mirar' || g.acao === 'desmirar') break; const doGrupo = m => g.alvo !== 'group' || ('room-' + (m.sala + 1)) === g.grupo || m.grupo === g.grupo; const alvo = vivos.filter(m => m.hp > 0);
         if (g.acao === 'heal') { alvo.filter(doGrupo).forEach(m => { m.hp += g.amount || 0; }); break; }
         // (a named group, the villain who hunts: only it, and nothing to say when it is not in play)
         if (g.alvo === 'group' && /^gp/.test(g.grupo || '')) { if (g.acao === 'damage') alvo.filter(doGrupo).forEach(m => { m.hp -= g.amount || 1; }); mortes(); break; }
         if (!alvo.length) R.efeitosVazios.push('room ' + (si + 1) + ': ' + (g.acao === 'damage' ? 'damage' : g.condition || g.acao));
         if (g.acao === 'damage') alvo.forEach(m => { m.hp -= g.amount || 1; }); mortes(); break; }
-      case 'end_map': if (g.resultado === 'derrota') { perdeu = true; R.motivo = 'end_map (defeat)'; } else { venceu = true; } break;
+      case 'end_map': if (g.resultado === 'derrota') { perdeu = true; R.motivo = 'end_map (defeat)'; nota('A trigger ends the map in defeat.'); } else { venceu = true; nota('A trigger ends the map in victory.'); } break;
     }
   };
   const salaDasCasas = cells => { if (!(cells || []).length) return null; const [x, y] = cells[0]; for (let si = 0; si < pm.salas.length; si++) if (chaoDaSala(si, pm).has(x + ',' + y)) return si; return null; };
@@ -134,7 +168,7 @@ function simularPartida(pm, cfg, H) {
       //  table answered "not yet" at the guide's place, and the escort never ended)
       || (x.tipo === 'rounds' && (o['rodada:' + x.uid] || []).some(y => ['spawn', 'counter', 'open_room', 'end_map'].includes(y.tipo) && !(y.tipo === 'end_map' && y.resultado === 'derrota'))));
     const valor = i => { const t = texto(i); let v = 0; if (avanca(i)) v += 10; if (/newitem/.test(t)) v += 4; if (/"random"/.test(t)) v += 2; if (/"gold"/.test(t) && !/"remove"/.test(t)) v += 1;
-      if (/(cura|heals?)\s+\d/i.test(t)) v += vida < H * cfg.vida - 2 ? 5 : -2; if (/enemy_condition/.test(t) && !/"acao":"(heal|mirar|desmirar)"/.test(t)) v += vivos.some(m => m.hp > 0) ? 3 : -6;
+      if (/(cura|heals?)\s+\d/i.test(t)) v += vida < vidaTot - 2 ? 5 : -2; if (/enemy_condition/.test(t) && !/"acao":"(heal|mirar|desmirar)"/.test(t)) v += vivos.some(m => m.hp > 0) ? 3 : -6;
       // (a status question, "the guide fell": never the bad news by choice)
       if (/"acao":"set","n":0/.test(t)) v -= 20; if (/"remove".*"gold"|"acao":"remove"/.test(t)) v -= 1; if (/(Ainda não|Not yet|Nada, obrigado|Nothing, thanks|Seguir sem|Go on without|Deixar|Leave it)/i.test(g.options[i].text || '')) v -= 5; return v; };
     const melhor = livres.slice().sort((a, b) => valor(b) - valor(a))[0];
@@ -160,7 +194,7 @@ function simularPartida(pm, cfg, H) {
         if (!progride && /move_heroes/.test(t) && !/give_item|newitem|cura|heals|"spawn"|"counter"/.test(t)) return;
         const busca = (o.gatilhos || []).find(g => g.tipo === 'choice' && g.umaVez); if (busca && !progride && escolher(o, busca, si) === -2) return;
         // (a heal and nothing else, with the party whole: later, when it is of use)
-        if (!progride && !busca && /(cura|heals?)\s+\d/i.test(t) && !/give_item/.test(t) && vida >= H * cfg.vida) return;
+        if (!progride && !busca && /(cura|heals?)\s+\d/i.test(t) && !/give_item/.test(t) && vida >= vidaTot) return;
         out.push({ si, oi, o, k, progride, bloqueado, fecha, util: /give_item|cura|heals|newitem/.test(t), t }); }); });
     return out; };
   const fm = pm.meta.finalMission || { tipo: 'defeat_all' };
@@ -183,7 +217,7 @@ function simularPartida(pm, cfg, H) {
   const metaDe = Object.fromEntries((pm.contadores || []).map(c => [c.nome, metaDoContador(c)]));
   const estado = () => abertas.size + '|' + JSON.stringify(Object.fromEntries(Object.entries(cont).filter(([k]) => !doRelogio.has(k)).map(([k, v]) => [k, Math.min(v, metaDe[k] ?? v)]))) + '|' + JSON.stringify(acumulado) + '|' + vivos.filter(m => m.hp > 0).length + '|' + tirados.size + '|' + escondidos.size + '|' + R.itens + '|' + ouro + '|' + timers.length;
   const inuteis = new Set(); let ultimoEstado = '';
-  const usar = c => { const { si, oi, o, k } = c; const ctx = { chave: k }; const e0 = estado(); log('use ' + baseObj(o.type) + ' in room ' + (si + 1) + (o.name ? ' "' + o.name + '"' : '') + (c.progride ? ' [progress]' : ''));
+  const usar = c => { const { si, oi, o, k } = c; const ctx = { chave: k }; const e0 = estado(); log('use ' + baseObj(o.type) + ' in room ' + (si + 1) + (o.name ? ' "' + o.name + '"' : '') + (c.progride ? ' [progress]' : '')); soltarGolpes(); nota('The party uses “' + nomeDe(o) + '” in room ' + (si + 1) + (c.progride ? ' (it moves the map on).' : '.'));
     // (as the export does: an object locked by a requirement that also removes itself leaves the board only when a locked
     // trigger runs, never when its requirement fails)
     const travados = (o.gatilhos || []).filter(g => (g.requisitos || []).length); const saiSo = travados.length ? (o.gatilhos || []).filter(g => !(g.requisitos || []).length && g.tipo === 'remove_object' && g.proprio) : [];
@@ -205,8 +239,8 @@ function simularPartida(pm, cfg, H) {
   while (!venceu && !perdeu && rodada <= cfg.maxRodadas) {
     // start of the round: timers ("rounds"), map events, pressure
     const contAntes = { ...cont };   // (v365: what the clock alone changes, below)
-    timers.forEach(t => { const n = t.g.n || 1; const passou = rodada - t.desde; if (t.g.modo === 'uma') { if (!t.feitas && passou >= n) { t.feitas = 1; executar(t.o, 'rodada:' + t.g.uid, t.si, {}); } }
-      else if (passou > 0 && passou % n === 0 && (!t.g.vezes || t.feitas < t.g.vezes)) { t.feitas++; executar(t.o, 'rodada:' + t.g.uid, t.si, {}); } });
+    timers.forEach(t => { const n = t.g.n || 1; const passou = rodada - t.desde; if (t.g.modo === 'uma') { if (!t.feitas && passou >= n) { t.feitas = 1; nota('“' + nomeDe(t.o) + '”: its count of rounds is up, its triggers run.'); executar(t.o, 'rodada:' + t.g.uid, t.si, {}); } }
+      else if (passou > 0 && passou % n === 0 && (!t.g.vezes || t.feitas < t.g.vezes)) { t.feitas++; nota('“' + nomeDe(t.o) + '”: its count of rounds is up, its triggers run.'); executar(t.o, 'rodada:' + t.g.uid, t.si, {}); } });
     (pm.eventos || []).forEach(ev => { const r0 = ev.rodada || 1; if (rodada < r0) return; if (rodada === r0 || (ev.cada && (rodada - r0) % ev.cada === 0)) executar(ev, 'gatilhos', ev.sala || 0, {}); });
     const pr = pm.meta.pressao; if (pr && pr.tipo === 'fadiga' && rodada >= pr.desde) fadiga += H * (pr.pior && rodada >= pr.pior ? 2 : 1);
     Object.keys(cont).forEach(k => { if (cont[k] !== contAntes[k]) doRelogio.add(k); });
@@ -223,10 +257,10 @@ function simularPartida(pm, cfg, H) {
       // (v360: the source may be in the open room next door, from where its monsters come to the party: the table walks there
       //  (the walk costs the round's moves) and works on it; standing where it was, it fought for ever)
       if (alvo && !naFonte) { const fs = candidatos().filter(c => !c.bloqueado && c.progride && /"acao":"set","n":0/.test(c.t) && /skill_test/.test(c.t)).sort((a, b) => distancia(a.si) - distancia(b.si)); const f = fs[0];
-        if (f && f.si !== local) { const d = distancia(f.si); acoes -= Math.min(acoes, d * H); local = f.si; fez = true; if (acoes <= 0) continue; }
+        if (f && f.si !== local) { const d = distancia(f.si); acoes -= Math.min(acoes, d * H); local = f.si; fez = true; soltarGolpes(); nota('The party walks to room ' + (local + 1) + '.'); if (acoes <= 0) continue; }
         if (f) { naFonte = true; acoes--; usar(f); fez = true; if (venceuJa()) venceu = true; continue; } }
-      if (alvo) { alvo.hp -= Math.max(1, (cfg.danoAtaque != null ? cfg.danoAtaque : cfg.sucessos * cfg.dano) - Math.floor((alvo.def || 0) * cfg.defesa));   // (custom: the user's average damage per attack)
-         acoes--; if (alvo.hp <= 0) log('a monster falls'); fez = true; mortes(); contadores(); if (venceuJa()) venceu = true; continue; }
+      if (alvo) { const golpe = Math.max(1, (cfg.danoAtaque != null ? cfg.danoAtaque : Math.min(cfg.sucessos, cfg.sucessosAtaque || cfg.sucessos) * cfg.dano) - Math.floor((alvo.def || 0) * cfg.defesa)); alvo.hp -= golpe;   // (custom: the user's average damage per attack)
+         golpes.n++; golpes.dano += golpe; acoes--; if (alvo.hp <= 0) { log('a monster falls'); golpes.caidos++; } fez = true; mortes(); contadores(); if (venceuJa()) venceu = true; continue; }
       { const e = estado(); if (e !== ultimoEstado) { inuteis.clear(); ultimoEstado = e; } }
       const cs = candidatos().filter(c => !c.bloqueado);
       const pressa = R.limite && rodada > R.limite * 0.6;
@@ -242,20 +276,25 @@ function simularPartida(pm, cfg, H) {
       const aqui = opc.filter(c => c.si === local); const c = (prog[0] && para(prog[0]) === 0 ? prog[0] : null) || (mare && prog[0] && (!prog[0].fecha || fundura(prog[0].si) < fundura(local)) ? prog[0] : null) || aqui[0] || prog[0] || opc[0];
       if (!c) break;
       const d = distancia(c.si) + (c.si === local ? 0 : 0);
-      const custo = d * H + 1; if (custo > acoes && d > 0) { if (acoes >= H) { acoes -= H; local = c.si; fez = true; } else acoes = 0; continue; }
-      acoes -= d * H + 1; local = c.si; usar(c); fez = true; if (venceuJa()) venceu = true;
+      const custo = d * H + cfg.custoUso; if (custo > acoes && d > 0) { if (acoes >= H) { acoes -= H; local = c.si; fez = true; soltarGolpes(); nota('The party walks to room ' + (local + 1) + '.'); } else acoes = 0; continue; }
+      acoes -= d * H + cfg.custoUso; local = c.si; usar(c); fez = true; if (venceuJa()) venceu = true;
     }
+    soltarGolpes();
     if (venceu || perdeu) break;
     // the monsters: every monster in play hits once (one that came in away from the party arrives first)
-    { let d = 0; vivos.filter(m => m.hp > 0).forEach(m => { if (m.chegando) { m.chegando = false; return; } d += (m.atk || 1) + cfg.golpe; ferir((m.atk || 1) + cfg.golpe, 'monsters'); R.danoPor['room ' + (m.sala + 1) + ' ' + (pm.salas[m.sala]?.funcao || '')] = (R.danoPor['room ' + (m.sala + 1) + ' ' + (pm.salas[m.sala]?.funcao || '')] || 0) + (m.atk || 1) + cfg.golpe; }); if (d) log('monsters hit for ' + d + ' (health ' + vida + ')'); }
+    { let d = 0, chegam = 0; vivos.filter(m => m.hp > 0).forEach(m => { if (m.chegando) { m.chegando = false; chegam++; return; } d += (m.atk || 1) + cfg.golpe; ferir((m.atk || 1) + cfg.golpe, 'monsters', alvoDoGolpe(m)); R.danoPor['room ' + (m.sala + 1) + ' ' + (pm.salas[m.sala]?.funcao || '')] = (R.danoPor['room ' + (m.sala + 1) + ' ' + (pm.salas[m.sala]?.funcao || '')] || 0) + (m.atk || 1) + cfg.golpe; }); if (d) log('monsters hit for ' + d + ' (health ' + vida + ')'); if (d) nota('The monsters in play hit the party: ' + d + ' damage.'); if (chegam) nota(chegam + ' monster(s) reach the party: they hit from the next round.'); }
+    fimDaRodada();
     if (perdeu) break;
     if (!fez && !vivos.some(m => m.hp > 0)) { semProgresso++; if (semProgresso >= 3) { R.travado = true; R.motivo = 'stuck: nothing left to do'; break; } } else semProgresso = 0;
     rodada++;
     if (R.limite && rodada > R.limite) { perdeu = true; R.motivo = 'round limit'; break; }
   }
   // fatigue weighs as damage at the end (the table converts it)
+  soltarGolpes(); if (dia && !dia.fim) fimDaRodada();
   if (fadiga) ferir(Math.floor(fadiga * cfg.fadiga), 'fatigue');
   if (!venceu && !perdeu && rodada > cfg.maxRodadas) R.motivo = 'too many rounds';
+  if (dia) dia.fim = { vida: Math.max(0, vida), max: vidaTot, fadiga, emJogo: vivos.filter(m => m.hp > 0).length };
+  R.vidaHeroi = Math.round(vidaTot / H); R.vidaPorHeroi = maxH.slice(); R.perdaPorHeroi = danoH.slice(); R.vidaMinPorHeroi = minH.map(v => Math.max(0, v)); R.feridasPorHeroi = feridas.slice();
   R.venceu = venceu && !perdeu; R.perdeu = !R.venceu; R.rodadas = rodada; R.vidaFinal = Math.max(0, vida); R.fadiga = fadiga; R.contadores = { ...cont };   // (v348: where each count stood at the end, for whoever reads a simulation that got stuck)
   return R;
 }
@@ -298,12 +337,31 @@ function simularLote(n = 20, base = {}, herois = [2]) {
   }
   return out;
 }
+/* v380: «+ details» of a line of the table: what happened, round by round, and how the map ended */
+function resultadoDaSimulacao(R) {
+  const n = R.rodadas; if (R.venceu) return 'The party wins the map in round ' + n + '.';
+  const m = R.motivo || '';
+  if (/^severe wound/.test(m)) return 'The heroes lose in round ' + n + ': a hero with a severe wound was wounded again.';
+  if (/^party defeated \(monsters/.test(m)) return 'The party falls in round ' + n + ': the damage of the monsters.';
+  if (/^party defeated \(texto/.test(m)) return 'The party falls in round ' + n + ': the damage of the texts.';
+  if (/^party defeated \(fatigue/.test(m)) return 'The party falls in round ' + n + ': the fatigue.';
+  if (m === 'round limit') return 'The map is lost in round ' + n + ': the round limit.';
+  if (/^stuck/.test(m)) return 'The party is stuck in round ' + n + ': nothing left to do.';
+  if (m === 'too many rounds') return 'The simulation stops at round ' + n + ': too many rounds.';
+  if (/^end_map/.test(m)) return 'The map ends in defeat in round ' + n + ', by a trigger.';
+  return 'The party falls in round ' + n + '.';
+}
+function diarioDaSimulacao(R) {
+  const dias = (R.diario || []).map(d => `<div class="diaSim"><b>${esc(tr('Round ' + d.r))}</b><ul>${d.ev.map(t => `<li>${esc(tr(t))}</li>`).join('') || `<li class="ajuda">${esc(tr('Nothing new.'))}</li>`}</ul>`
+    + (d.fim ? `<small>${esc(tr('End of the round: health ' + d.fim.vida + ' of ' + d.fim.max + ', fatigue ' + d.fim.fadiga + ', monsters in play ' + d.fim.emJogo + '.'))}</small>` : '') + '</div>').join('');
+  return `<details class="simDiario"><summary>${esc(tr('+ details'))}</summary>${dias}<p class="fimSim"><b>${esc(tr(resultadoDaSimulacao(R)))}</b></p></details>`;
+}
 /* the table of the simulation of one map, for 2, 3 and 4 heroes (Map generator > Simulate) */
 function tabelaDaSimulacao(pm, custom) {
   const lista = custom && custom.listaHerois && custom.listaHerois.length ? custom.listaHerois : [2, 3, 4];
   const linhas = lista.map(H => { const R = simularMapa(pm, { ...(custom || {}), herois: H }); const a = avaliarFacil(pm, R, H);
-    return `<tr><td>${H}</td><td>${R.venceu ? '✓' : '✗'}</td><td>${R.rodadas}${R.limite ? ' / ' + R.limite : ''}</td><td>${a.perda}%</td><td>${a.vidaMin}%</td><td>${R.monstros}</td><td>${R.itens}</td><td>${esc(a.problemas.map(x => tr(x.split(':')[0]) + (x.includes(':') ? ':' + x.slice(x.indexOf(':') + 1) : '')).join('; ') || tr('none'))}</td></tr>`; });
-  return `<table class="simBal"><thead><tr><th>${tr('Heroes')}</th><th>${tr('Won')}</th><th>${tr('Rounds')}</th><th>${tr('Health lost')}</th><th>${tr('Lowest health')}</th><th>${tr('Monsters')}</th><th>${tr('Items')}</th><th>${tr('Findings')}</th></tr></thead><tbody>${linhas.join('')}</tbody></table>`;
+    return `<tr><td>${H}</td><td>${R.venceu ? '✓' : '✗'}</td><td>${R.rodadas}${R.limite ? ' / ' + R.limite : ''}</td><td title="${esc(tr('Health points of each hero (of ' + R.vidaHeroi + '). The whole party: ' + a.perda + '%'))}">${R.perdaPorHeroi.join('/')}</td><td title="${esc(tr('Health points of each hero (of ' + R.vidaHeroi + '). The whole party: ' + a.vidaMin + '%'))}">${R.vidaMinPorHeroi.join('/')}</td><td title="${esc(tr('Wounds of each hero: 0 none, 1 light, 2 severe.'))}">${(R.feridasPorHeroi || []).join('/')}</td><td>${R.monstros}</td><td>${R.itens}</td><td>${esc(a.problemas.map(x => tr(x.split(':')[0]) + (x.includes(':') ? ': ' + tr(x.slice(x.indexOf(':') + 1).trim()) : '')).join('; ') || tr('none'))}</td></tr><tr class="simDet"><td colspan="9">${diarioDaSimulacao(R)}</td></tr>`; });
+  return `<table class="simBal"><thead><tr><th>${tr('Heroes')}</th><th>${tr('Won')}</th><th>${tr('Rounds')}</th><th>${tr('Health lost')}</th><th>${tr('Lowest health')}</th><th>${tr('Wounds')}</th><th>${tr('Monsters')}</th><th>${tr('Items')}</th><th>${tr('Findings')}</th></tr></thead><tbody>${linhas.join('')}</tbody></table>`;
 }
 
 /* the custom simulation (Map generator > Custom simulation): the party the user describes, kept in this browser */

@@ -485,7 +485,7 @@ function fichaFacanha(c, f) {
   const linhaCond = d => `<div class="condFeito ${cabe(d) ? '' : 'foraDoMomento'}" data-cond="${d.k}"><div class="cab"><b>${esc(tr(GRUPOS_FEITO.find(g => g[0] === d.g)[1]))}:</b> ${esc(tr(d.nome))}<span class="espaco"></span><button class="sm" data-condx="${d.k}" title="${esc(tr('Remove this condition'))}">✕</button></div>${controle(d)}${d.ajuda ? `<p class="ajuda">${esc(tr(d.ajuda))}</p>` : ''}</div>`;
   const ct = contagemDe(x); const cts = CONTAGENS_FEITO.filter(z => !z.em || z.em.includes(f.momento)); const ctd = CONTAGENS_FEITO.find(z => z.k === ct);
   const orig = !!f.base, mudado = orig && !!f.custom;
-  c.innerHTML = `<div class="cabF"><h2>${esc(nomeFacanha(f))} ${etiquetaEstado(f)}</h2><div class="botoes">${orig ? `<button class="sm primario" id="ff_dup">⧉ ${esc(tr('Duplicate'))}</button>` : ''}${mudado ? `<button class="sm" id="ff_volta">↺ ${esc(tr('Back to the game’s'))}</button>` : ''}<button class="sm perigo" id="ff_apaga">Delete</button></div></div>
+  c.innerHTML = `<div class="cabF"><h2>${esc(nomeFacanha(f))} ${etiquetaEstado(f)}</h2><div class="botoes"><button class="sm ${orig ? 'primario' : ''}" id="ff_dup">⧉ ${esc(tr('Duplicate'))}</button>${mudado ? `<button class="sm" id="ff_volta">↺ ${esc(tr('Back to the game’s'))}</button>` : ''}<button class="sm perigo" id="ff_apaga">Delete</button></div></div>
     ${orig ? avisoOficial(mudado ? 'An older version of the editor changed this original. To undo it, use “↺ Back to the game’s”.' : '', 'Whether the workshop offers it (the pool of feats) is chosen in the list.') : ''}
     <div class="folha"><div class="col">
       <div class="duas"><label class="campo">Name <input id="ff_nome" value="${esc(f.nome || '')}"></label>
@@ -552,11 +552,12 @@ function fichaFacanha(c, f) {
   };
   $('#ff_apaga').onclick = () => { if (!confirm('Delete the feat “' + nomeFacanha(f) + '”?')) return; oficina().facanhas = oficina().facanhas.filter(z => z !== f); oficina().poolFacanhas = (oficina().poolFacanhas || []).filter(id => id !== f.id); fichaSel = null; renderFacanhas(); };
   if (abaF === 'herois') { const hs = c.querySelector('#ff_heroi'); if (hs) hs.closest('label').hidden = true; }   // (in the hero's feats, the hero is the one of the panel)
-  if (!orig) return;
-  travarOficial(c, '');
+  // (v379: a copy of one's own feat too; only an original's copy takes its place in the pool)
   $('#ff_dup').onclick = () => { const nome = nomeDaCopia(nomeFacanha(f), (oficina().facanhas || []).map(nomeFacanha)); if (!nome) return;
     const d = clone(f); d.id = 'B_' + uid(); d.base = null; d.custom = true; d.nome = nome; d.extrasConhecidos = true; d.textoAuto = false; if (!d.premios) d.premios = [...(f.premiosJogo || [])]; delete d.premiosJogo; delete d.outrosPremios;
-    oficina().facanhas.push(d); const pool = poolDasFacanhas(); const k = pool.indexOf(f.id); if (k >= 0) pool[k] = d.id; fichaSel = d.id; renderFacanhas(); aviso(tr('Duplicated: this one is yours to change.')); };
+    oficina().facanhas.push(d); if (orig) { const pool = poolDasFacanhas(); const k = pool.indexOf(f.id); if (k >= 0) pool[k] = d.id; } fichaSel = d.id; renderFacanhas(); aviso(tr('Duplicated: this one is yours to change.')); };
+  if (!orig) return;
+  travarOficial(c, '');
   const vj = $('#ff_volta'); if (vj) vj.onclick = () => { const cj = facanhaDoJogo(f.base); if (!cj) return; const n = facanhaDoCatalogo(cj); Object.keys(f).forEach(k => { if (k !== 'id') delete f[k]; }); Object.assign(f, n, { id: f.id }); renderFacanhas(); };
 }
 

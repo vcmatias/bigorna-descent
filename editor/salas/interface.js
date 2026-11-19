@@ -332,7 +332,7 @@ function renderPaleta() {
       if (usada) dv.classList.add('usada'); if (noutra) dv.classList.add('noutra');
       dv.title = usada ? 'Tile ' + numeroDaPeca(t.id) + ' is already in this room (side A or B)' : noutra ? 'Tile ' + numeroDaPeca(t.id) + ' is in another room: reusing it here needs that room removed first' : t.w + '×' + t.h;
       dv.innerHTML = `<img loading="lazy" decoding="async" ${imgTardia(miniatura(t))} alt=""><div>${t.id.toUpperCase()} <small>${t.w}×${t.h}${t.act === 2 ? ' · II' : ''}</small></div>`;
-      dv.onclick = () => { if (usada && typeof Tutorial !== 'undefined' && Tutorial.ativo() && Tutorial.explicar('pecas-mesma-sala')) return; if (usada) aviso('Tile ' + numeroDaPeca(t.id) + ' is already in this room: laid again, it can only mark where that tile moves to (“Move the tile”).'); pecaEscolhida = t.id; renderPaleta(); }; g.appendChild(dv);
+      dv.onclick = () => { if (usada && typeof Tutorial !== 'undefined' && Tutorial.ativo()) aviso('Tile ' + numeroDaPeca(t.id) + ' is already in this room.'); else if (usada) aviso('Tile ' + numeroDaPeca(t.id) + ' is already in this room: laid again, it can only mark where that tile moves to (“Move the tile”).'); pecaEscolhida = t.id; renderPaleta(); }; g.appendChild(dv);
     });
     const vs = oficina().pecas.filter(v => !v.underlay); if (vs.length) { const st = document.createElement('div'); st.className = 'subtitulo'; st.textContent = 'Workshop tiles (made in the Workshop)'; g.after(st); const gv = document.createElement('div'); gv.className = 'grade'; st.after(gv);
       aosPoucos(gv, vs, v => { const t = defPeca(v.id); if (!t) return; const dv = document.createElement('div'); dv.className = 'item' + (v.id === pecaEscolhida ? ' ativo' : '');

@@ -307,7 +307,7 @@ function montarDmapDe(p) {
           acoes.push({ id: 'setVar', params: { var: 'teste-' + idx, value: nTeste } }, { id: 'setVar', params: { var: 'escolha-' + idx, value: 0 } });
           acoes.push({ id: 'showChallenge', params: { text: g.text || '', successes: g.successes || 2, secret: !!g.secret, cumulative: !!g.cumulativo, id: g.uid, difficulty: ({ 1: 'easy', 2: 'standard', 3: 'hard' })[g.successes || 2] || 'extreme' } });
           // a cumulative test right on an object that can be used every time: the success spends the object
-          const gasta = g.cumulativo && o.usos === 'always' && (o.gatilhos || []).includes(g) && !o.enemy;
+          const gasta = (g.cumulativo || g.gastaNoSucesso) && o.usos === 'always' && (o.gatilhos || []).includes(g) && !o.enemy;
           const ok = comExtra(o, 'ok:' + g.uid, [...(noSucesso.get(g.uid) || []), ...(gasta ? [{ id: 'spendObject', params: { interactable: idx } }] : []), ...(g.ok ? [{ id: 'showMessage', params: { text: g.ok } }] : []), ...acoesDe(s, si, o, 'ok:' + g.uid, extras)]);
           const fail = comExtra(o, 'fail:' + g.uid, [...(g.fail ? [{ id: 'showMessage', params: { text: g.fail } }] : []), ...acoesDe(s, si, o, 'fail:' + g.uid, extras)]);
           if (ok.length) extras.push({ id: 'ok-' + g.uid, name: 'Success: ' + rotulo(o), once: false, event: { id: 'choiceMade', params: { interactable: idx, option: 0 } }, conditions: [{ id: 'varEquals', params: { var: 'ultimoDesafio', value: 1 } }, qual], actions: ok });
@@ -407,7 +407,7 @@ function montarDmapDe(p) {
       case 'object_used': { const alvo = p.salas[r.sala]?.objetos[r.objeto]; return alvo ? { id: 'varEquals', params: { var: 'used-' + indiceDe.get(alvo), value: 1 } } : null; }
       case 'choice': return !r.nome ? null : r.op ? { id: 'campaignCond', params: { cond: { ...condExportada(r), starts: iniciosDasVariaveis() } } } : { id: 'campaignVar', params: { var: varEscolha(r.nome), value: r.sim === false ? 0 : 1 } };
       case 'gold': return { id: 'goldAtLeast', params: { amount: r.amount || 1 } };
-      case 'counter': return r.contador ? { id: 'varAbove', params: { var: varDoContador(r.contador), value: (r.meta || 3) - 1 } } : null;
+      case 'counter': return !r.contador ? null : r.op === 'gt' ? (r.outro ? { id: 'varAboveVar', params: { var: varDoContador(r.contador), other: varDoContador(r.outro) } } : null) : { id: 'varAbove', params: { var: varDoContador(r.contador), value: (r.meta || 3) - 1 } };
       default: return null;
     }
   }).filter(Boolean);

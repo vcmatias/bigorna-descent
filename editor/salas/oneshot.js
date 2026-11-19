@@ -78,7 +78,7 @@ const BigornaGerador = {
         const dmap = montarDmap(projeto);
         // (v261: the act of the party: the saved party's (p.atoGrupo, from the mod), else the act the map asks for)
         const simulacao = (nHerois ? [nHerois] : [2, 3, 4]).map(H => { const R = simularMapa(r.projeto, { herois: H, ...(atoGrupo ? { ato: atoGrupo } : {}) }); const a = avaliarFacil(r.projeto, R, H);
-          return { herois: H, vida: Math.round(R.vidaMax / H), venceu: !!R.venceu, rodadas: R.rodadas || 0, limite: R.limite || 0, perda: a.perda, vidaMin: a.vidaMin, monstros: R.monstros || 0, itens: R.itens || 0,
+          return { herois: H, vida: Math.round(R.vidaMax / H), venceu: !!R.venceu, rodadas: R.rodadas || 0, limite: R.limite || 0, perda: a.perda, vidaMin: a.vidaMin, perdaH: R.perdaPorHeroi || [], vidaMinH: R.vidaMinPorHeroi || [], monstros: R.monstros || 0, itens: R.itens || 0,
             achados: (a.problemas || []).map(x => OUTRA_LINGUA ? TRADZ(String(x).split(':')[0]) : tr(String(x).split(':')[0])) }; });
         return { aviso, semente: inteira(sem), duracao, dificuldade: dif, perigo: per, ajuste: aj, atos, nome: projeto.meta.name || '', dmap: JSON.stringify(comFicha(dmap)), simulacao };   // (v264: with the card at the head, as exported)
       };

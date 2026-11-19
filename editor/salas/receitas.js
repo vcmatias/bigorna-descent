@@ -106,7 +106,7 @@ function fichaReceita(c, r) {
   const mats = MATERIAIS_RECEITA();
   const orig = !!r.base, rj = orig ? receitaDoJogo(r.base) : null;
   const mudado = orig && !!rj && JSON.stringify([r.item, r.valor || 0, (r.custos || []).map(x => [x.mat, x.qtd])]) !== JSON.stringify([rj.item, rj.valor || 0, (rj.custos || []).map(x => [x.mat, x.qtd])]);
-  c.innerHTML = `<div class="cabF"><h2>${esc(nomeReceita(r))} ${etiquetaEstado(r)}</h2><div class="botoes">${orig ? `<button class="sm primario" id="fr_dup">⧉ ${esc(tr('Duplicate'))}</button>` : ''}${mudado ? `<button class="sm" id="fr_volta">↺ ${esc(tr('Back to the game’s'))}</button>` : ''}<button class="sm perigo" id="fr_apaga">Delete</button></div></div>
+  c.innerHTML = `<div class="cabF"><h2>${esc(nomeReceita(r))} ${etiquetaEstado(r)}</h2><div class="botoes"><button class="sm ${orig ? 'primario' : ''}" id="fr_dup">⧉ ${esc(tr('Duplicate'))}</button>${mudado ? `<button class="sm" id="fr_volta">↺ ${esc(tr('Back to the game’s'))}</button>` : ''}<button class="sm perigo" id="fr_apaga">Delete</button></div></div>
     ${orig ? avisoOficial(mudado ? 'An older version of the editor changed this original. To undo it, use “↺ Back to the game’s”.' : '', 'Whether the party knows it from the start may change here.') : ''}
     <div class="folha"><div class="col">
       <div class="retrato"><div class="quadro">${a && a.img ? `<img loading="lazy" decoding="async" ${imgTardia(a.img)} alt="">` : '<span>no item</span>'}</div><div>
@@ -140,10 +140,10 @@ function fichaReceita(c, r) {
   $('#fr_valor').oninput = e => { r.valor = Math.max(0, +e.target.value || 0); mudou(); };
   $('#fr_inicio').onchange = e => { r.inicio = e.target.checked; renderReceitas(); };
   $('#fr_apaga').onclick = () => { if (!confirm('Delete ' + nomeReceita(r) + '?')) return; oficina().receitas = oficina().receitas.filter(x => x !== r); esquecerFicha('itens', 'RECEITA:' + r.id); fichaSel = null; renderReceitas(); };
+  // (a copy of a recipe, of the game or one's own: a new recipe of the workshop, same item and costs, to change)
+  $('#fr_dup').onclick = () => { const d = clone(r); d.id = 'B_' + uid(); d.base = null; d.custom = true; oficina().receitas.push(d); fichaSel = d.id; renderReceitas(); aviso(tr('Duplicated: this one is yours to change.')); };
   if (!orig) return;
   travarOficial(c, '#fr_inicio');
-  // (a copy of a recipe: a new recipe of the workshop, same item and costs, to change)
-  $('#fr_dup').onclick = () => { const d = clone(r); d.id = 'B_' + uid(); d.base = null; d.custom = true; oficina().receitas.push(d); fichaSel = d.id; renderReceitas(); aviso(tr('Duplicated: this one is yours to change.')); };
   const vj = $('#fr_volta'); if (vj) vj.onclick = () => { r.item = rj.item; r.valor = rj.valor; r.custos = clone(rj.custos); renderReceitas(); };
 }
 /* the recipe of the game as the workshop would import it (to compare and to undo) */

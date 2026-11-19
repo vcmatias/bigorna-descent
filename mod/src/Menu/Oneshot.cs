@@ -29,6 +29,7 @@ namespace Bigorna.Menu
         public class Simulacao
         {
             public int Herois, Vida, Rodadas, Limite, Perda, VidaMin, Monstros, Itens; public bool Venceu;
+            public List<int> PerdaH = new List<int>(), VidaMinH = new List<int>();   // (v380: os pontos de vida de cada herói)
             public List<string> Achados = new List<string>();
         }
         public class Resultado
@@ -217,6 +218,7 @@ namespace Bigorna.Menu
                             foreach (var s in (o["simulacao"] as JArray) ?? new JArray())
                                 r.Simulacao.Add(new Simulacao { Herois = (int?)s["herois"] ?? 0, Vida = (int?)s["vida"] ?? 8, Venceu = (bool?)s["venceu"] ?? false, Rodadas = (int?)s["rodadas"] ?? 0, Limite = (int?)s["limite"] ?? 0,
                                     Perda = (int?)s["perda"] ?? 0, VidaMin = (int?)s["vidaMin"] ?? 0, Monstros = (int?)s["monstros"] ?? 0, Itens = (int?)s["itens"] ?? 0,
+                                    PerdaH = ((s["perdaH"] as JArray) ?? new JArray()).Select(x => (int)x).ToList(), VidaMinH = ((s["vidaMinH"] as JArray) ?? new JArray()).Select(x => (int)x).ToList(),
                                     Achados = ((s["achados"] as JArray) ?? new JArray()).Select(x => (string)x).Where(x => !string.IsNullOrEmpty(x)).ToList() });
                         }
                     }
@@ -351,12 +353,13 @@ namespace Bigorna.Menu
               .Append("<pos=75%>").Append(T("Monstros", "Monsters")).Append("<pos=89%>").Append(T("Itens", "Items")).Append("</b>\n");
             foreach (var s in r.Simulacao)
                 sb.Append(s.Herois).Append("<pos=13%>").Append(s.Venceu ? T("sim", "yes") : T("não", "no")).Append("<pos=26%>").Append(s.Rodadas).Append(s.Limite > 0 ? " / " + s.Limite : "")
-                  .Append("<pos=40%>").Append(s.Perda).Append("%<pos=58%>").Append(s.VidaMin).Append("%<pos=75%>").Append(s.Monstros).Append("<pos=89%>").Append(s.Itens).Append("\n");
+                  .Append("<pos=40%>").Append(s.PerdaH.Count > 0 ? string.Join("/", s.PerdaH.Select(x => x.ToString()).ToArray()) : s.Perda + "%")
+                  .Append("<pos=58%>").Append(s.VidaMinH.Count > 0 ? string.Join("/", s.VidaMinH.Select(x => x.ToString()).ToArray()) : s.VidaMin + "%").Append("<pos=75%>").Append(s.Monstros).Append("<pos=89%>").Append(s.Itens).Append("\n");
             var achados = r.Simulacao.Where(s => s.Achados.Count > 0).Select(s => s.Herois + T(" heróis: ", " heroes: ") + string.Join(", ", s.Achados.ToArray())).ToList();
             if (achados.Count > 0) sb.Append("<size=80%><i>").Append(string.Join(" · ", achados.ToArray())).Append("</i></size>\n");
             // (v261: a vida de cada heroi e a do ato: 8 no Ato I, 11 no Ato II)
             sb.Append("<size=75%>").Append(TF("Um grupo simples joga o mapa pelas regras fáceis (2 sucessos por teste, 2 ações por herói, sem armas nem habilidades especiais, {0} de vida cada), como na simulação do editor.",
-                "A plain party plays the map by the easy rules (2 successes per test, 2 actions per hero, no special weapons nor abilities, {0} health each), as in the editor's simulation.", r.Simulacao[0].Vida > 0 ? r.Simulacao[0].Vida : 8)).Append("</size>");
+                "A plain party plays the map by the easy rules (2 successes per test, 2 actions per hero, no special weapons nor abilities, {0} health each), as in the editor's simulation.", r.Simulacao[0].Vida > 0 ? r.Simulacao[0].Vida : 8)).Append(" ").Append(T("Vida perdida e menor vida: os pontos de vida de cada herói.", "Health lost and lowest health: the health points of each hero.")).Append("</size>");
             return sb.ToString();
         }
     }

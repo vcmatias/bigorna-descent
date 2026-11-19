@@ -393,6 +393,7 @@ function camposGatilho(el, s, oi, g, lista) {
     case 'objective': html = campo('Objective text', `<input data-k="text" value="${esc(g.text || '')}" placeholder="As shown in the game">`); break;
   }
   el.innerHTML = html;
+  ligarSeletorContador(el, g, () => { renderPropriedades(); renderConferencia(); });
   el.querySelectorAll('[data-k]').forEach(inp => {
     const k = inp.dataset.k;
     const h = () => {
@@ -496,13 +497,15 @@ function renderRequisitos(el, s, oi, g) {
     if (r.tipo === 'item') campos = ITENS_B().length || r.item ? `<select data-k="item"><option value="">— pick —</option>${opcoesItens(r.item)}</select>` : `<p class="ajuda">The workshop has no items yet. <button class="sm" data-oficina="itens">Open the Workshop</button></p>`;
     else if (r.tipo === 'mission') { const ms = missoesInternas(); campos = ms.length ? `<select data-k="uid">${ms.map(x => `<option value="${x.uid}" ${r.uid === x.uid ? 'selected' : ''}>${esc(x.nome)}${ondeMissao(x)}</option>`).join('')}</select>` : '<span class="ajuda">no “Add an objective” trigger exists yet</span>'; if (ms.length && r.uid === undefined) r.uid = ms[0].uid; }
     else if (r.tipo === 'room_open' || r.tipo === 'enemies_defeated') campos = `<select data-k="sala">${projeto.salas.map((x, i) => `<option value="${i}" ${r.sala === i ? 'selected' : ''}>${i + 1} · ${esc(x.nome)}</option>`).join('')}</select>`;
-    else if (r.tipo === 'counter') campos = `<input data-k="contador" list="dl_contadores" value="${esc(r.contador || '')}" placeholder="Keys" style="width:140px"> reaches <input data-k="meta" type="number" min="1" value="${r.meta || 3}" style="width:64px">${listaContadores()}`;
+    else if (r.tipo === 'counter') campos = `${seletorContador(r.contador, 'width:140px')} <select data-k="op" data-rerender="1"><option value="">${esc(tr('reaches'))}</option><option value="gt" ${r.op === 'gt' ? 'selected' : ''}>${esc(tr('is more than'))}</option></select> `
+      + (r.op === 'gt' ? `<select data-k="outro"><option value="">${esc(tr('— pick —'))}</option>${[...new Set([...contadoresDoMapa().filter(x => x !== r.contador), ...(r.outro ? [r.outro] : [])])].map(v => `<option value="${esc(v)}" ${r.outro === v ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>` : `<input data-k="meta" type="number" min="1" value="${r.meta || 3}" style="width:64px">`) + listaContadores();
     else if (r.tipo === 'choice') campos = campanha ? htmlCondicao(r.nome ? r : null, 'rq_' + (g.uid || 'g') + '_' + ri, 'Only if', true) + `<p class="ajuda">${esc(tr('Played on its own, out of the campaign, the map counts every variable as at the start of the campaign.'))}</p>` : `<span class="ajuda">Only in a campaign: start one (top bar) and remember answers in its scenes.</span>`;
     else if (r.tipo === 'gold') campos = `at least <input data-k="amount" type="number" min="1" value="${r.amount || 30}" style="width:70px"> gold`;
     else if (r.tipo === 'object_used') campos = `<b>${projeto.salas[r.sala]?.objetos[r.objeto] ? esc(rotulo(projeto.salas[r.sala].objetos[r.objeto])) : 'none yet'}</b> <button class="sm" data-clique>Click the object</button>`;
     d.innerHTML = `<div class="cab"><b>${esc(TIPOS_REQUISITO.find(t => t.id === r.tipo)?.nome || r.tipo)}</b><button class="sm" data-x title="Remove">✕</button></div><div class="corpo">${campos}</div>`;
+    ligarSeletorContador(d, r, () => { renderRequisitos(el, s, oi, g); renderConferencia(); });
     d.querySelector('[data-x]').onclick = () => { o.requisitos.splice(ri, 1); if (!o.requisitos.length) { const dono = donoDe(s, oi); if (dono && !(dono['senao:' + g.uid] || []).length) delete dono['senao:' + g.uid]; } tudo(); };
-    d.querySelectorAll('[data-k]').forEach(inp => inp.onchange = () => { r[inp.dataset.k] = inp.dataset.k === 'sala' || inp.type === 'number' ? +inp.value : inp.value.trim(); renderConferencia(); });
+    d.querySelectorAll('[data-k]').forEach(inp => inp.onchange = () => { r[inp.dataset.k] = inp.dataset.k === 'sala' || inp.type === 'number' ? +inp.value : inp.value.trim(); if (inp.dataset.rerender) { if (!r.op) delete r.op; renderRequisitos(el, s, oi, g); } renderConferencia(); });
     if (r.tipo === 'choice' && campanha) ligarCondicao(d, 'rq_' + (g.uid || 'g') + '_' + ri, () => r.nome ? r : null, c => { const cc = c && JSON.parse(JSON.stringify(c)); ['nome', 'sim', 'op', 'n', 'outra', 'entre'].forEach(k => delete r[k]); if (cc) Object.assign(r, cc, { tipo: 'choice' }); }, leve => { renderConferencia(); if (!leve) renderPropriedades(); });
     const of = d.querySelector('[data-oficina]'); if (of) of.onclick = () => abrirFichas(of.dataset.oficina);
     const cl = d.querySelector('[data-clique]'); if (cl) cl.onclick = () => pedirClique({ modo: 'object', g, si: sel.sala, texto: 'Click the object that must be used first.', cb: (x, y, q) => { if (!q || q.tipo !== 'objeto') return aviso('Click an object.'), false; r.sala = q.sala; r.objeto = q.i; return true; } });
@@ -608,7 +611,8 @@ function pecaReutilizada(num, si) {
 function avisarReuso(reuso, si, por) {
   // (in the tutorial, the first time: why a tile laid again asks this, then the window with its buttons explained)
   const tut = typeof Tutorial !== 'undefined' && Tutorial.ativo();
-  if (tut && Tutorial.explicar('pecas-reuso', () => avisarReuso(reuso, si, por))) return;
+  // (in the tutorial: only the warning that the tile is already placed, without the options to remove it)
+  if (tut) return aviso('Tile ' + numeroDaPeca(projeto.salas[reuso.sala].pecas[reuso.peca].tile) + ' is already in room ' + (reuso.sala + 1));
   const nota = t => tut ? `<small class="tutNota">🎓 ${esc(tr(t))}</small>` : '';
   const abre = abridoresDe(si);
   const dona = projeto.salas[reuso.sala]; const p = dona.pecas[reuso.peca];
@@ -675,12 +679,12 @@ function usosDoContador(nome) {
       else if (g.tipo === 'counter' && g.contador === nome) r.push({ si, chave, o, muda: true, g, texto: (g.acao === 'sub' ? '− ' : g.acao === 'set' ? '= ' : '+ ') + (g.n ?? 1) });
       if (g.tipo === 'mission' && g.como === 'counter' && g.contador === nome) r.push({ si, chave, o, espera: true, g, texto: 'objective at ' + (g.meta || 3) });
     });
-    [o, ...todosGatilhos(o)].flatMap(x => x.requisitos || []).forEach(q => { if (q.tipo === 'counter' && q.contador === nome) r.push({ si, chave, o, requer: true, q, texto: 'requires ' + (q.meta || 3) }); });
+    [o, ...todosGatilhos(o)].flatMap(x => x.requisitos || []).forEach(q => { if (q.tipo === 'counter' && q.op === 'gt' && (q.contador === nome || q.outro === nome)) r.push({ si, chave, o, compara: true, texto: 'requires ' + (q.contador || '?') + ' > ' + (q.outro || '?') }); else if (q.tipo === 'counter' && q.contador === nome) r.push({ si, chave, o, requer: true, q, texto: 'requires ' + (q.meta || 3) }); });
   });
   return r;
 }
 function renomearContador(velho, novo) {
-  projeto.salas.flatMap(s => donosDaSala(s)).concat(donosContadores()).forEach(({ o }) => { todosGatilhos(o).forEach(g => { if ((g.tipo === 'counter' || g.tipo === 'mission') && g.contador === velho) g.contador = novo; }); [o, ...todosGatilhos(o)].flatMap(x => x.requisitos || []).forEach(q => { if (q.tipo === 'counter' && q.contador === velho) q.contador = novo; }); });
+  projeto.salas.flatMap(s => donosDaSala(s)).concat(donosContadores()).forEach(({ o }) => { todosGatilhos(o).forEach(g => { if ((g.tipo === 'counter' || g.tipo === 'mission') && g.contador === velho) g.contador = novo; }); [o, ...todosGatilhos(o)].flatMap(x => x.requisitos || []).forEach(q => { if (q.tipo === 'counter' && q.contador === velho) q.contador = novo; if (q.tipo === 'counter' && q.outro === velho) q.outro = novo; }); });
   const c = (projeto.contadores || []).find(x => x.nome === velho); if (c) c.nome = novo;
 }
 function irParaDono(si, chave) {
@@ -743,7 +747,7 @@ function abrirContadores() {
   contadoresDoMapa().forEach(n => { if (!projeto.contadores.some(c => c.nome === n)) novoContador(n); });
   projeto.contadores = projeto.contadores.filter(c => c.nome).sort((a, b) => a.nome.localeCompare(b.nome));
   const chip = u => `<button class="sm usoCont" data-si="${u.si}" data-ch="${esc(String(u.chave))}" title="${u.si >= 0 ? 'Room ' + (u.si + 1) + ' · ' + esc(projeto.salas[u.si].nome) + ': select it' : 'Open this counter'}">${esc(rotulo(u.o))} <small>${esc(u.texto)}</small></button>`;
-  const linhas = projeto.contadores.map((c, i) => { const us = usosDoContador(c.nome); const muda = us.filter(u => u.muda), missoes = us.filter(u => u.espera), requer = us.filter(u => u.requer);
+  const linhas = projeto.contadores.map((c, i) => { const us = usosDoContador(c.nome); const muda = us.filter(u => u.muda), missoes = us.filter(u => u.espera), requer = us.filter(u => u.requer || u.compara);
     return `<div class="contador" data-c="${i}"><div class="linha"><input data-cn="${i}" value="${esc(c.nome)}" title="Rename: every trigger and requirement that uses it follows"><label class="campo" style="margin:0" title="${esc(tr('The count never goes above this number. Empty: no limit. It always starts at 0.'))}">${esc(tr('Limit'))} <input data-cl="${i}" type="number" min="0" value="${limiteDoContador(c) || ''}" placeholder="${esc(tr('none'))}" style="width:64px"></label><button class="sm" data-cx="${i}" title="${us.length ? 'Used by ' + us.length + ' trigger(s) or requirement(s): they lose the counter' : 'Delete'}">✕</button></div>
       <div class="linha contaLinha"><label class="campo" style="margin:0;flex:0 0 auto" title="Triggers: only the “Add / subtract / use a count” triggers change it. Monsters defeated or rounds passed: it also adds 1 by itself">Counts <select data-cc2="${i}">${Object.entries(CONTA_CONTADOR).map(([k, t]) => `<option value="${k}" ${(c.conta || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>${c.conta === 'monstros' ? botaoMonstroDoContador(c, i) : ''}</div>
       <div class="usos"><span class="rotuloTx">Changed by</span> ${c.conta ? `<span class="ajuda contaAuto">${esc(textoContaAuto(c))}</span>` : ''}${muda.map(chip).join('') || (c.conta ? '' : '<span class="ajuda">nothing yet: give an object (or a monster) an “Add / subtract / use a count” trigger, or make it count monsters defeated or rounds passed</span>')}</div>
@@ -805,10 +809,21 @@ function previaContador(g) {
   const chip = (t, dica) => `<span class="vagaTx" title="${esc(dica)}">${esc(t)}</span>`;
   return '<div class="rotuloTx">In the app:</div>' + esc(g.texto).replace(/\[count\]/gi, `<b class="termoTx">${esc(g.contador || '?')}</b>`).replace(/\[n\]|\{n\}/gi, chip('n', VAGAS_CONTADOR.n)).replace(/\[total\]/gi, chip(String(totalDoContador(g.contador)), VAGAS_CONTADOR.total));
 }
+/* v380: the counter of a trigger or requirement: the list of the map's counters, then «+ New counter», which turns the list into
+   a box to write the name of the new one (Enter or a click outside makes it; Esc gives it up) */
+const seletorContador = (atual, estilo) => { const l = [...new Set([...contadoresDoMapa(), ...(atual ? [atual] : [])])];
+  return `<select data-contsel ${estilo ? `style="${estilo}"` : ''}><option value="">${esc(tr('— pick —'))}</option>${l.map(c => `<option value="${esc(c)}" ${c === atual ? 'selected' : ''}>${esc(c)}</option>`).join('')}<option value="__novo">${esc(tr('+ New counter'))}</option></select>`; };
+function ligarSeletorContador(el, alvo, depois) {
+  el.querySelectorAll('[data-contsel]').forEach(sl => sl.onchange = () => {
+    if (sl.value !== '__novo') { alvo.contador = sl.value; return depois(); }
+    const i = document.createElement('input'); i.placeholder = tr('New counter (Keys, Levers, Seals…)'); i.style.cssText = sl.style.cssText; sl.replaceWith(i); i.focus();
+    let feito = false; const fim = () => { if (feito) return; feito = true; const n = i.value.trim(); if (n) { if (!(projeto.contadores || []).some(x => x.nome === n)) novoContador(n); alvo.contador = n; } depois(); };
+    i.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') fim(); else if (e.key === 'Escape') { i.value = ''; fim(); } }; i.onblur = fim; });
+}
 const listaContadores = () => `<datalist id="dl_contadores">${contadoresDoMapa().map(c => `<option value="${esc(c)}">`).join('')}</datalist>`;
 const varDoContador = nome => 'cont-' + slug(nome || 'counter');
 function camposContador(g, uso) {
-  const nome = `<label class="campo">Counter <input data-k="contador" list="dl_contadores" value="${esc(g.contador || '')}" placeholder="Keys"></label>${listaContadores()}`;
+  const nome = `<label class="campo">Counter ${seletorContador(g.contador)}</label>`;
   if (uso === 'meta') return nome + `<label class="campo">Completed when it reaches <input data-k="meta" type="number" min="1" value="${g.meta || 3}" style="width:70px"></label><p class="ajuda">Give each object that counts (each key, each lever) an “Add / subtract / use a count” trigger with this counter. The mission ends by itself when the number is reached.</p>`;
   const acao = `<label class="campo">Action <select data-k="acao"><option value="add" ${!g.acao || g.acao === 'add' ? 'selected' : ''}>Add</option><option value="sub" ${g.acao === 'sub' ? 'selected' : ''}>Take away</option><option value="set" ${g.acao === 'set' ? 'selected' : ''}>Set to</option><option value="use" ${g.acao === 'use' ? 'selected' : ''}>Use: when it reaches</option></select></label>`;
   if (g.acao === 'use') { const n = Math.max(1, +g.n || 1);

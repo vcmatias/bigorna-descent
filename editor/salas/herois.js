@@ -171,7 +171,7 @@ function fichaHeroi(c, hj, novo) {
       <p class="ajuda">The hero takes the place of a game hero. It gets the class, the two weapons, the skills and the feats of that profile, and its place in the hero choice. A hero already there goes back to the roster.</p>` : '';
   // (a hero of the game only reads: name, voice and weapons as in the game; the pictures and who plays its profile stay open)
   const oficialMudou = !novo && !!(h.nome || h.voz || (oficina().maos || []).some(x => x && x.id === hj.id));
-  c.innerHTML = `<div class="cabF"><h2>${esc(h.nome || nomeJogo)} <span class="etq ${heroiMudou(h) ? 'custom' : ''}">${esc(etq)}</span></h2><div class="botoes">${novo ? '<button class="sm perigo" id="fh_apagar">Delete hero</button>' : `<button class="sm primario" id="fh_dup">⧉ ${esc(tr('Duplicate'))}</button>` + (heroiMudou(h) ? '<button class="sm" id="fh_volta">↺ Back to the game’s hero</button>' : '')}</div></div>
+  c.innerHTML = `<div class="cabF"><h2>${esc(h.nome || nomeJogo)} <span class="etq ${heroiMudou(h) ? 'custom' : ''}">${esc(etq)}</span></h2><div class="botoes">${novo ? `<button class="sm" id="fh_dupNovo">⧉ ${esc(tr('Duplicate'))}</button><button class="sm perigo" id="fh_apagar">Delete hero</button>` : `<button class="sm primario" id="fh_dup">⧉ ${esc(tr('Duplicate'))}</button>` + (heroiMudou(h) ? '<button class="sm" id="fh_volta">↺ Back to the game’s hero</button>' : '')}</div></div>
     ${novo ? '' : avisoOficial(oficialMudou ? 'An older version of the editor changed this hero. To undo it, use “↺ Back to the game’s hero”.' : '', 'Here you can change who plays this hero’s profile. A duplicate is a hero of the roster with pictures of its own: you can put it in a profile.')}
     <div class="folha"><div class="col">
       <label class="campo">Name <input id="fh_nome" value="${esc(novo ? (novo.nome || '') : (h.nome || ''))}" placeholder="${esc(nomeJogo)}"></label>
@@ -230,6 +230,9 @@ function fichaHeroi(c, hj, novo) {
   c.querySelectorAll('[data-irarma]').forEach(b => b.onclick = () => { abaF = 'armas'; armaSel = b.dataset.irarma; pecaAberta = null; renderFichas(); });
   c.querySelectorAll('[data-rolp]').forEach(b => b.onclick = () => abrirProezas(hj.id, b.dataset.rolp || null));
   c.querySelectorAll('[data-rolk]').forEach(b => b.onclick = () => { const p = b.dataset.rolk ? periciaDaChave(hj.id, b.dataset.rolk) : null; abrirPericias(hj.id, p ? p.id : null); });
+  // (v379: a copy of a hero of one's own, with all it has)
+  const dn = $('#fh_dupNovo'); if (dn) dn.onclick = () => { const nome = nomeDaCopia(novo.nome || tr('New hero'), HEROIS_JOGO.map(x => nomeDoHeroi(x.id)).concat(heroisNovos().map(x => x.nome))); if (!nome) return;
+    const d = clone(novo); d.id = 'HN_' + uid(); d.nome = nome; oficina().herois.push(d); heroiSel = d.id; renderHerois(); aviso(tr('Duplicated: this one is yours to change.')); };
   if (novo) return;
   travarOficial(c, '#fh_quem, [data-irarma], #fh_maosJogo, .rolProezas, .rolPericias');
   // (the duplicate: a hero of the roster with this one's name, pictures and voice; it gets a profile on its sheet)

@@ -451,9 +451,8 @@ tela.addEventListener('mousemove', ev => {
 let _ultimoSobMouse = '', _desenhoPedido = false;
 tela.addEventListener('mouseleave', () => { cursor = null; cruz = null; desenhar(); });
 tela.addEventListener('contextmenu', ev => ev.preventDefault());
-// a double click on something of another room makes that room the active one (and picks what was clicked); also with a tool
-// in hand (its first click does nothing outside the active room) and from another level: the level goes to that of the tile
-// clicked, when nothing of the room stands at the level on screen
+// a double click on another room makes it the active one, at the level where it stands (nothing is picked); also with a tool
+// in hand (its first click does nothing outside the active room) and from another level
 tela.addEventListener('dblclick', ev => {
   if (vista3d.on || escolha) return;
   const [x, y] = paraCasa(ev); const fora = oQueHa(x, y, true);
@@ -461,9 +460,14 @@ tela.addEventListener('dblclick', ev => {
   const alvo = fora ? fora.sala : projeto.salas.findIndex(s => naCasa(s).length);
   if (alvo == null || alvo < 0 || alvo === salaAtual) return;
   salaAtual = alvo; sel = null; gatAberto = -1; arrasto = null; movendo = null;
+  // (v379: only the room is opened, at the level where it stands: the tile under the click, or else the thing clicked, or else
+  // the room's lowest tile; nothing gets selected)
   let mudouNivel = false;
-  if (!fora) { const q = naCasa(projeto.salas[alvo]).filter(q => !ehAlfombra(q.tile)).sort((a, b) => (b.level || 0) - (a.level || 0))[0]; if (q && (q.level || 0) !== nivel) { nivel = q.level || 0; mudouNivel = true; } }
-  const cands = candidatosEm(x, y, false); if (cands.length) sel = cands.find(c => c.tipo !== 'peca') || cands[0];
+  const s2 = projeto.salas[alvo]; const sob = naCasa(s2).filter(q => !ehAlfombra(q.tile)).sort((a, b) => (b.level || 0) - (a.level || 0))[0];
+  const objFora = fora && fora.tipo === 'objeto' ? s2.objetos[fora.i] : null;
+  const chaoSala = s2.pecas.filter(q => !ehAlfombra(q.tile)).map(q => q.level || 0);
+  const lv = sob ? sob.level || 0 : objFora ? objFora.level || 0 : chaoSala.length ? Math.min(...chaoSala) : nivel;
+  if (lv !== nivel) { nivel = lv; mudouNivel = true; }
   tudo(); aviso('Room ' + (alvo + 1) + (projeto.salas[alvo].nome ? ' (' + projeto.salas[alvo].nome + ')' : '') + ' is now the active room' + (mudouNivel ? ' (level ' + nivel + ')' : '') + '.');
 });
 tela.addEventListener('mousedown', ev => {
@@ -509,7 +513,8 @@ tela.addEventListener('mousedown', ev => {
     const p = { tile: pecaEscolhida, pos: [x, y], rot, level: alfombra ? 0 : nivel, pilares: [] }; if (ehEspecial(pecaEscolhida)) p.level = nivelEspecial(p);   // (a special tile takes the level of where it stands)
     if (alfombra && usoAlfombra(pecaEscolhida) >= caixaAlfombra(pecaEscolhida)) return aviso(VERSO_ALFOMBRA[pecaEscolhida] ? 'All ' + caixaAlfombra(pecaEscolhida) + ' ' + nomeAlfombra(pecaEscolhida) + ' / ' + nomeAlfombra(VERSO_ALFOMBRA[pecaEscolhida]) + ' cards are already on the map (the two faces share the same cards).' : 'All ' + caixaAlfombra(pecaEscolhida) + ' cop' + (caixaAlfombra(pecaEscolhida) > 1 ? 'ies' : 'y') + ' of ' + nomeAlfombra(pecaEscolhida) + ' are already on the map (change the copies in the Workshop).');
     if (alfombra && nivel > 0) return aviso('Underlays lie on the floor: pick level 0 on the ribbon.');
-    if (!alfombra && s.pecas.filter(q => numeroDaPeca(q.tile) === numeroDaPeca(p.tile)).length >= caixaDaPeca(numeroDaPeca(p.tile)) && typeof Tutorial !== 'undefined' && Tutorial.ativo() && Tutorial.explicar('pecas-mesma-sala')) return;   // (the tutorial explains it the first time)
+    // (in the tutorial, a tile laid again only warns that it is already there: no marker, no removal)
+    if (!alfombra && s.pecas.filter(q => numeroDaPeca(q.tile) === numeroDaPeca(p.tile)).length >= caixaDaPeca(numeroDaPeca(p.tile)) && typeof Tutorial !== 'undefined' && Tutorial.ativo()) return aviso('Tile ' + numeroDaPeca(p.tile) + ' is already in this room.');
     // the same tile again in this room: only as the marker of where it moves to ("Move a tile")
     // (v241: while the room has fewer than the copies owned, the tile is laid again; with all of them in the room, it moves)
     const naSala = alfombra ? 0 : s.pecas.filter((q, qi) => numeroDaPeca(q.tile) === numeroDaPeca(p.tile) && !ehMarca('peca', salaAtual, qi)).length;

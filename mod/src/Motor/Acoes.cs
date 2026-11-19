@@ -442,7 +442,9 @@ namespace Bigorna.Motor
                 case "showObject": Objetos.Mostrar(P.Inteiro(p, "interactable", -1), true); break;
                 case "hideObject": Objetos.Mostrar(P.Inteiro(p, "interactable", -1), false); break;
                 // o objeto fica na mesa, mas ja nao se usa (um teste cumulativo que enfim passou)
-                case "spendObject": { var po = Objetos.Pegar(P.Inteiro(p, "interactable", -1)); if (po != null) { po.Usado = true; Log.Info("  objeto «" + po.Rotulo + "» gasto"); } break; }
+                case "spendObject": { var po = Objetos.Pegar(P.Inteiro(p, "interactable", -1)); if (po != null) { po.Usado = true; Log.Info("  objeto «" + po.Rotulo + "» gasto");
+                        // (v382: a ficha de interação gasta sai da mesa, como no uso de uma vez; com texto de gasto ou da Oficina, fica)
+                        if (string.Equals(po.Dados?.Tipo, "InteractToken", StringComparison.OrdinalIgnoreCase) && string.IsNullOrEmpty(po.Dados?.TextoGasto) && string.IsNullOrEmpty(po.Dados?.Proprio)) Objetos.Mostrar(po, false, true); } break; }
                 case "startFire": { var ar = P.Area(p); Anotar(ar != null ? T("Fogo na área destacada", "Fire in the highlighted area") : T("Fogo na área indicada", "Fire in the indicated area"), ar != null ? TransformsDe(p).ToList() : null); if (ar != null) Log.Info("  fogo em " + ar[0] + "," + ar[1] + " a " + ar[2] + "," + ar[3]); break; }
                 case "highlightArea":
                 {

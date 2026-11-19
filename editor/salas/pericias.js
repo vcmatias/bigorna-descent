@@ -75,7 +75,7 @@ function fichaPericia(c, p) {
   const jogo = p.base ? periciaDoJogo(p.base) : null;
   const premiam = (oficina().facanhas || []).filter(f => (f.premios || f.premiosJogo || []).includes(idPericiaExportada(p)));
   const orig = !!p.base, mudado = orig && !!jogo && ((p.nome && p.nome !== (p.nomeJogo || jogo.name_en)) || (p.custo || 1) !== (jogo.XPCost || 1));
-  c.innerHTML = `<div class="cabF"><h2 data-sem-traducao>${esc(nomePericia(p))} ${etiquetaEstado(p)}</h2><div class="botoes">${orig ? `<button class="sm primario" id="fp_dup">⧉ ${esc(tr('Duplicate'))}</button>` : ''}${mudado ? `<button class="sm" id="fp_volta">↺ ${esc(tr('Back to the game’s'))}</button>` : ''}<button class="sm perigo" id="fp_apaga">Delete</button></div></div>
+  c.innerHTML = `<div class="cabF"><h2 data-sem-traducao>${esc(nomePericia(p))} ${etiquetaEstado(p)}</h2><div class="botoes"><button class="sm ${orig ? 'primario' : ''}" id="fp_dup">⧉ ${esc(tr('Duplicate'))}</button>${mudado ? `<button class="sm" id="fp_volta">↺ ${esc(tr('Back to the game’s'))}</button>` : ''}<button class="sm perigo" id="fp_apaga">Delete</button></div></div>
     ${orig ? avisoOficial(mudado ? 'An older version of the editor changed this original. To undo it, use “↺ Back to the game’s”.' : '', 'The pictures of its cards and your notes may change here.') : ''}
     <div class="folha"><div class="col">
       <label class="campo">Name <input id="fp_nome" value="${esc(p.nome || '')}" placeholder="${esc(jogo ? jogo.name_en : '')}"></label>
@@ -101,11 +101,12 @@ function fichaPericia(c, p) {
   $('#fp_cartas').onchange = async e => { const fs = [...e.target.files]; for (const f of fs) { try { p.cartas.push({ uid: uid(), img: await imagemDeCarta(f) }); } catch { aviso('A picture could not be read.'); } } renderPericias(); };
   c.querySelectorAll('[data-cdel]').forEach(b => b.onclick = () => { p.cartas.splice(+b.dataset.cdel, 1); renderPericias(); });
   c.querySelectorAll('[data-cesq]').forEach(b => b.onclick = () => { const i = +b.dataset.cesq; const [k] = p.cartas.splice(i, 1); p.cartas.splice(i - 1, 0, k); renderPericias(); });
-  if (!orig) return;
-  travarOficial(c, '.folha > .col:nth-child(2), #fp_notas, #fp_facanha');
+  // (v379: a copy of one's own skill too)
   $('#fp_dup').onclick = () => { const nome = nomeDaCopia(nomePericia(p), oficina().pericias.map(nomePericia).concat((CAT.habilidades || []).map(x => x.name_en))); if (!nome) return;
     const d = { id: 'pr' + uid(), heroi: p.heroi || (jogo ? HEROIS_IDS[jogo.Hero] : '') || '', nome, custo: p.custo || (jogo && jogo.XPCost) || 1, cartas: clone(p.cartas || []), notas: p.notas || '', custom: true };
     oficina().pericias.push(d); fichaSel = d.id; renderPericias(); aviso(tr('Duplicated: this one is yours to change.')); };
+  if (!orig) return;
+  travarOficial(c, '.folha > .col:nth-child(2), #fp_notas, #fp_facanha');
   const vj = $('#fp_volta'); if (vj) vj.onclick = () => { p.nome = jogo.name_en; p.nomeJogo = jogo.name_en; p.custo = jogo.XPCost || 1; renderPericias(); };
 }
 
